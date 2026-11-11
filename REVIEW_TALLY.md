@@ -361,6 +361,22 @@ has no redirect and no selectable choice; a return re-enters the call site at
     `first`, `last` and `return: true`; `entry_phase` is not authorable and
     `return_phase` is always PLANNING. (V)
 
+65. **A call frame outlives its callee (reproduced).** The stack changes in
+    two places only: pushed when an edge with `return_phase` is followed,
+    popped when the cursor has no redirect and no selectable choice. Nothing
+    checks that the cursor is still inside what was called. Experiment: hub
+    calls shop; the reader leaves shop by an ordinary choice and walks alley,
+    street, dead end. The frame stays on the stack for all three moves, and at
+    the dead end it pops and the reader is back at the hub. (V)
+66. **A no-choice interjection renders its sender twice (reproduced).** A
+    scene with a `last` call to a one-line block and two choices: one move
+    renders scene, the block, then scene again; the scene's `_visit_count` is
+    2 and it appears twice in the cursor history. (V)
+67. **`return_phase=None` already means "do not come back".** Such an edge is
+    a jump: nothing is pushed. So an interrupt that leaves for another scene
+    needs no stack. The hazard in finding 65 is the opposite case, a call
+    whose callee is allowed to leave. (V)
+
 ### Performance (measured 2026-11-10)
 
 Workload: a large downstream world, about 4,800 graph members, driven through
@@ -634,6 +650,27 @@ Today every return is a refresh at PLANNING and every termination is
   choice fragments when POSTREQS redirected (finding 62), so a plain resume
   would return to a node with no menu shown.
 
+Derek's two cases, 2026-11-11, and where they land:
+
+- **Interjection.** A concept in the scene (a companion) has a one-line block:
+  say something, note a mood, bump a "last spoke" counter, return at once so
+  the sender can list its choices. Today this is a call and costs a second
+  render of the sender (finding 66). It does not need the cursor to move. It
+  fits the journal fold: the concept contributes a fragment while the sender
+  is journaled and applies its small state change in FINALIZE. That is a
+  fan-in on the journal, and it matches "concepts nominate, a handler
+  decides". An authored block could still be the source, lowered to a
+  contribution.
+- **Interrupt.** A condition fires and pushes the reader to another scene. If
+  they come back it is a new visit: render again, and the redirect fails
+  because it is `once`. That is a jump (`return_phase` none) plus history, no
+  stack.
+
+So a third axis: **does the edge intend a return at all?** Jump, call, or
+contribution. And one rule to add for calls: a frame is tied to what it
+called, so leaving the callee by anything other than its return either
+discards the frame or is refused. Which of those is a design decision.
+
 This is documentation and a compiler table first. Frame changes follow only
 where the table shows two intents that need different behaviour.
 
@@ -740,6 +777,8 @@ Sizes are guesses.
 | 3i | Compose-journal feeds forward through the phase context (Derek's preference): a named, typed field for the batch so far, replaced each step so it holds the settled batch after culling; `ctx.results` stays the append-only history; drop the argument rewriting | simplify | S |
 | 3j | Write the "intrinsic contribution, extrinsic assembly" pattern and the phase-manager recipe idea into VM_DESIGN.md | docs | S |
 | 3o | Control-flow intent table in VM_DESIGN.md with one witness test per intent (P8) | docs, test | M |
+| 3q | Scope call frames to their callee: discard or refuse on leaving by another route (finding 65) | fix | S |
+| 3r | Interjections as journal contributions, not calls (finding 66) | feature | M |
 | 3p | Decide and implement: return at sink, resume versus refresh, one meaning of visited (P8) | design, fix | M |
 | 4 | One shared clear-and-project helper for menu, sandbox and game hubs | simplify | M |
 | 5 | Name fan-out results as bound dependencies; reserve `Affordance` for the source-open edge | rename | S |
