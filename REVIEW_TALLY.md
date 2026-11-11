@@ -120,6 +120,25 @@ imperative stance, "wanting to both have and eat cake."
   episodes when their conditions are met. They feel imperative only because
   they are created when needed, and because Python is imperative.
 
+Refinement (Derek): both formalisms are used only because episodes,
+traversable concepts, beg for the if-then form, while most concepts do not
+need to be ordered. The episode DAG mediates between the linear journal space
+and the non-linear story graph, which is itself one configuration of the
+ambient story space, the world of templates and rules. "Like using a graph to
+order data with a heapsort."
+
+| Level | What it is | Order |
+|---|---|---|
+| World | templates and rules | none |
+| Story graph | one grounded configuration | relations only |
+| Episode DAG | traversable concepts and their edges | partial |
+| Journal | what was told | total |
+
+Each level adds order. The imperative voice is needed exactly where order is,
+which is the episode DAG; everything else can stay declarative. Edge order
+(finding 61) is then the comparator that breaks ties, and deserves to be
+stated as such.
+
 What follows from it (mine, for discussion):
 
 - The two voices are two readings of one rule, from the state side or from the
