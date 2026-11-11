@@ -607,10 +607,23 @@ he often knows the consumers from earlier versions before they exist here.
     Twelve worlds are a `domain.py` with one or more `Block` subclasses and
     handlers, and a short script that wires them with `actions`, `continues`
     and `trigger`. (V)
-72. **`predicate` is the main routing key in the demos and "legacy" in the
-    engine.** Nine worlds route game outcomes with `predicate: game_won` and
-    the like on triggered edges. `TraversableEdge.predicate` is documented as
-    a legacy compatibility guard. One of the two is out of date. (V)
+72. **Three words for one idea, plus a second mechanism.** Derek writes
+    `conditions` and `effects`, from long habit; agents push `predicate` as
+    the more general logical term. In the code:
+    - the mixins are `HasAvailability` (field `availability`) and
+      `HasEffects` (field `effects`); there is no `HasConditions`;
+    - the value types are `Predicate` and `Effect`;
+    - the materializer accepts both `conditions` and `availability` in a
+      script and merges them into `availability`;
+    - separately, an edge has a singular `predicate` field: the name of a
+      namespace key that must be truthy. Nine worlds use it
+      (`predicate: game_won`), `HasGame` sets it on its outcome edges, and the
+      docstring calls it legacy.
+    `predicate: game_won` and `conditions: [game_won]` say the same thing. So
+    this is a compiler question, as Derek says: authors write conditions and
+    effects; the field is availability, which is the state those conditions
+    gate; `Predicate` is the type. The singular `predicate` field is the one
+    redundant piece. (V)
 73. **The push side has almost no demo-world witness.** No world script uses
     `return`, `once`, `effects`, `availability`, a fan-out, a menu,
     contributions, interactions, exits or dependencies. One uses
@@ -954,6 +967,13 @@ where the table shows two intents that need different behaviour.
 
 ### P9. One small witness world per new operator (new)
 
+Derek, 2026-11-11: much of what is missing here is recent work demanded by a
+downstream world's format, so it lacks a consumer in this repo. And the
+declarative side gets short shrift because agents helping with domain code
+find if/then easier than requirements and bindings. So these worlds are also
+the exemplars an agent copies from; without a declarative one in the repo,
+the next world will be imperative too.
+
 Follow the existing habit: each operator added in the overhaul gets a tiny
 world that is its integration test and its teaching example, with a README
 and a CLI witness. Candidates, each a few dozen lines of script and no custom
@@ -1078,7 +1098,7 @@ Sizes are guesses.
 | 3r | Interjections as journal contributions, not calls (finding 66) | feature | M |
 | 3p | Decide and implement: return at sink, resume versus refresh, one meaning of visited (P8) | design, fix | M |
 | 3t | Invariant test: planning the same node twice against unchanged state leaves the graph unchanged (ids and order). Expected to fail on hubs today; passes once items 3 and 4 land | test | S |
-| 3v | Decide `predicate`: current routing key or legacy; update the docstring or the nine worlds (finding 72) | cleanup | S |
+| 3v | Lower the singular `predicate:` key to a condition in the compiler and drop the edge field and its branch in `source_available`; state the vocabulary once (authors write `conditions` and `effects`) (finding 72) | cleanup | S |
 | 3w | Witness worlds for new operators as they land (P9) | demo | S each |
 | 4 | One shared clear-and-project helper for menu, sandbox and game hubs. It re-uses existing edges and assignments where they are still wanted and removes only the rest; this is what keeps resume valid on hubs | simplify | M |
 | 5 | Name fan-out results as bound dependencies; reserve `Affordance` for the source-open edge | rename | S |
