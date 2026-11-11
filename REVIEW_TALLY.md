@@ -139,6 +139,18 @@ which is the episode DAG; everything else can stay declarative. Edge order
 (finding 61) is then the comparator that breaks ties, and deserves to be
 stated as such.
 
+History (Derek): content fragments were originally leaf nodes hanging off the
+episodes that generated them, and a journal was produced from any group of
+episodes by a breadth-first walk, "exactly like reading out a heapsort."
+
+Where that stands now: fragments live in the ledger's output stream, not the
+graph, but each still carries `source_id` (the entity or edge that donated the
+content), `origin_id` (the producer) and a step, and `get_slice` filters the
+stream by step span and selector. So "a journal from any group of episodes" is
+still expressible as a query. Keeping fragments out of the graph is also what
+lets story state be compared without the journal (P5), and it is why the
+JOURNAL phase is expected not to change the graph (finding 53).
+
 What follows from it (mine, for discussion):
 
 - The two voices are two readings of one rule, from the state side or from the
