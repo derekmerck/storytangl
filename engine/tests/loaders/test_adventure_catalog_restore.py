@@ -20,6 +20,8 @@ def _process(root: Path, mode: str) -> None:
     # Configure these before importing the service or its settings.
     os.environ["TANGL_SERVICE__PATHS__CACHE_DATA"] = f"@path {root / 'cache'}"
     os.environ["TANGL_SERVICE__PATHS__STORY_MEDIA"] = f"@path {root / 'media'}"
+    import tangl
+    assert Path(tangl.__file__).resolve().is_relative_to(Path(__file__).resolve().parents[2] / "src")
     from tangl.core import Selector, Token
     from tangl.loaders.compilers import AssetCompiler
     from tangl.mechanics.sandbox import SandboxCompiledAssetType
@@ -76,9 +78,11 @@ def _process(root: Path, mode: str) -> None:
 
 
 def test_cold_service_restores_catalog_tokens(tmp_path: Path) -> None:
+    from pytest_helpers.subprocess_env import REPO_ROOT, checkout_env
+
     for mode in ("write", "read"):
         subprocess.run([sys.executable, __file__, mode, str(tmp_path)], check=True,
-                       env=os.environ.copy(), timeout=60)
+                       cwd=REPO_ROOT, env=checkout_env(), timeout=60)
 
 
 def test_saved_grotto_checkpoint_survives_restore_and_rollback(tmp_path: Path, monkeypatch) -> None:

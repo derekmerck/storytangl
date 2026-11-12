@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import json
+
+import pytest
+
+from tangl.devref.builder import build_index
+from tangl.devref.issues import ISSUE_CACHE_RELPATH
 from tangl.devref.query import build_context_pack, get_topic_map, search_topics
 
 
@@ -68,10 +74,33 @@ def test_get_topic_map_returns_related_topics_and_artifacts(devref_db_path) -> N
     assert topic_map.artifacts
 
 
-def test_manual_topic_facets_drive_find_map_and_pack(devref_db_path) -> None:
+@pytest.mark.parametrize("with_issues", [False, True])
+def test_manual_topic_facets_drive_find_map_and_pack(tmp_path, with_issues: bool) -> None:
     """Topic-relative annotations override filename-derived note classification."""
-
+    repo = tmp_path / "repo"
     expected_path = "engine/src/tangl/mechanics/progression/README.md"
+    overview = repo / expected_path
+    overview.parent.mkdir(parents=True)
+    overview.write_text(
+        "# Probit-d20\n\n```{storytangl-topic}\n:topics: progression\n"
+        ":facets: overview, design\n:relation: defines\n```\n\nProgression overview.\n"
+    )
+    notes = repo / "docs/src/design/progression_notes.md"
+    notes.parent.mkdir(parents=True)
+    notes.write_text(
+        "# Progression notes\n\n```{storytangl-topic}\n:topics: progression\n"
+        ":facets: notes\n:relation: documents\n```\n\nA focused note.\n"
+    )
+    if with_issues:
+        cache = repo / ISSUE_CACHE_RELPATH
+        cache.parent.mkdir(parents=True)
+        cache.write_text(json.dumps({"generated_at": "2026-11-12T00:00:00Z", "issues": [{
+            "number": 101, "title": "Progression follow-up", "body": "Tracked note.",
+            "state": "OPEN", "url": "https://github.com/example/repo/issues/101",
+            "labels": ["devref:progression"],
+        }]}))
+    devref_db_path = tmp_path / "index.sqlite3"
+    build_index(repo_root=repo, db_path=devref_db_path, incremental=False)
 
     search = search_topics("progression overview", db_path=devref_db_path, limit=8)
     search_hit = next(item for item in search.artifacts if item.source_path == expected_path)
@@ -96,5 +125,7 @@ def test_manual_topic_facets_drive_find_map_and_pack(devref_db_path) -> None:
         db_path=devref_db_path,
         limit=50,
     )
-    assert len(notes_pack.items) < 50
-    assert all(item.title != "Probit-d20" for item in notes_pack.items)
+    expected_notes = {("Progression notes", "notes", "documents")}
+    if with_issues:
+        expected_notes.add(("#101 Progression follow-up", "notes", "mentions"))
+    assert {(item.title, item.facet, item.relation) for item in notes_pack.items} == expected_notes

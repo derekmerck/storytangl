@@ -1,10 +1,10 @@
 """Singleton and named balances through owner-graph constructor form."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
 import subprocess
 import sys
+from pytest_helpers.subprocess_env import REPO_ROOT, TESTS_ROOT, checkout_env
 from typing import ClassVar
 from uuid import uuid4
 
@@ -175,5 +175,5 @@ def test_cold_catalog_bootstrap_and_json_restore(tmp_path: Path) -> None:
             [sys.executable, "-c", "from engine.tests.story.test_counted_wallet_identity import _cold;"
              "from pathlib import Path; import sys; _cold(Path(sys.argv[1]), sys.argv[2])",
              str(tmp_path), mode],
-            check=True, env=os.environ.copy(), timeout=30,
+            check=True, cwd=REPO_ROOT, env=checkout_env(REPO_ROOT, TESTS_ROOT), timeout=30,
         )

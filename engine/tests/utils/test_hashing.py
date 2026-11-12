@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
+from pytest_helpers.subprocess_env import REPO_ROOT, checkout_env
 from hashlib import sha224
 from typing import Any
 
@@ -58,7 +58,8 @@ def test_nested_unordered_collections_hash_identically_across_processes() -> Non
     digests = {
         subprocess.check_output(
             [sys.executable, "-c", code],
-            env={**os.environ, "PYTHONHASHSEED": str(seed)},
+            cwd=REPO_ROOT,
+            env={**checkout_env(), "PYTHONHASHSEED": str(seed)},
             text=True,
         ).strip()
         for seed in (0, 11, 37)

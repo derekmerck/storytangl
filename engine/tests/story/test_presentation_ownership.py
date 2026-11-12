@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
-from pathlib import Path
+from pytest_helpers.subprocess_env import REPO_ROOT, checkout_env
 
 
 def _run_import_check(source: str) -> None:
@@ -17,17 +16,14 @@ def _run_import_check(source: str) -> None:
     another checkout, as in a git worktree, silently tests the wrong code.
     """
 
-    roots = [entry for entry in sys.path if entry and Path(entry).name == "src"]
-    env = dict(os.environ)
-    if roots:
-        inherited = env.get("PYTHONPATH")
-        env["PYTHONPATH"] = os.pathsep.join(roots + ([inherited] if inherited else []))
+    env = checkout_env()
 
     result = subprocess.run(
         [sys.executable, "-c", source],
         capture_output=True,
         text=True,
         check=False,
+        cwd=REPO_ROOT,
         env=env,
     )
     assert result.returncode == 0, result.stderr

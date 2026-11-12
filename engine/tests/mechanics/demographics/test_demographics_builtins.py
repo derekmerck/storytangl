@@ -6,6 +6,7 @@ from importlib.resources import files
 from pathlib import Path
 import subprocess
 import sys
+from pytest_helpers.subprocess_env import REPO_ROOT, checkout_env
 from random import Random
 from uuid import uuid4
 
@@ -135,6 +136,7 @@ assert set(NameBank.all_instance_labels()) == {"fra", "jpn"}
     (root / "resources").symlink_to(tmp_path, target_is_directory=True)
     result = subprocess.run(
         [sys.executable, "-c", script, str(root)], capture_output=True, text=True,
+        cwd=REPO_ROOT, env=checkout_env(),
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
