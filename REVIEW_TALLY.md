@@ -307,8 +307,8 @@ to a frame when control leaves its scope, and why ids must survive relinking.
 | Downstream calendar world codec | done (private repo, read-only) |
 | Downstream gamebook promotion ledger | done (private repo, read-only) |
 
-Not yet read in any depth (as of 2026-11-11): the story compile path
-(`story/fabula` compiler and materializer), `tangl.media` beyond its
+Not yet read in any depth (as of 2026-11-11; the compile path was outlined
+later that day): `tangl.media` beyond its
 provisioners, `tangl.prose` and `tangl.lang`, `tangl.presentation`, mechanics
 other than sandbox and game handlers (assemblies and components, progression,
 demographics, credentials internals), the four apps (CLI, pygame, web,
@@ -834,6 +834,66 @@ hit hard enough to solve yet.
     walk that runs out of choices simply stops. The terminal sink Derek
     describes, the one that updates the user account, does not exist. (V)
 
+### Compile path (probe 2026-11-11, outline plus targeted reads)
+
+Read: `story/fabula/world.py` story creation, the materializer's pass lists
+and template hook, the compiler's shape, the codec interface. Not read: the
+body of `StoryCompiler.compile`, the Twine codec, most wiring passes.
+
+Derek's framing: the inverse problem to presentation. Many ways to represent
+a story space, from near-native YAML that drops almost straight into
+templates to a Twine adapter.
+
+81. **Keep. The pipeline has the shape of the four levels.** Source, then a
+    codec that decodes to near-native data and records losses (and can encode
+    back), then `StoryCompiler` to a typed template bundle with diagnostics
+    (and a `decompile`), then `World` holding templates, then `create_story`
+    and the materializer's passes to a graph. Many representations meet at one
+    intermediate form. (V)
+82. **Eager and lazy are one pipeline with two switches**, as Derek describes
+    them: which templates are materialized (all, or the seed groups) and
+    whether the prelink passes run. Code matches intent. (V)
+83. **The same pass list is written twice.** `_run_topology_passes` (batch)
+    and `_run_runtime_topology_passes` (per newly attached node) each list the
+    same four wiring passes. Scene contract finalizing is only in the batch
+    one; lazily created scenes go through `_ensure_runtime_container_entry`
+    instead, so container setup has two paths. (V; the second path not read)
+84. **All four wiring passes produce requirement-bearing edges.** Block
+    actions, role and setting dependencies, menu fan-outs and media
+    dependencies. So on the pull side the imperative and declarative voices do
+    lower to one kind of record here. There is no pass for the push side
+    other than menu fan-outs. (V)
+85. **Creation ids are minted in one place.**
+    `StoryMaterializer.story_materialize_template` calls
+    `template.materialize(uid=_next_provision_uid(_ctx=_ctx))`. With a context
+    the id is seeded; at story creation it falls back to a random one, which
+    is the cause of finding 23. The graph's own uid is a random default and
+    `story_id` is set to it. So the root of P1 is this call and the graph
+    uid. (V for the call; I that no context is passed at creation, from the
+    measurement in finding 23)
+86. **The template thumbprint is already load-bearing.** Entry nodes are found
+    by `Selector(templ_hash=template.content_hash())`. The content hash links
+    entity to template in practice; it is just not the id. Two entities from
+    one template share it and `find_one` takes the first, which is the
+    occurrence question the board agent raised. (V)
+87. **First entry has more special cases than finding 79 listed.** Explicit
+    versus seed entry templates, `_apply_story_entry_ids`, a
+    `_resolve_entry_override` hook that returns nothing, `do_story_ready`, and
+    a per-node `do_story_materialized`. (V)
+88. **Diagnosis is interleaved with compiling**, as in the resolver (finding
+    5). About the first 600 lines of `compiler.py` are issue collection and
+    reporting, and `compile` itself is one method of about 280 lines. The
+    diagnostics are worth keeping, in particular the report of authored keys
+    that were dropped. (V)
+89. **Two forms of the intermediate data.** `StoryScript` is a validated
+    schema for near-native scripts, but `compile` also accepts plain dicts so
+    codecs are not forced through it. Either the schema is the contract or it
+    is a linter. (V)
+90. **Codecs in this tree: near-native and Twine.** Other formats are
+    contributed by a world's domain module through `get_story_codecs`. No
+    Obsidian markdown reader was found here. The Twine codec is 1,390 lines
+    against about 70 for near-native. (V)
+
 ### Performance (measured 2026-11-10)
 
 Workload: a large downstream world, about 4,800 graph members, driven through
@@ -1358,6 +1418,7 @@ Sizes are guesses.
 | 3x | Validator reports edges that enter a container at a member or leave from a non-sink member (finding 77); report only at first | test | S |
 | 3z | Story as the root container: fold `story_ready`, entry selection and priming into its source; add its sink as the end-of-story point that updates the user (findings 79, 80) | design | M |
 | 3y | Container setup at the source and cleanup at the sink, with cross-container edges lowered through them (P10) | design | M |
+| 3aa | One wiring pass list used by both the batch and the per-node path; one path for container setup (finding 83) | simplify | S |
 | 4 | One shared clear-and-project helper for menu, sandbox and game hubs. It re-uses existing edges and assignments where they are still wanted and removes only the rest; this is what keeps resume valid on hubs | simplify | M |
 | 5 | Name fan-out results as bound dependencies; reserve `Affordance` for the source-open edge | rename | S |
 | 6 | Fan-in in VM; witnesses: site arrivals (site plus due-when) and "go home / call mom" | feature | L |
