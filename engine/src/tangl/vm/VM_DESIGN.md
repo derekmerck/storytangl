@@ -492,11 +492,14 @@ inventories use the same authority pattern through `get_token_catalogs(...)` and
 two-phase model: (1) caller + ancestors contribute via `get_ns()`, (2) immediate-caller
 dispatch contributors add runtime/context layers. Different nodes during the same
 pipeline pass (cursor, frontier nodes during PLANNING, ancestors during condition
-evaluation) each get their own cached namespace. The cache is discarded after each
-mutating phase: JOURNAL renders what UPDATE changed, and the node's own triggered
+evaluation) each get their own cached namespace. The cache is discarded after UPDATE
+and FINALIZE: JOURNAL renders what UPDATE changed, and the node's own triggered
 continues read what UPDATE and FINALIZE changed. That is what the split between the two
 is for -- state for arrival in UPDATE, which the content then describes, and bookkeeping
-after the content in FINALIZE. The cache dies with the PhaseCtx.
+after the content in FINALIZE. This is the usual division of responsibility, not a
+prohibition on intentional, policy-owned JOURNAL mutation during committed realization;
+opt-in concept introductions are one example. A DEBUG-only before/after graph hash
+is diagnostic and does not reject or undo such changes. The cache dies with the PhaseCtx.
 
 **Visit-history queries resolve stable node references.** The VM namespace exposes
 `visited(ref)`, `visit_count(ref)`, and `steps_since_visit(ref)` through one resolver
