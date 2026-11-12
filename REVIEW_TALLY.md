@@ -44,6 +44,7 @@ with the project interpreter and `PYTHONPATH=engine/src`.
 | A7 | Service conformance test: remote client and REST routes match the `ServiceMethodSpec` table | finding 48; Derek agrees on a single source | test fails on drift; nothing generated |
 | A8 | Validator, report only: edges that enter a container at a member or leave from a non-sink member | finding 77 | `validate_traversal_contracts` lists them; no world fails |
 | A9 | Invariant test, expected to fail on hubs for now: planning a node twice against unchanged state leaves ids and order unchanged | grounding must be repeatable | test exists, marked expected-fail where it fails |
+| A11 | Guard test: no `json.dumps`, `json.loads`, `model_dump` or `model_validate` in `core`, `vm` or `story` outside an allow-list (today: `core/bases.py`, `core/base_fragment.py`, `core/token.py`, `story/episode/action.py`, `story/fabula/compiler.py`, `story/analysis.py`) | Derek, 2026-11-12: agents write their own serializers unless stopped; finding 89 | test fails on a new site; allow-list is explicit |
 | A10 | Done: PR 676 merged to `main` as `e95281c1` on 2026-11-11 (Python dependency update; web job pinned to Ubuntu 24.04). Follow-up: return the web job to `ubuntu-latest` once that image installs cleanly; the web lockfile and three held-back Python packages are still open | dependency alerts | done |
 
 ### B. Ready to write down: Derek's stated intent, not yet in the design notes
@@ -307,8 +308,8 @@ to a frame when control leaves its scope, and why ids must survive relinking.
 | Downstream calendar world codec | done (private repo, read-only) |
 | Downstream gamebook promotion ledger | done (private repo, read-only) |
 
-Not yet read in any depth (as of 2026-11-11; compiling and materializing
-were outlined later that day): `tangl.media` beyond its
+Not yet read in any depth (as of 2026-11-11; compiling, materializing and
+presentation were read later): `tangl.media` beyond its
 provisioners, `tangl.prose` and `tangl.lang`, `tangl.presentation`, mechanics
 other than sandbox and game handlers (assemblies and components, progression,
 demographics, credentials internals), the four apps (CLI, pygame, web,
@@ -921,6 +922,83 @@ templates to a Twine adapter.
     Obsidian markdown reader was found here. The Twine codec is 1,390 lines
     against about 70 for near-native. (V)
 
+91. **A thumbprint identity already exists for scheduled events.**
+    `_scheduled_event_contribution_key` in the sandbox handlers returns "a
+    replay-stable identity for one scheduled-event contribution": a SHA-256
+    over the event's declared value, its source, its sponsor and, optionally,
+    its index. That is the P1 recipe (declaration, requester, ordinal),
+    already in use from the #527 work, and the index is the occurrence
+    discriminator the board agent asked about. It is built with a hand-rolled
+    `json.dumps` and `hashlib` beside `model_dump(mode="json")`, not with the
+    engine's hasher, which is the habit finding 89 warns about. (V)
+
+### Presentation (probe 2026-11-12)
+
+Read: every class and field in `tangl.presentation`, `core/base_fragment.py`
+and `journal/fragments.py`; the head of `PRESENTATION_DESIGN.md`; a census of
+which fields are produced by the engine and read by each client. The census
+counts whole-word matches outside tests, so common words (`placement`,
+`direction`, `contribution`) are inflated on the engine side.
+
+Derek's framing: presentation is a core contract describing what the engine
+outputs, and it has strayed as the lines blur between client preferences,
+semantic styles versus practical CSS-like behaviour, media formats, authored
+media and prose, and generated media and prose.
+
+92. **The stated mission is small and sound.** "Small, domain-neutral syntax
+    that a client may render, arrange, or solicit", not a widget library,
+    renderer, authority or second journal. The package depends only on
+    pydantic and core. (V)
+93. **What it carries now, sorted by the lines Derek names.** (V)
+
+    | Kind | Examples |
+    |---|---|
+    | What was said | content, attributed and dialog fragments, groups, markers |
+    | What can be done | choice fragments; `accepts` (pick, text, quantity, pieces, place, compose) with validators; blockers; cost previews |
+    | What is disclosed | projected sections and their values (scalar, key-value, list, table, badges) |
+    | Semantic advice | `style_tags`, `emphasis`, symbolic `icon`, coarse `placement` |
+    | CSS-like mechanism | `style_dict`; staging hints (shape, size, position, x, y, transition, duration, timing, flip); theme colours; stage extent in pixels; surfaces and normalized rectangles; `widget`; `hotkey` |
+    | Viewer preference | preference declarations; visibility and clip bindings that tie staged media to a preference value |
+    | Media format | sprite sheet manifests, frames and clips; `content_format`; `media_clip` |
+    | Transient guidance | UX events, grammar hints |
+
+94. **The contract has split into two client dialects over a floor.** From
+    the census:
+    - read only by pygame: `icon_media`, `icon_only`, `short_label`,
+      `placement`, `media_x`, `media_y`, `media_keep`, `media_flip_h`,
+      `speaker_id`, surfaces, stage extent, preference values, sprite sheets,
+      and nearly all of `media_visibility`;
+    - read only by the web client: `style_name`, `style_dict`, `hotkey`,
+      grammar hints, UX events, info affordances, theme colours, `patch_kind`,
+      `display_state`, `time_delta`;
+    - read by two or more clients: `style_tags`, `emphasis`, `widget`,
+      `media_timing`, `media_role`, `content_format`, `presentation_handle`,
+      `replaces_text`, projected sections;
+    - the CLI reads almost none of the hints. It is the floor. (V, by census)
+95. **Some fields have no producer or no reader.** `media_size`,
+    `media_position` and `media_duration` appear nowhere outside their
+    definitions. `media_transition` appears once, in a world. `hotkey`,
+    `time_delta`, `patch_kind`, `display_state` and theme colours are read by
+    the web client and produced by nothing in the engine. (V, by census)
+96. **Four hint carriers with overlapping fields.** `PresentationHints` on
+    content, groups, pieces and sections; `UIHints` on choices;
+    `StagingHints` on media; and on key-value rows a `hint`, an `emphasis` and
+    a free `presentation_hints` dict. `icon` is on two of them. `emphasis` has
+    two vocabularies: primary, subtle, warning on choices; ok, warn, danger,
+    subtle on rows. (V)
+97. **Mixed base classes.** Intent models, key-value rows and targets are
+    `Unstructurable`; hints, projection values and events are plain pydantic
+    models. Hints are embedded in fragments, which are persisted records. By
+    Derek's structure-only rule (finding 89) this is a question to settle, not
+    yet read in detail. (V for the bases)
+98. **A third rule language runs in the client.** Visibility and clip bindings
+    are small declarative rules (this image shows when preference X has value
+    Y) evaluated client-side, beside story conditions and effects. (V)
+99. **The design note has become a slice log.** After its opening paragraph,
+    `PRESENTATION_DESIGN.md` is a sequence of dated, issue-numbered slices,
+    most describing pygame behaviour. The contract and one client's
+    implementation notes are in one file, as with #402. (V)
+
 ### Performance (measured 2026-11-10)
 
 Workload: a large downstream world, about 4,800 graph members, driven through
@@ -1331,6 +1409,27 @@ discussion:
 Open: whether source and sink are designated members with extra duties, or
 return as dedicated nodes; and how the sink learns where to forward.
 
+### P11. Re-centre presentation on three questions (new, mine)
+
+The engine answers three things: what was said, what can be done, what is
+disclosed. Those are the contract every client must honour, and the CLI
+already does with nothing else.
+
+Everything else is advice, in two tiers:
+
+- **Semantic advice**: tags and coarse roles a client may honour or ignore
+  (`style_tags`, `emphasis`, symbolic `icon`, coarse `placement`,
+  `media_role`). One vocabulary, one carrier.
+- **Profiles**: mechanism for a class of client, named and optional. A
+  staging profile (positions, clips, surfaces, visibility bindings) and a
+  style profile (`style_dict`, theme colours, hotkeys). A client declares
+  which profiles it understands, as the content-negotiation notes already
+  propose for media and prose formats.
+
+Then: fields with no producer or reader are removed or marked reserved; media
+formats move beside media; the design note keeps the contract and each
+client's slice notes move to that client.
+
 ### P4. The save is the choice list (not discussed; deprioritized by P5)
 
 With P1 in place, a session is (world, seed, list of chosen edge ids and
@@ -1448,6 +1547,8 @@ Sizes are guesses.
 | 3ab | Trusted `structure`: skip validation for data that came from `unstructure` (finding 89); measure against the timing guard | perf | S |
 | 3ac | Generated edges built by structuring plain data, not by direct constructor calls (finding 89); pairs with P1 | simplify | M |
 | 3aa | One wiring pass list used by both the batch and the per-node path; one path for container setup (finding 83) | simplify | S |
+| 3ad | Presentation: remove or reserve fields with no producer or reader; one `emphasis` vocabulary; one hint carrier (findings 95, 96) | cleanup | S |
+| 3ae | Presentation: split the design note into contract and per-client slice notes; state the three questions and the two advice tiers (P11) | docs | S |
 | 4 | One shared clear-and-project helper for menu, sandbox and game hubs. It re-uses existing edges and assignments where they are still wanted and removes only the rest; this is what keeps resume valid on hubs | simplify | M |
 | 5 | Name fan-out results as bound dependencies; reserve `Affordance` for the source-open edge | rename | S |
 | 6 | Fan-in in VM; witnesses: site arrivals (site plus due-when) and "go home / call mom" | feature | L |
