@@ -307,8 +307,8 @@ to a frame when control leaves its scope, and why ids must survive relinking.
 | Downstream calendar world codec | done (private repo, read-only) |
 | Downstream gamebook promotion ledger | done (private repo, read-only) |
 
-Not yet read in any depth (as of 2026-11-11; the compile path was outlined
-later that day): `tangl.media` beyond its
+Not yet read in any depth (as of 2026-11-11; compiling and materializing
+were outlined later that day): `tangl.media` beyond its
 provisioners, `tangl.prose` and `tangl.lang`, `tangl.presentation`, mechanics
 other than sandbox and game handlers (assemblies and components, progression,
 demographics, credentials internals), the four apps (CLI, pygame, web,
@@ -834,7 +834,14 @@ hit hard enough to solve yet.
     walk that runs out of choices simply stops. The terminal sink Derek
     describes, the one that updates the user account, does not exist. (V)
 
-### Compile path (probe 2026-11-11, outline plus targeted reads)
+### Compile and materialize (probe 2026-11-11, outline plus targeted reads)
+
+Terms (Derek): **compile** goes from authored source content and handlers to
+a `World` instance. **Materialize** goes from content rules and templates to
+node instances on a graph. They look alike and share serialization code, but
+they are different operations. In the four levels, compile produces the world
+and materialize grounds it into a story graph. Findings 81, 88, 89 and 90 are
+about compiling; 82 to 87 are about materializing.
 
 Read: `story/fabula/world.py` story creation, the materializer's pass lists
 and template hook, the compiler's shape, the codec interface. Not read: the
