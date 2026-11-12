@@ -309,7 +309,8 @@ to a frame when control leaves its scope, and why ids must survive relinking.
 | Downstream gamebook promotion ledger | done (private repo, read-only) |
 
 Not yet read in any depth (as of 2026-11-11; compiling, materializing,
-presentation and media's design were read later): `tangl.media` beyond its
+presentation, media's design and the client apps were read later):
+`tangl.media` beyond its
 provisioners, `tangl.prose` and `tangl.lang`, `tangl.presentation`, mechanics
 other than sandbox and game handlers (assemblies and components, progression,
 demographics, credentials internals), the four apps (CLI, pygame, web,
@@ -1050,6 +1051,74 @@ internals, the resource registry, sprite sheet code.
      contract. Media hooks also take `ctx: Any` and read the worker dispatcher
      out of context metadata. (V)
 
+### Client apps (probe 2026-11-12)
+
+Read: file inventory of `apps/`, the three session bridges' outlines, the
+web client's API paths, the conformance kit's layout. Counted, outside tests:
+which service operations, fragment types, input kinds and envelope features
+each client mentions. Counts are pattern matches, not behaviour; nothing was
+run.
+
+Derek's account: the CLI is close to his first UI pass. The web client was
+the test bed for everything non-CLI. The REST server was demoted from engine
+to app once it was clear it consumes a service manager like anything else.
+Ren'Py is an experiment showing the CLI game loop can be embedded in another
+Python host. That led to pygame, the current favourite, which is tightly
+coupled and simpler to control than an adapter shim. The apps are drifting
+as the floor of the client contract and the supported extras pull apart.
+Prose is still open: he wants it to follow media's pattern (pass in raw
+content, speakers and scene specifics; rewrite to match story state) and has
+deferred it because it is less obvious how.
+
+| App | Lines | Reaches the service by |
+|---|---|---|
+| CLI | 2,150 | a `ServiceManager` built by `build_service_manager` (local or remote by settings) |
+| pygame | 5,540 | an in-process `ServiceManager` through `PygameSessionBridge` |
+| web | 4,840 | REST, its own typed client |
+| REST server | 1,310 | wraps a `ServiceManager`; reads the method spec table in one place |
+| Ren'Py | 860 | an in-process `ServiceManager` through `RenPySessionBridge` |
+
+108. **The common floor, by what all four clients mention:** content,
+     attributed text, choices, media, and the `pick` and `text` input kinds.
+     (V, by count)
+109. **No client covers the whole contract; each leads on a different part.**
+
+     | Feature | CLI | pygame | web | Ren'Py |
+     |---|---|---|---|---|
+     | Input kinds handled | pick, text, quantity, pieces | pick, text, pieces | all six | pick, text, quantity |
+     | UX events | yes | no | yes | no |
+     | Grammar hints | no | no | yes | no |
+     | Projected state sections | yes | yes, heavily | yes | no |
+     | UI preferences | no | yes | no | no |
+     | Music snapshot | no | yes | no | no |
+     | Control fragments | barely | yes | yes | no |
+     | Find an action by typed text | yes | no | yes | no |
+     | Marker fragments | no | no | once | no |
+
+     (V, by count)
+110. **Refusing explicitly is already a pattern in one client.** pygame's
+     bridge defines `UnsupportedAccepts` for input kinds it cannot collect.
+     That is the right behaviour for a client above the floor and below the
+     full contract. (V)
+111. **The session bridge is written three times.** `PygameSessionBridge`
+     and `RenPySessionBridge` both define `start`, `choose`, `build_turns`,
+     `_ensure_user_id` and `_payload_source`; the CLI does the same work
+     inside its story controller. Folding an envelope into turns or passages
+     is also done in the web client's `fragmentUtils.ts`. (V)
+112. **A portable conformance kit exists and the clients do not run it.**
+     `engine/contrib/conformance` holds eleven JSON envelope fixtures, a
+     reference port base with CLI and Tk ports, parity and legibility checks,
+     multi-envelope sequences and sprite sheet vectors. Only
+     `engine/tests/conformance` loads the fixtures. No app's tests reference
+     them; the web client keeps its own TypeScript fixtures. The tool built
+     to hold clients to one floor is not applied to the three real clients.
+     (V)
+113. **`RemoteServiceManager` has no direct consumer in `apps/`.** It is
+     selected by settings inside `build_service_manager`, so only the CLI can
+     reach it. (V)
+114. **`BlockFragment` is mentioned only by the Ren'Py bridge.** (V, by
+     count)
+
 ### Performance (measured 2026-11-10)
 
 Workload: a large downstream world, about 4,800 graph members, driven through
@@ -1490,6 +1559,20 @@ Then: fields with no producer or reader are removed or marked reserved; media
 formats move beside media; the design note keeps the contract and each
 client's slice notes move to that client.
 
+### P12. Hold the clients to the floor with the kit that exists (new, mine)
+
+- **Run the portable fixtures in each client's tests.** For each fixture a
+  client either renders it or refuses it explicitly. A crash or silent drop
+  fails. This turns "the floor" into something CI checks.
+- **Each client declares what it supports**: input kinds, fragment types,
+  profiles. The table in finding 109 becomes data the client publishes, and
+  the engine or an author can read it. This is the same declaration P11's
+  profiles need.
+- **One session bridge.** `start`, `choose`, `refresh` and a fold from
+  envelope to turns, in one place that pygame, Ren'Py and the CLI share.
+  Whether it lives in the service layer or a small client-side package is
+  open.
+
 ### P4. The save is the choice list (not discussed; deprioritized by P5)
 
 With P1 in place, a session is (world, seed, list of chosen edge ids and
@@ -1608,6 +1691,8 @@ Sizes are guesses.
 | 3ac | Generated edges built by structuring plain data, not by direct constructor calls (finding 89); pairs with P1 | simplify | M |
 | 3aa | One wiring pass list used by both the batch and the per-node path; one path for container setup (finding 83) | simplify | S |
 | 3af | Media: delete the one-line raster forge stub; move the #571 slices out of the package contract (findings 106, 107) | cleanup | S |
+| 3ag | Clients run the portable conformance fixtures: render or refuse explicitly (finding 112) | test | M |
+| 3ah | One shared session bridge for the in-process Python clients (finding 111) | simplify | M |
 | 3ad | Presentation: remove or reserve fields with no producer or reader; one `emphasis` vocabulary; one hint carrier (findings 95, 96) | cleanup | S |
 | 3ae | Presentation: split the design note into contract and per-client slice notes; state the three questions and the two advice tiers (P11) | docs | S |
 | 4 | One shared clear-and-project helper for menu, sandbox and game hubs. It re-uses existing edges and assignments where they are still wanted and removes only the rest; this is what keeps resume valid on hubs | simplify | M |
