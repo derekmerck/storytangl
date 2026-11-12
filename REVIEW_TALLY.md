@@ -892,10 +892,30 @@ templates to a Twine adapter.
     reporting, and `compile` itself is one method of about 280 lines. The
     diagnostics are worth keeping, in particular the report of authored keys
     that were dropped. (V)
-89. **Two forms of the intermediate data.** `StoryScript` is a validated
-    schema for near-native scripts, but `compile` also accepts plain dicts so
-    codecs are not forced through it. Either the schema is the contract or it
-    is a linter. (V)
+89. **Answered (Derek): plain dicts are accepted on purpose.** Data that was
+    unstructured from something legal is legal by fiat when it comes back;
+    if it is not, that is an error, and checking it against the schema again
+    on load is waste. Everything goes only through `structure` and
+    `unstructure`, which arrange native datatypes into a class or back.
+    Serialization belongs only to the persistence manager and the hasher.
+    Nothing entity-like should be created except by structuring it. The
+    schema is for authored input.
+    Checked against that intent:
+    - **`structure` validates every time.** It ends in an ordinary
+      constructor call, so pydantic validates round-tripped data again;
+      `model_construct` is used nowhere. In the turn profile (finding 50),
+      model construction and validation during snapshot restore were about a
+      tenth of the time. The principle is stated but not implemented. (V)
+    - **The hasher and persistence use different encoders.** Hashing calls
+      `json.dumps` with its own default function and sorted keys
+      (`utils/hashing.py`); JSON persistence has its own encoder class and
+      object hook, beside pickle, BSON and YAML handlers. (V)
+    - **About thirty sites construct graph edges directly**, not by
+      structuring: 23 in the sandbox handlers, four in the materializer, and
+      one each in the resolver, the story handlers, the game handlers and the
+      incremental sandbox. (V, by pattern search)
+    - These connect to P1: if a generated edge is always structured from
+      plain data, its id can be a hash of that data by construction.
 90. **Codecs in this tree: near-native and Twine.** Other formats are
     contributed by a world's domain module through `get_story_codecs`. No
     Obsidian markdown reader was found here. The Twine codec is 1,390 lines
@@ -1425,6 +1445,8 @@ Sizes are guesses.
 | 3x | Validator reports edges that enter a container at a member or leave from a non-sink member (finding 77); report only at first | test | S |
 | 3z | Story as the root container: fold `story_ready`, entry selection and priming into its source; add its sink as the end-of-story point that updates the user (findings 79, 80) | design | M |
 | 3y | Container setup at the source and cleanup at the sink, with cross-container edges lowered through them (P10) | design | M |
+| 3ab | Trusted `structure`: skip validation for data that came from `unstructure` (finding 89); measure against the timing guard | perf | S |
+| 3ac | Generated edges built by structuring plain data, not by direct constructor calls (finding 89); pairs with P1 | simplify | M |
 | 3aa | One wiring pass list used by both the batch and the per-node path; one path for container setup (finding 83) | simplify | S |
 | 4 | One shared clear-and-project helper for menu, sandbox and game hubs. It re-uses existing edges and assignments where they are still wanted and removes only the rest; this is what keeps resume valid on hubs | simplify | M |
 | 5 | Name fan-out results as bound dependencies; reserve `Affordance` for the source-open edge | rename | S |
