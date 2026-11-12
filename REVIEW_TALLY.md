@@ -21,6 +21,66 @@ Last updated: 2026-11-10.
 - The sketch feeds a planned clean TypeScript bootstrap, then a Python 3.9
   rewrite. Tests are not the parity basis.
 
+## Handoff: what is stable (2026-11-11)
+
+For a design or implementation agent picking this up. Read "Corrections after
+the board comparison" first. Statements attributed to Derek are intent;
+measured and reproduced items are evidence; both clean-slate sketches and
+anything marked "mine" are hypotheses and are not part of this handoff.
+
+Experiment scripts are in `scratch/review_probes/` on this branch. Run them
+with the project interpreter and `PYTHONPATH=engine/src`.
+
+### A. Ready to do: small, decided, no design call needed
+
+| # | Work | Basis | Done when |
+|---|---|---|---|
+| A1 | Raise the default `checkpoint_cadence` above 1 | Derek: cadence 1 was scaffolding; finding 25 | default changed; rollback tests still pass |
+| A2 | Gate the pre-journal whole-graph hash behind the debug check | finding 53 | hash taken only when debug logging is on |
+| A3 | Large-graph timing guard: one synthetic graph, a per-choice budget | finding 55; Derek expected this test to exist | test fails if a choice exceeds the budget |
+| A4 | Hoist the identical `set_provider` / `set_successor` bodies of `Dependency` and `Affordance` to `HasRequirement` | finding 4, confirmed by the board agent | one implementation; tests unchanged |
+| A5 | Cold-process tests pass the source path explicitly | finding 20 | they pass from a worktree with a stale editable install |
+| A6 | Make `test_manual_topic_facets_drive_find_map_and_pack` build from a fixture | corrections section | passes with and without `tmp/devref/issues.json` |
+| A7 | Service conformance test: remote client and REST routes match the `ServiceMethodSpec` table | finding 48; Derek agrees on a single source | test fails on drift; nothing generated |
+| A8 | Validator, report only: edges that enter a container at a member or leave from a non-sink member | finding 77 | `validate_traversal_contracts` lists them; no world fails |
+| A9 | Invariant test, expected to fail on hubs for now: planning a node twice against unchanged state leaves ids and order unchanged | grounding must be repeatable | test exists, marked expected-fail where it fails |
+| A10 | Merge PR 676 (Python dependency update, web job pinned to Ubuntu 24.04); all checks pass | dependency alerts | merged |
+
+### B. Ready to write down: Derek's stated intent, not yet in the design notes
+
+Each is a short section in an existing, already linked design file. Use his
+wording from the cited part of this tally.
+
+| # | Topic | Tally source | Suggested home |
+|---|---|---|---|
+| B1 | Four levels as progressive orderings: world, story graph, episode DAG, journal | sketch v2, "The stance" | `ARCHITECTURE.md` |
+| B2 | Declarative and imperative as two readings; materialization as assembling the declared set | sketch v2, "The stance" | `AFFORDANCE_MODEL.md` |
+| B3 | Fan-out and fan-in in his terms | sketch v1 vocabulary | `AFFORDANCE_MODEL.md` |
+| B4 | Container source and sink: the setup and cleanup bottleneck; the story as the outermost container | "Containers: one source, one sink" | `VM_DESIGN.md` |
+| B5 | Intrinsic contribution, extrinsic assembly (`get_ns` and `gather_ns`; journal handlers) | finding 33 | `VM_DESIGN.md` |
+| B6 | Two kinds of similarity; games as narrative devices with an authoring thumb on the scale | P5 | `VM_DESIGN.md` replay notes; mechanics design note |
+| B7 | Authoring vocabulary: authors write `conditions` and `effects`; field is `availability`; type is `Predicate` | finding 72 | story or loader design note |
+
+### C. Evidence to attach to existing issues
+
+| Issue | Attach |
+|---|---|
+| #560 | The reproductions: `call_stack_probe.py` (frame outlives callee; interjection renders sender twice), `resume_probe.py` (both return phases loop), `resume_rule_probe.py` (resume after the calling edge works in five cases, including with re-planning). Note that the frame escape is a consequence of the "jump does not unwind" floor. |
+| #548, #472 | The profile (finding 50) and the three timings; `ledger_cost.py` for stream growth |
+| #556 | The downstream site-arrival handler as first witness (finding 37) |
+| #438, #461 | The push-side demo gap (finding 73) and the witness-world list (P9) |
+
+### D. Not stable; do not implement from this tally
+
+Thumbprint ids and occurrence identity (P1); a VM fan-in operator (P2); the
+shared hub helper beyond studying the #527 retained-binding path; resume in
+the engine (owned by #560, policies not approved); lowering edges through
+source and sink (P10); the story as root container; multi-lane; the parity
+basis (P3); lowering `predicate:` (needs a compatibility check across nine
+worlds first); per-hop tracing on a cadence (measured, but changes what
+rollback can rely on; needs an owner's decision in #548 or #472); both
+clean-slate sketches.
+
 ## Corrections after the board comparison (2026-11-11)
 
 The issues-board agent compared this tally with the roadmap. Checked against
