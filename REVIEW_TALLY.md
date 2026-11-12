@@ -44,7 +44,7 @@ with the project interpreter and `PYTHONPATH=engine/src`.
 | A7 | Service conformance test: remote client and REST routes match the `ServiceMethodSpec` table | finding 48; Derek agrees on a single source | test fails on drift; nothing generated |
 | A8 | Validator, report only: edges that enter a container at a member or leave from a non-sink member | finding 77 | `validate_traversal_contracts` lists them; no world fails |
 | A9 | Invariant test, expected to fail on hubs for now: planning a node twice against unchanged state leaves ids and order unchanged | grounding must be repeatable | test exists, marked expected-fail where it fails |
-| A10 | Merge PR 676 (Python dependency update, web job pinned to Ubuntu 24.04); all checks pass | dependency alerts | merged |
+| A10 | Done: PR 676 merged to `main` as `e95281c1` on 2026-11-11 (Python dependency update; web job pinned to Ubuntu 24.04). Follow-up: return the web job to `ubuntu-latest` once that image installs cleanly; the web lockfile and three held-back Python packages are still open | dependency alerts | done |
 
 ### B. Ready to write down: Derek's stated intent, not yet in the design notes
 
