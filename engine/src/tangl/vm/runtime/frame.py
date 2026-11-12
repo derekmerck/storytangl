@@ -42,10 +42,10 @@ not a new phase boundary: every phase still runs exactly once in causal order.
 
 JOURNAL Mutation Policy
 -----------------------
-JOURNAL handlers are expected to primarily emit records. UPDATE/FINALIZE remain
-the canonical mutation phases. If JOURNAL mutates graph state, vm logs a
-debug diagnostic so authors can audit and decide whether to move that logic or
-emit explicit annotation records.
+JOURNAL handlers primarily emit records; UPDATE/FINALIZE are the usual home for
+story effects. A voice may intentionally mutate state during committed realization,
+such as an opt-in introduction. At debug level, the VM reports graph changes for
+inspection; this diagnostic does not prohibit or undo them.
 
 See Also
 --------
@@ -921,14 +921,16 @@ class Frame:
         if entry_phase > ResolutionPhase.JOURNAL:
             return []
         ctx.current_phase = ResolutionPhase.JOURNAL
-        journal_hash_before = self.graph.value_hash()
+        diagnose_mutation = logger.isEnabledFor(logging.DEBUG)
+        if diagnose_mutation:
+            journal_hash_before = self.graph.value_hash()
         records = self._collect_phase_records(do_journal(self.cursor, ctx=ctx), step=ctx.step)
-        if logger.isEnabledFor(logging.DEBUG):
+        if diagnose_mutation:
             journal_hash_after = self.graph.value_hash()
             if journal_hash_after != journal_hash_before:
                 logger.debug(
                     "JOURNAL mutation detected at step=%s cursor_id=%s; "
-                    "prefer UPDATE/FINALIZE for state mutation or emit annotation records",
+                    "inspect against the voice's realization policy",
                     ctx.step,
                     self.cursor.uid,
                 )

@@ -400,6 +400,70 @@ class TestFollowEdge:
             "JOURNAL mutation detected" in record.message for record in caplog.records
         )
 
+    @pytest.mark.parametrize("debug", [False, True])
+    def test_journal_hashes_only_for_debug_and_keeps_mutation_and_output(
+        self, debug: bool, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        graph, [node] = _simple_graph("journal")
+        frame = Frame(graph=graph, cursor=node)
+        ctx = frame._make_ctx()
+        hashes = []
+        value_hash = Graph.value_hash
+
+        def count_hash(self):
+            result = value_hash(self)
+            hashes.append(result)
+            return result
+
+        monkeypatch.setattr(Graph, "value_hash", count_hash)
+        caplog.set_level(logging.DEBUG if debug else logging.INFO, logger="tangl.vm.runtime.frame")
+
+        @on_journal
+        def emit_and_mutate(*, caller, ctx, **kw):
+            caller.locals["introduced"] = True
+            return SimpleFragment(content="introduction")
+
+        records = frame._run_journal_phase(ctx=ctx, entry_phase=ResolutionPhase.JOURNAL)
+
+        assert node.locals["introduced"] is True
+        assert [record.content for record in records] == ["introduction"]
+        assert len(hashes) == (2 if debug else 0)
+        if debug:
+            assert hashes[0] != hashes[1]
+        assert any("JOURNAL mutation detected" in record.message for record in caplog.records) is debug
+
+    @pytest.mark.parametrize("entry_level,changed_level,expected_hashes", [
+        (logging.INFO, logging.DEBUG, 0),
+        (logging.DEBUG, logging.INFO, 2),
+    ])
+    def test_journal_hash_pair_uses_debug_state_at_entry(
+        self, entry_level: int, changed_level: int, expected_hashes: int,
+        monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        graph, [node] = _simple_graph("journal")
+        frame = Frame(graph=graph, cursor=node)
+        ctx = frame._make_ctx()
+        hashes = []
+        value_hash = Graph.value_hash
+
+        def count_hash(self):
+            result = value_hash(self)
+            hashes.append(result)
+            return result
+
+        monkeypatch.setattr(Graph, "value_hash", count_hash)
+        caplog.set_level(entry_level, logger="tangl.vm.runtime.frame")
+
+        @on_journal
+        def change_logging(*, caller, ctx, **kw):
+            logging.getLogger("tangl.vm.runtime.frame").setLevel(changed_level)
+            return SimpleFragment(content="journal")
+
+        records = frame._run_journal_phase(ctx=ctx, entry_phase=ResolutionPhase.JOURNAL)
+
+        assert len(hashes) == expected_hashes
+        assert [record.content for record in records] == ["journal"]
+
     def test_frame_local_behaviors_participate_as_context_authorities(self) -> None:
         g, [a, b] = _simple_graph("a", "b")
         b.locals = {}
