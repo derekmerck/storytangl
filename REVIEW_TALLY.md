@@ -308,8 +308,8 @@ to a frame when control leaves its scope, and why ids must survive relinking.
 | Downstream calendar world codec | done (private repo, read-only) |
 | Downstream gamebook promotion ledger | done (private repo, read-only) |
 
-Not yet read in any depth (as of 2026-11-11; compiling, materializing and
-presentation were read later): `tangl.media` beyond its
+Not yet read in any depth (as of 2026-11-11; compiling, materializing,
+presentation and media's design were read later): `tangl.media` beyond its
 provisioners, `tangl.prose` and `tangl.lang`, `tangl.presentation`, mechanics
 other than sandbox and game handlers (assemblies and components, progression,
 demographics, credentials internals), the four apps (CLI, pygame, web,
@@ -999,6 +999,57 @@ media and prose, and generated media and prose.
     most describing pygame behaviour. The contract and one client's
     implementation notes are in one file, as with #402. (V)
 
+### Media (probe 2026-11-12, outline plus design note)
+
+Read: both media design notes, the module and class outline, the provisioning
+and phase-hook outlines, the creator pipeline section. Not read: forge
+internals, the resource registry, sprite sheet code.
+
+100. **Keep. The media contract is the clearest in the repo.** Three inputs
+     (an authored id or path, authored inline data, a semantic projection
+     through a `MediaSpec`) arrive at one `MediaRIT`, which a `MediaFragment`
+     places in the journal, the service dereferences, and the client presents.
+     Authored and generated media are kept apart cleanly: only generated media
+     has a spec. (V)
+101. **Media is the pull side, re-used as intended.** `MediaDep` extends
+     `Dependency`; offers are ordinary `ProvisionOffer`s; the note's phrase is
+     "same offer protocol, different search spaces". Media dependencies are
+     soft by default. (V)
+102. **Media already has the careful version of thumbprint identity.** A
+     generated resource keeps three payloads: the semantic request, the
+     adapted backend request, and the realized request. Identity is a hash of
+     a declared projection of the adapted request (`fingerprint_payload`);
+     provenance that cannot change the output is kept but excluded.
+     Composition identity uses child content hashes and excludes child uids.
+     The note also states the distinction P1 needs: media is
+     content-addressed, concepts are identity-addressed, and two actors with
+     identical fields are still two actors. A concept thumbprint is therefore
+     a derived name (declaration, requester, ordinal), not content equality.
+     (V)
+103. **Media registers on the VM from its own side, and the VM also imports
+     media.** `media/phase_hooks.py` registers two `on_provision` handlers.
+     The resolver separately imports media's provisioners by name (finding 2).
+     The first route shows the second is avoidable. (V)
+104. **A different scope chain.** Inventories resolve story, then world, then
+     system: deployment scope, not graph hierarchy. It is the same gather
+     step as pattern 2 over a different chain, which supports sharing the
+     walk without forcing one reduction. Likewise `on_adapt_media_spec` is
+     documented as ordered dispatch with in-place mutation and "last result
+     wins, not fed forward", deliberately not a general reducer. (V)
+105. **Negotiation exists for media and is inert for prose.** A render
+     profile, a content profile and a pending policy decide what a client
+     receives. `ContentFragment.content_format` is declared, produced by
+     nothing, and the web client renders markup as literal text. The
+     "profiles" in P11 should extend this mechanism, not add another. (V, from
+     the note)
+106. **Forge status, from the note's own table.** Active: checker, ComfyUI,
+     DiceBear, SVG text; composition is a one-level proof. Partial: SVG
+     (the largest at 1,336 lines), Stable, TTS. Stub: raster, one line. (V)
+107. **Same slice-log pattern, better contained.** About 300 lines of the
+     package note are dated issue slices (#571) inside an otherwise stable
+     contract. Media hooks also take `ctx: Any` and read the worker dispatcher
+     out of context metadata. (V)
+
 ### Performance (measured 2026-11-10)
 
 Workload: a large downstream world, about 4,800 graph members, driven through
@@ -1069,6 +1120,12 @@ once at birth and never recomputed.
   function to match ids.
 - Open: whether step belongs in an attachment's id. Leaving it out gives the
   attachment a stable identity across steps.
+- **Prior art inside the repo (2026-11-12):** scheduled events already have a
+  replay-stable key hashed from declaration, source, sponsor and index
+  (finding 91), and generated media has an identity projection that
+  separates what determines identity from provenance (finding 102). P1 should
+  be stated as generalizing those two, with the engine's hasher, and not as a
+  new scheme.
 - **Extended after the step probe:** the thumbprint has to start at story
   creation. Root = hash of (world, story label, session seed); every authored
   entity's id = hash of (root, template path). The RNG seed derives from the
@@ -1420,7 +1477,10 @@ Everything else is advice, in two tiers:
 - **Semantic advice**: tags and coarse roles a client may honour or ignore
   (`style_tags`, `emphasis`, symbolic `icon`, coarse `placement`,
   `media_role`). One vocabulary, one carrier.
-- **Profiles**: mechanism for a class of client, named and optional. A
+- **Profiles**: mechanism for a class of client, named and optional. Media
+  already negotiates by render profile, content profile and pending policy
+  (finding 105); profiles here extend that, they do not add a second
+  negotiation. A
   staging profile (positions, clips, surfaces, visibility bindings) and a
   style profile (`style_dict`, theme colours, hotkeys). A client declares
   which profiles it understands, as the content-negotiation notes already
@@ -1547,6 +1607,7 @@ Sizes are guesses.
 | 3ab | Trusted `structure`: skip validation for data that came from `unstructure` (finding 89); measure against the timing guard | perf | S |
 | 3ac | Generated edges built by structuring plain data, not by direct constructor calls (finding 89); pairs with P1 | simplify | M |
 | 3aa | One wiring pass list used by both the batch and the per-node path; one path for container setup (finding 83) | simplify | S |
+| 3af | Media: delete the one-line raster forge stub; move the #571 slices out of the package contract (findings 106, 107) | cleanup | S |
 | 3ad | Presentation: remove or reserve fields with no producer or reader; one `emphasis` vocabulary; one hint carrier (findings 95, 96) | cleanup | S |
 | 3ae | Presentation: split the design note into contract and per-client slice notes; state the three questions and the two advice tiers (P11) | docs | S |
 | 4 | One shared clear-and-project helper for menu, sandbox and game hubs. It re-uses existing edges and assignments where they are still wanted and removes only the rest; this is what keeps resume valid on hubs | simplify | M |
