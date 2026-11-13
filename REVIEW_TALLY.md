@@ -1166,6 +1166,18 @@ match it. It is less obvious how, so it has been deferred.
      It is imported by presence, demographics and assembly mechanics, and by
      prose in one place (`naming.py`). In media's terms it is a forge with no
      pipeline calling it. (V)
+     History (Derek): `tangl.lang` began as a rewriting kit for turning
+     first-person stories into CYOA form: changing names, sexes and point of
+     view, reconjugating sentences, adjusting register. Parts were retired (a
+     spaCy tokenizer now sits in scratch). The renaming and regendering parts
+     are expected to matter again, for a character who changes outfit, name,
+     avatar, hair colour or pronouns mid-story.
+     That case fixes what a prose request has to carry (P13): the text, plus
+     the slice of character state it depends on. When that slice changes, the
+     realization's identity changes and the text is rewritten; when it does
+     not, the earlier realization is re-used. Media already does this for
+     appearance. Earlier journal entries keep the old name, since the journal
+     records what was told.
 119. **`story` and `prose` import each other.** `story` imports the render
      session, the dialog handler and mu-block types from `prose`. `prose`
      imports actors, blocks, roles, settings and the graph from `story`, but
