@@ -191,6 +191,8 @@ class TestProviderEdgeContract:
         assert list(graph.find_edges_to(provider)) == []
         edge.set_successor(other, _ctx=ctx)
         assert edge.provider is edge.successor is other
+        assert edge.requirement.resolved_step == 7
+        assert edge.requirement.resolved_cursor_id == origin.uid
         assert list(graph.find_edges_to(other)) == [edge]
         edge.set_provider(None, _ctx=ctx)
         assert edge.provider is edge.successor is None
