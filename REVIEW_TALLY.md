@@ -51,6 +51,11 @@ with the project interpreter and `PYTHONPATH=engine/src`.
 
 ### B. Ready to write down: Derek's stated intent, not yet in the design notes
 
+**In review as PR 681 (2026-11-13):** a "Working Laws" section in
+`philosophy.md` covering B1 to B6, B8 and B10 in nine statements, plus B11
+(the determinism rewrite) and B13 (decayed symbols). Not in it: B7 and B9,
+the glossary entries, and B12 (the two traversal notes).
+
 Per finding 132 and P14, most of B1 to B10 belong together as one short
 section of laws in `philosophy.md`, with terms added to the glossary, not as
 ten insertions in ten files. The "suggested home" column below is where each
