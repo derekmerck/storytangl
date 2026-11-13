@@ -310,7 +310,7 @@ to a frame when control leaves its scope, and why ids must survive relinking.
 | Downstream gamebook promotion ledger | done (private repo, read-only) |
 
 Not yet read in any depth (as of 2026-11-11; compiling, materializing,
-presentation, media's design and the client apps were read later):
+presentation, media's design, the client apps and prose were read later):
 `tangl.media` beyond its
 provisioners, `tangl.prose` and `tangl.lang`, `tangl.presentation`, mechanics
 other than sandbox and game handlers (assemblies and components, progression,
@@ -1120,6 +1120,64 @@ deferred it because it is less obvious how.
 114. **`BlockFragment` is mentioned only by the Ren'Py bridge.** (V, by
      count)
 
+### Prose and lang (probe 2026-11-12, outline plus the rendering contract)
+
+Read: module and class outlines of `tangl.prose` (1,675 lines) and
+`tangl.lang` (2,000 lines), import directions, and three sections of
+`EPISODE_SYUZHET_RENDERING.md`. Not read: function bodies, the other prose
+design notes (`PROSE_AUTHORING`, `CONCEPT_LINKED_PROSE`,
+`PRESENCE_PROSE_CONTRACT`).
+
+Derek's position: prose is still open. He wants it to follow media's pattern:
+pass in raw content, speakers and scene specifics, and rewrite the content to
+match current story state, as media finds or generates pictures and audio to
+match it. It is less obvious how, so it has been deferred.
+
+115. **Keep. The rendering contract already frames prose and media as one
+     family without forcing one representation.** Episode plus namespace goes
+     to a typed adapter, then to a fragment or a resource specification, then
+     to the journal. Adapters share namespace, referents, recursion and
+     provenance, and "do not need to share a template language, traversal
+     algorithm, intermediate representation, or output type". It lists six
+     levels of pre-baking, from a complete authored realization to generated
+     content with a fallback, and a static-to-dynamic axis. (V)
+116. **What prose has today.** A text-aspect seam (a target and a named
+     aspect, resolved through `render_text` dispatch); a recursive template
+     session (`TextRenderSession`); mu-blocks for dialog; concept-linked
+     naming by what the narrator knows; portraits. In the note's six levels
+     that covers authored text, template fill and recursive composition. (V)
+117. **Stage by stage against media.** (V for media, from finding 100 to 105;
+     V by outline for prose)
+
+     | Stage | Media | Prose |
+     |---|---|---|
+     | Authored form | id or path, inline data, or a `MediaSpec` | a string or template, callouts, or a target and aspect |
+     | A request object | `MediaSpec` | none |
+     | An open requirement on the graph | `MediaDep` | none; text is rendered inline during JOURNAL |
+     | Adapt to context | `on_adapt_media_spec` | aspect resolvers on `render_text` |
+     | Select or create | inventories, then forges | template fill only |
+     | Identity and re-use | content hash or spec fingerprint | none |
+     | Pending and fallback | yes | no |
+     | Output | `MediaFragment` | content, attributed and dialog fragments |
+     | Negotiated format | render and content profiles | `content_format` declared, unused |
+
+118. **`tangl.lang` is the rule-based rewriter that is not yet on the prose
+     path.** Pronouns, nominals, personal names, conjugation, a thesaurus.
+     It is imported by presence, demographics and assembly mechanics, and by
+     prose in one place (`naming.py`). In media's terms it is a forge with no
+     pipeline calling it. (V)
+119. **`story` and `prose` import each other.** `story` imports the render
+     session, the dialog handler and mu-block types from `prose`. `prose`
+     imports actors, blocks, roles, settings and the graph from `story`, but
+     only in `naming.py` and `portraits.py`. So the package holds two things:
+     a rendering substrate that sits below story, and two story extensions
+     that sit above it. Splitting them along that line restores a strict
+     import order. (V)
+120. **The four-layer rule does not say where prose, media, journal and
+     presentation sit.** AGENTS.md names core, vm, story and service.
+     Presentation is described elsewhere as a dependency floor. The others
+     are placed only by their imports. (V)
+
 ### Performance (measured 2026-11-10)
 
 Workload: a large downstream world, about 4,800 graph members, driven through
@@ -1574,6 +1632,31 @@ client's slice notes move to that client.
   Whether it lives in the service layer or a small client-side package is
   open.
 
+### P13. Prose on media's pattern: the missing pieces (mine; design is open)
+
+Not a design, a list of what finding 117 says is absent, in the order media
+acquired them:
+
+1. **A request object.** Raw content, the speaker, the scene specifics, and
+   the intent (voice, point of view, tense, language). The analogue of
+   `MediaSpec`.
+2. **An identity for a realization.** A hash of the request's
+   rendering-relevant projection, as media does with `fingerprint_payload`.
+   That makes a rewrite reproducible and re-usable, which matters more once a
+   rewriter is not deterministic.
+3. **A select-or-create step.** Use an authored realization if one matches;
+   otherwise fill, compose or rewrite. `tangl.lang` is the first rewriter;
+   a model-backed one would be another, as forges are for media.
+4. **Pending and fallback**, only if a rewriter is slow. The fallback is the
+   raw content, which always exists.
+5. **A negotiated output format**, by switching on the `content_format` that
+   is already declared.
+
+The journal already records what was told, so replay does not depend on a
+rewriter being repeatable; identity is for re-use and for re-voicing. Whether
+prose needs an open requirement on the graph, as media has, is the open
+question: text has no inventory to bind to today.
+
 ### P4. The save is the choice list (not discussed; deprioritized by P5)
 
 With P1 in place, a session is (world, seed, list of chosen edge ids and
@@ -1694,6 +1777,7 @@ Sizes are guesses.
 | 3af | Media: delete the one-line raster forge stub; move the #571 slices out of the package contract (findings 106, 107) | cleanup | S |
 | 3ag | Clients run the portable conformance fixtures: render or refuse explicitly (finding 112) | test | M |
 | 3ah | One shared session bridge for the in-process Python clients (finding 111) | simplify | M |
+| 3ai | Split `tangl.prose` into the rendering substrate (below story) and the naming and portrait extensions (above it); state where prose, media, journal and presentation sit in the layer rule (findings 119, 120) | simplify, docs | S |
 | 3ad | Presentation: remove or reserve fields with no producer or reader; one `emphasis` vocabulary; one hint carrier (findings 95, 96) | cleanup | S |
 | 3ae | Presentation: split the design note into contract and per-client slice notes; state the three questions and the two advice tiers (P11) | docs | S |
 | 4 | One shared clear-and-project helper for menu, sandbox and game hubs. It re-uses existing edges and assignments where they are still wanted and removes only the rest; this is what keeps resume valid on hubs | simplify | M |
