@@ -62,6 +62,7 @@ wording from the cited part of this tally.
 | B5 | Intrinsic contribution, extrinsic assembly (`get_ns` and `gather_ns`; journal handlers) | finding 33 | `VM_DESIGN.md` |
 | B6 | Two kinds of similarity; games as narrative devices with an authoring thumb on the scale | P5 | `VM_DESIGN.md` replay notes; mechanics design note |
 | B8 | The phase contract: shape only in provisioning; state in UPDATE or FINALIZE when possible, and why FINALIZE exists; what the journal may and may not change | finding 123 | `VM_DESIGN.md`, replay note |
+| B10 | The ontology in Derek's words: concept, episode, block, scene, episodic process, person, place and thing; and the line between story and prose, media, mechanics | finding 126 | `ARCHITECTURE.md` |
 | B9 | The story overlay as a translation table: each narrative name, its VM or core base, and the namespace contract it adds | finding 124, 125 | `ARCHITECTURE.md` or the story design note |
 | B7 | Authoring vocabulary: authors write `conditions` and `effects`; field is `availability`; type is `Predicate` | finding 72 | story or loader design note |
 
@@ -1333,13 +1334,31 @@ base was built as it was.
      the story layer's content, beyond naming, is how a bound thing appears
      to templates. That is the same surface prose references resolve against
      (finding 121). (V)
-126. **"Concept" and "Episode" are package names and Derek's words, not
-     types.** There is no `Concept` or `Episode` class. Concepts are `Node`
-     subclasses in `story/concepts`, where the role and setting edges also
-     live; episodes are `Block` and `Scene`. Nothing can select "any concept"
-     or "any episode" by kind except through the VM bases. Whether that
-     matters depends on fan-in, which speaks of concepts affording episodes.
-     (V)
+126. **The ontology, as Derek states it (2026-11-12).** This replaces my
+     remark that "Concept" and "Episode" lack classes; that is by design.
+     - Any concept is just any node. Nodes in a story graph are concepts.
+     - Traversable nodes are special concepts called episodes. One is a
+       block. A group is a scene, which is primarily a scope indicator for
+       shared namespace features.
+     - The DAG of episodes is the episodic process: typically a linear path
+       through the graph, emitting journal fragment leaves as each step
+       happens.
+     - Non-episodic concepts generally fall into three categories: a person,
+       a place, or a thing. They are bound through roles and settings, or
+       tracked as singleton token assets or fungible wallets.
+     - There are plenty of others (themes, story arcs, motifs), all more or
+       less the same concept with narrow contributions that depend on their
+       relationships to other concepts.
+     - The line between packages: story is what affects the shape of, and
+       path through, a story space. Prose, media and mechanics refine
+       appearance, presentation and interactivity. Voice and point of view
+       belong to prose or media.
+     Consequences for earlier findings: the asset wallets and tokens under
+     `story/concepts` are how "things" are tracked, so they are in the right
+     place (against my note in finding 127). And the question in finding 120,
+     where prose, media and the rest sit, has a criterion: does the feature
+     change shape or path, or only how things appear and are interacted
+     with.
 127. **Where story is not thin.** (V, by outline and size)
      - `system_handlers.py`, 978 lines: journal policy (content, media,
        choices, dialog composition), menu projection, finding an action by
@@ -1348,8 +1367,8 @@ base was built as it was.
        main work, after the resolver and the compiler.
      - `analysis.py`, 1,792 lines: graph projection and drawing. It is the
        largest file in the package and is tooling.
-     - `concepts/asset/`, about 600 lines: wallets, holders and transactions,
-       an economy mechanic living under story concepts.
+     - `concepts/asset/`, about 600 lines: wallets, holders and transactions.
+       By finding 126 this is where "things" are tracked, so it belongs here.
      - `story_graph.py`: template lineage maps and four override hooks,
        described in the package docstring as a compatibility alias.
 128. **Keep. The package docstring is an accurate map** of its five parts and
