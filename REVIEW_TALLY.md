@@ -61,6 +61,7 @@ wording from the cited part of this tally.
 | B4 | Container source and sink: the setup and cleanup bottleneck; the story as the outermost container | "Containers: one source, one sink" | `VM_DESIGN.md` |
 | B5 | Intrinsic contribution, extrinsic assembly (`get_ns` and `gather_ns`; journal handlers) | finding 33 | `VM_DESIGN.md` |
 | B6 | Two kinds of similarity; games as narrative devices with an authoring thumb on the scale | P5 | `VM_DESIGN.md` replay notes; mechanics design note |
+| B8 | The phase contract: shape only in provisioning; state in UPDATE or FINALIZE when possible, and why FINALIZE exists; what the journal may and may not change | finding 123 | `VM_DESIGN.md`, replay note |
 | B7 | Authoring vocabulary: authors write `conditions` and `effects`; field is `availability`; type is `Predicate` | finding 72 | story or loader design note |
 
 ### C. Evidence to attach to existing issues
@@ -1253,18 +1254,30 @@ match it. It is less obvious how, so it has been deferred.
        change the graph" (finding 53, and the journal history note) describe
        the rule, not the practice. Fragments stay out of the graph; some
        concept state does change during journaling.
-     - Classification: a guideline that is incomplete. There are two kinds of
-       change. Story effects, which are true whether or not they are told,
-       belong in UPDATE. Discourse effects, which become true by being told
-       (introduced, shown angry), happen in the telling.
-     - What keeps this compatible with "the journal could be in French and
-       land on the same state": a discourse effect must come from the markup,
-       the beat's semantic record (finding 122), and never from the realized
-       text. Introductions and attitudes both already meet that.
-     - Open: whether such effects are applied in place during the fold, which
-       lets later lines in the same block see them, or emitted as annotation
-       records and applied in FINALIZE, which the replay note prefers and
-       which would let a re-voicing replay them without rendering.
+     - **The contract, as Derek states it (2026-11-12), which replaces my
+       classification and my open question:** shape should only change during
+       provisioning. State should change during UPDATE or FINALIZE when
+       possible. The split into a pre and a post update exists for one
+       reason: if the prose is "player drops their {inv.sword.name}" and
+       UPDATE has already dropped the sword, the template cannot say what
+       happened. So the drop is recorded during FINALIZE and the template
+       evaluates against the starting state.
+     - The journal may own state changes on what it is talking about: a
+       speaker's attitude as it moves through a dialog, who she is
+       addressing, her last words, whether she overheard something. The rule
+       is: do not introduce or provision new concepts during journaling, and
+       only change state on the concepts being discussed, and only as far as
+       it pertains to this piece of prose, where possible.
+     - Rejected by Derek: a separate bookkeeping system that records such
+       changes and applies them later. So these apply in place, as
+       `introduce` already does. My "story effect versus discourse effect"
+       split and the record-then-FINALIZE option are withdrawn.
+     - What follows for the code: the debug guard in `_run_journal_phase`
+       tests the wrong thing. It hashes the whole graph and flags any change.
+       The violation is a change of shape, so the check should be on graph
+       membership, which is cheap, and the whole-graph hash goes (finding 53).
+       The replay note and the frame docstring should state the contract in
+       these terms.
 
 ### Performance (measured 2026-11-10)
 
@@ -1875,7 +1888,7 @@ Sizes are guesses.
 | 3af | Media: delete the one-line raster forge stub; move the #571 slices out of the package contract (findings 106, 107) | cleanup | S |
 | 3ag | Clients run the portable conformance fixtures: render or refuse explicitly (finding 112) | test | M |
 | 3ah | One shared session bridge for the in-process Python clients (finding 111) | simplify | M |
-| 3al | State the rule for discourse effects: declared in markup, applied during JOURNAL in order (or recorded and applied in FINALIZE); reconcile the replay note and the debug guard with it (finding 123) | design, docs | S |
+| 3al | State the phase contract in Derek's terms (shape only in provisioning; state in UPDATE or FINALIZE when possible; the journal may change state on the concepts it discusses, in place; no new concepts in JOURNAL) in the replay note and the frame docstring; make the JOURNAL guard a membership check, not a whole-graph hash (findings 53, 123) | docs, fix | S |
 | 3aj | Dialog attitude falls back to the speaker concept's current attitude when the line gives none; one resolution order for line, concept, neutral (finding 122) | feature | S |
 | 3ak | Dialog speaker and hook lookup by protocol, without `getattr` probing or the broad `except` (finding 122) | cleanup | S |
 | 3ai | Split `tangl.prose` into the rendering substrate (below story) and the naming and portrait extensions (above it); state where prose, media, journal and presentation sit in the layer rule (findings 119, 120) | simplify, docs | S |
