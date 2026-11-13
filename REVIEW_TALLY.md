@@ -1213,6 +1213,30 @@ match it. It is less obvious how, so it has been deferred.
        so it could be done once when the world is compiled. (V; `linking.py`
        read in full, `naming.py` in part)
 
+122. **A dialog callout already fans out to style and media, but only from
+     what is written on the line.** Derek: the mini-markup is in effect a
+     shortcut for a prose spec, the complement of a media spec. It is dumber
+     in what it does (identify concepts, not define how one looks or sounds)
+     and far more complicated in what it is asked to do (many concepts,
+     disjoint and related, not one at a time). It also has to bridge to
+     media, because the prose holds the attitude: `> [!dialog.angry] Aria`
+     becomes a client style and a grimace on the portrait. Or the line is
+     just `> [!dialog] Aria` and the engine already knows Aria is angry, so
+     that has to propagate.
+     In `prose/dialog.py`:
+     - the attitude is read only from the callout header (the part after
+       `dialog.`); with none written it is `None`;
+     - it becomes a style tag, `attitude:<value>`, on the fragment;
+     - it is passed to the speaker's `adapt_look_media_spec` or dialog image,
+       and carried as `speaker_attitude` for the portrait composer, which
+       maps attitude to an expression;
+     - nothing asks the concept for its current attitude when the line gives
+       none. The second case Derek describes is not implemented.
+     Also: the speaker is found by probing the namespace with `getattr` for
+     `name`, `get_label` and `goes_by`, the last inside a broad `except
+     Exception`, and the style and media hooks are found with
+     `callable(getattr(...))`. (V)
+
 ### Performance (measured 2026-11-10)
 
 Workload: a large downstream world, about 4,800 graph members, driven through
@@ -1687,6 +1711,16 @@ acquired them:
 5. **A negotiated output format**, by switching on the `content_format` that
    is already declared.
 
+After findings 121 and 122, a sharper statement of item 1 (mine): the
+callout line is not itself the prose spec. It is the beat's semantic record:
+who speaks, in what attitude, saying what, referring to whom. A text
+realization, a style tag and a media request are each projected from it, so
+attitude belongs to neither prose nor media. The markup's job is reference
+and local override; concepts hold the defaults and nominate them when asked
+(as `nominate_portrait_look` already does); adapters realize. Attitude then
+resolves the way names do: what the line says, else what the concept
+currently is, else neutral.
+
 The journal already records what was told, so replay does not depend on a
 rewriter being repeatable; identity is for re-use and for re-voicing. Whether
 prose needs an open requirement on the graph, as media has, is the open
@@ -1812,6 +1846,8 @@ Sizes are guesses.
 | 3af | Media: delete the one-line raster forge stub; move the #571 slices out of the package contract (findings 106, 107) | cleanup | S |
 | 3ag | Clients run the portable conformance fixtures: render or refuse explicitly (finding 112) | test | M |
 | 3ah | One shared session bridge for the in-process Python clients (finding 111) | simplify | M |
+| 3aj | Dialog attitude falls back to the speaker concept's current attitude when the line gives none; one resolution order for line, concept, neutral (finding 122) | feature | S |
+| 3ak | Dialog speaker and hook lookup by protocol, without `getattr` probing or the broad `except` (finding 122) | cleanup | S |
 | 3ai | Split `tangl.prose` into the rendering substrate (below story) and the naming and portrait extensions (above it); state where prose, media, journal and presentation sit in the layer rule (findings 119, 120) | simplify, docs | S |
 | 3ad | Presentation: remove or reserve fields with no producer or reader; one `emphasis` vocabulary; one hint carrier (findings 95, 96) | cleanup | S |
 | 3ae | Presentation: split the design note into contract and per-client slice notes; state the three questions and the two advice tiers (P11) | docs | S |
