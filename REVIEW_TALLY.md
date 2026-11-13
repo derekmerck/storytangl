@@ -35,17 +35,18 @@ with the project interpreter and `PYTHONPATH=engine/src`.
 
 | # | Work | Basis | Done when |
 |---|---|---|---|
-| A1 | Raise the default `checkpoint_cadence` above 1 | Derek: cadence 1 was scaffolding; finding 25 | default changed; rollback tests still pass |
-| A2 | Gate the pre-journal whole-graph hash behind the debug check | finding 53 | hash taken only when debug logging is on |
-| A3 | Large-graph timing guard: one synthetic graph, a per-choice budget | finding 55; Derek expected this test to exist | test fails if a choice exceeds the budget |
-| A4 | Hoist the identical `set_provider` / `set_successor` bodies of `Dependency` and `Affordance` to `HasRequirement` | finding 4, confirmed by the board agent | one implementation; tests unchanged |
-| A5 | Cold-process tests pass the source path explicitly | finding 20 | they pass from a worktree with a stale editable install |
-| A6 | Make `test_manual_topic_facets_drive_find_map_and_pack` build from a fixture | corrections section | passes with and without `tmp/devref/issues.json` |
-| A7 | Service conformance test: remote client and REST routes match the `ServiceMethodSpec` table | finding 48; Derek agrees on a single source | test fails on drift; nothing generated |
+| A1 | Done: PR 679 (2026-11-13). Default cadence is ten completed choices; witnesses compare 20 choices at cadences 10 and 1, constructor and JSON restore, forced snapshots, and rollback inside an open call | Derek; finding 25 | done |
+| A2 | Done: PR 677 (2026-11-12). The journal diagnostic hashes run only with debug logging on; the docstring now says UPDATE and FINALIZE are the usual home for story effects and a voice may intentionally change state during JOURNAL | finding 53, 123 | done |
+| A3 | Large-graph timing guard: one synthetic graph and a per-choice budget. Start with a generous threshold so shared CI runners do not make it flaky, and record the measured time | finding 55; issues agent's note | test fails only on a large regression; the measurement is logged |
+| A4 | Optional, downgraded. Within each of `Dependency` and `Affordance`, have `set_successor` delegate to `set_provider` (including clearing), and pin the shared binding contract with one parametrized test over both. Do not hoist into `HasRequirement`: it is not an `Edge` and has no `set_successor`, so my original wording was wrong. A shared base is worth it only if the binding policy grows | finding 4; design agent's review | 17 duplicated lines per class reduced; both classes behave identically under the shared test |
+| A5 | Done: PR 678 (2026-11-13) | finding 20 | done |
+| A6 | Done: PR 678 (2026-11-13) | corrections section | done |
+| A7 | Partly done: PR 680 (2026-11-13) added an operation-to-route inventory and bounded conformance checks, and in doing so found that remote preflight compiled the world locally. Remaining: extend the same check to every operation | finding 48 | every `ServiceMethodSpec` entry has a checked route or a stated exemption |
 | A8 | Validator, report only: edges that enter a container at a member or leave from a non-sink member | finding 77 | `validate_traversal_contracts` lists them; no world fails |
 | A9 | Invariant test, expected to fail on hubs for now: planning a node twice against unchanged state leaves ids and order unchanged | grounding must be repeatable | test exists, marked expected-fail where it fails |
 | A11 | Guard test: no `json.dumps`, `json.loads`, `model_dump` or `model_validate` in `core`, `vm` or `story` outside an allow-list (today: `core/bases.py`, `core/base_fragment.py`, `core/token.py`, `story/episode/action.py`, `story/fabula/compiler.py`, `story/analysis.py`) | Derek, 2026-11-12: agents write their own serializers unless stopped; finding 89 | test fails on a new site; allow-list is explicit |
-| A12 | Each client's tests load the portable fixtures in `engine/contrib/conformance/fixtures` and, for each one, either render it or refuse it explicitly. Start with the in-process Python clients (pygame bridge, Ren'Py bridge, the real CLI controller); then the web client, reading the same JSON files in place of its own copies. Use pygame's `UnsupportedAccepts` as the model for refusal | Derek, 2026-11-12; finding 112 | one parametrized test per client over the fixture directory; a crash or a silent drop fails; each client's refusals are listed in one place |
+| A12 | Each client's tests load the portable fixtures in `engine/contrib/conformance/fixtures` and, for each one, either render it or refuse it explicitly. Start with the in-process Python clients (pygame bridge, Ren'Py bridge, the real CLI controller); then the web client, reading the same JSON files in place of its own copies. Use pygame's `UnsupportedAccepts` as the model for refusal. The rule: core content, choices and input kinds must be rendered or explicitly refused; optional stylistic hints may be ignored | Derek, 2026-11-12; finding 112 | one parametrized test per client over the fixture directory; a crash or a silent drop fails; each client's refusals are listed in one place |
+| A13 | Witness test: reading a committed journal is observational. Calling `get_journal` or `get_story_update` any number of times, in any render profile, leaves the graph unchanged. (State changes made while a journal entry is being built are allowed by the phase contract; this pins the other half.) | issues agent, second review; finding 123 | graph hash equal before and after repeated reads |
 | A10 | Done: PR 676 merged to `main` as `e95281c1` on 2026-11-11 (Python dependency update; web job pinned to Ubuntu 24.04). Follow-up: return the web job to `ubuntu-latest` once that image installs cleanly; the web lockfile and three held-back Python packages are still open | dependency alerts | done |
 
 ### B. Ready to write down: Derek's stated intent, not yet in the design notes
@@ -85,6 +86,65 @@ basis (P3); lowering `predicate:` (needs a compatibility check across nine
 worlds first); per-hop tracing on a cadence (measured, but changes what
 rollback can rely on; needs an owner's decision in #548 or #472); both
 clean-slate sketches.
+
+## Second round of outside review (2026-11-13)
+
+The issues-board agent reviewed the revised tally, and the design agent
+reviewed handoff item A4. Checked against the code and against what has
+landed on `main`.
+
+**Landed since the handoff list was written:** PR 677 (A2), PR 678 (A5, A6),
+PR 679 (A1), PR 680 (part of A7).
+
+**Timing on current `main`** (same large graph, five choices, one run, so
+indicative only): 4.73 s per choice as shipped, 3.65 s with checkpoints off,
+0.42 s with per-hop tracing also off. On 2026-11-10 those were 5.41, 4.05 and
+0.74. The floor fell by about 0.3 s, which fits removing the journal hashes.
+Per-hop tracing is still about 3.2 s of every choice and is the remaining
+large item (3k).
+
+**Adopted:**
+
+- A4 downgraded and reworded. The design agent is right that the setters
+  call `Edge.set_successor` and cannot move into `HasRequirement` as written,
+  and that the gain is 17 lines. Both classes bind the provider to
+  `successor`; the pull or push difference is in how the resolver treats
+  them (finding 7).
+- A witness that reading a committed journal changes nothing (A13). State
+  changes while an entry is built are within the phase contract as Derek
+  states it; reads must stay observational.
+- A consequence the issues agent's question exposes: a call that returns at
+  PLANNING re-runs JOURNAL on its caller (findings 58, 66), so any state the
+  journal changes is applied a second time. Introductions and attitudes are
+  idempotent; a counter is not. This belongs with #560.
+- "The episode DAG" is the unfolded process, not the authored graph. Hubs and
+  self-loops make the authored traversable graph cyclic; it is the sequence
+  of occurrences that forms the order. Derek's term, the episodic process,
+  already says this. The four-level table should use it.
+- For A12: core content, choices and inputs are rendered or refused;
+  optional hints may be ignored.
+- For P11: unify the hint vocabulary before the carrier. Choice hints,
+  staging hints and content hints apply to different things.
+- Promote the scope and navigation distinction to the design notes now;
+  keep P10's routing through source and sink unimplemented.
+- For prose: the semantic beat with several coordinated realizations is the
+  hypothesis to carry, and the attitude fallback (3aj) is a bounded feature
+  on its own. No prose request class or dependency system yet.
+- The principle, in the issues agent's words: two systems can obey the same
+  law without sharing an implementation class.
+
+**Not adopted, or overtaken:**
+
+- Holding A1 for a rollback check: PR 679 landed with those witnesses.
+- Treating the journal's right to change state as an open foundational
+  debate: Derek has stated the contract and PR 677 wrote it into the
+  docstring. What remains is the one witness (A13) and the re-entry
+  consequence above.
+- On 3ab, the caution that restored data crosses a trust boundary is fair
+  but narrower than Derek's rule (data that was unstructured from something
+  legal is legal by fiat). Narrowed to: skip validation for in-process
+  snapshot copies first, where the measured cost is; leave loads from
+  storage validating until that is decided separately.
 
 ## Corrections after the board comparison (2026-11-11)
 
@@ -2014,7 +2074,7 @@ Sizes are guesses.
 | 3x | Validator reports edges that enter a container at a member or leave from a non-sink member (finding 77); report only at first | test | S |
 | 3z | Story as the root container: fold `story_ready`, entry selection and priming into its source; add its sink as the end-of-story point that updates the user (findings 79, 80) | design | M |
 | 3y | Container setup at the source and cleanup at the sink, with cross-container edges lowered through them (P10) | design | M |
-| 3ab | Trusted `structure`: skip validation for data that came from `unstructure` (finding 89); measure against the timing guard | perf | S |
+| 3ab | Trusted `structure` for in-process snapshot copies first: skip validation there and measure; loads from storage keep validating until decided separately (finding 89) | perf | S |
 | 3ac | Generated edges built by structuring plain data, not by direct constructor calls (finding 89); pairs with P1 | simplify | M |
 | 3aa | One wiring pass list used by both the batch and the per-node path; one path for container setup (finding 83) | simplify | S |
 | 3af | Media: delete the one-line raster forge stub; move the #571 slices out of the package contract (findings 106, 107) | cleanup | S |
