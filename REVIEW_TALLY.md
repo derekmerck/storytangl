@@ -1272,12 +1272,18 @@ match it. It is less obvious how, so it has been deferred.
        changes and applies them later. So these apply in place, as
        `introduce` already does. My "story effect versus discourse effect"
        split and the record-then-FINALIZE option are withdrawn.
-     - What follows for the code: the debug guard in `_run_journal_phase`
-       tests the wrong thing. It hashes the whole graph and flags any change.
-       The violation is a change of shape, so the check should be on graph
-       membership, which is cheap, and the whole-graph hash goes (finding 53).
-       The replay note and the frame docstring should state the contract in
-       these terms.
+     - **Strength of the rule (Derek, same day).** "No provisioning during
+       journaling" is a rule of thumb. There is probably an easier way to do
+       whatever it is for, and the VM has no reason to do it today. An author
+       who does it in a handler is using the engine off label, and bugs or
+       cost there are theirs. It is a different kind of rule from "no JSON
+       dumping except in the permitted place", which is hard and gets a test
+       (handoff A11).
+     - So for the code: no guard and no enforcement. The whole-graph hash
+       taken before JOURNAL can simply go (finding 53); a membership check in
+       its place, which I suggested, would overweight the rule. The replay
+       note and the frame docstring should state the contract in Derek's
+       terms and say which parts are rules of thumb.
 
 ### Performance (measured 2026-11-10)
 
@@ -1888,7 +1894,7 @@ Sizes are guesses.
 | 3af | Media: delete the one-line raster forge stub; move the #571 slices out of the package contract (findings 106, 107) | cleanup | S |
 | 3ag | Clients run the portable conformance fixtures: render or refuse explicitly (finding 112) | test | M |
 | 3ah | One shared session bridge for the in-process Python clients (finding 111) | simplify | M |
-| 3al | State the phase contract in Derek's terms (shape only in provisioning; state in UPDATE or FINALIZE when possible; the journal may change state on the concepts it discusses, in place; no new concepts in JOURNAL) in the replay note and the frame docstring; make the JOURNAL guard a membership check, not a whole-graph hash (findings 53, 123) | docs, fix | S |
+| 3al | State the phase contract in Derek's terms (shape only in provisioning; state in UPDATE or FINALIZE when possible; the journal may change state on the concepts it discusses, in place; no new concepts in JOURNAL) in the replay note and the frame docstring, marked as a rule of thumb; remove the whole-graph hash before JOURNAL and add no replacement guard (findings 53, 123) | docs, fix | S |
 | 3aj | Dialog attitude falls back to the speaker concept's current attitude when the line gives none; one resolution order for line, concept, neutral (finding 122) | feature | S |
 | 3ak | Dialog speaker and hook lookup by protocol, without `getattr` probing or the broad `except` (finding 122) | cleanup | S |
 | 3ai | Split `tangl.prose` into the rendering substrate (below story) and the naming and portrait extensions (above it); state where prose, media, journal and presentation sit in the layer rule (findings 119, 120) | simplify, docs | S |
