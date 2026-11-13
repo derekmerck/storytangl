@@ -1237,6 +1237,35 @@ match it. It is less obvious how, so it has been deferred.
      Exception`, and the style and media hooks are found with
      `callable(getattr(...))`. (V)
 
+123. **Journaling changes concept state, by intent and already in code.**
+     Derek: this is one of the ways journaling can update concept state. If
+     the journal assigns a character a new attitude midway, her
+     `state.attitude` can be updated.
+     - It already happens for introductions. `introduce` sets a concept's
+       narrator knowledge to `IDENTIFIED` while the block is being rendered in
+       JOURNAL, and that knowledge is persisted on the concept. (V)
+     - The stated phase contract says otherwise. The replay note describes
+       JOURNAL as render only, with FINALIZE for "mutations that JOURNAL
+       described happening". The frame hashes the graph before JOURNAL and, at
+       debug level only, logs "JOURNAL mutation detected ... prefer
+       UPDATE/FINALIZE for state mutation or emit annotation records". (V)
+     - So earlier statements in this tally that JOURNAL "is expected not to
+       change the graph" (finding 53, and the journal history note) describe
+       the rule, not the practice. Fragments stay out of the graph; some
+       concept state does change during journaling.
+     - Classification: a guideline that is incomplete. There are two kinds of
+       change. Story effects, which are true whether or not they are told,
+       belong in UPDATE. Discourse effects, which become true by being told
+       (introduced, shown angry), happen in the telling.
+     - What keeps this compatible with "the journal could be in French and
+       land on the same state": a discourse effect must come from the markup,
+       the beat's semantic record (finding 122), and never from the realized
+       text. Introductions and attitudes both already meet that.
+     - Open: whether such effects are applied in place during the fold, which
+       lets later lines in the same block see them, or emitted as annotation
+       records and applied in FINALIZE, which the replay note prefers and
+       which would let a re-voicing replay them without rendering.
+
 ### Performance (measured 2026-11-10)
 
 Workload: a large downstream world, about 4,800 graph members, driven through
@@ -1846,6 +1875,7 @@ Sizes are guesses.
 | 3af | Media: delete the one-line raster forge stub; move the #571 slices out of the package contract (findings 106, 107) | cleanup | S |
 | 3ag | Clients run the portable conformance fixtures: render or refuse explicitly (finding 112) | test | M |
 | 3ah | One shared session bridge for the in-process Python clients (finding 111) | simplify | M |
+| 3al | State the rule for discourse effects: declared in markup, applied during JOURNAL in order (or recorded and applied in FINALIZE); reconcile the replay note and the debug guard with it (finding 123) | design, docs | S |
 | 3aj | Dialog attitude falls back to the speaker concept's current attitude when the line gives none; one resolution order for line, concept, neutral (finding 122) | feature | S |
 | 3ak | Dialog speaker and hook lookup by protocol, without `getattr` probing or the broad `except` (finding 122) | cleanup | S |
 | 3ai | Split `tangl.prose` into the rendering substrate (below story) and the naming and portrait extensions (above it); state where prose, media, journal and presentation sit in the layer rule (findings 119, 120) | simplify, docs | S |
