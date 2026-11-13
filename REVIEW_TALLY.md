@@ -1291,6 +1291,11 @@ match it. It is less obvious how, so it has been deferred.
        built-in JOURNAL handlers do not change graph membership on the
        in-repo worlds. Worlds and plugins are not checked. The replay note
        and the frame docstring should state the contract in Derek's terms.
+     - **How the rules change (Derek).** Even the hard ones are negotiable.
+       "No state change during journaling" was hard until legitimate
+       counterexamples appeared. The rule was not scrapped; the smallest
+       exception that met the need was carved out, keeping the rule simple.
+       That is the history behind the present wording.
      - The same scope applies to the serialization test (A11): it covers
        `core`, `vm` and `story`, not worlds or mechanics.
 
