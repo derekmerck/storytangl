@@ -1279,11 +1279,20 @@ match it. It is less obvious how, so it has been deferred.
        cost there are theirs. It is a different kind of rule from "no JSON
        dumping except in the permitted place", which is hard and gets a test
        (handoff A11).
-     - So for the code: no guard and no enforcement. The whole-graph hash
-       taken before JOURNAL can simply go (finding 53); a membership check in
-       its place, which I suggested, would overweight the rule. The replay
-       note and the frame docstring should state the contract in Derek's
-       terms and say which parts are rules of thumb.
+     - **Who a rule binds (Derek).** The rules are hard for core feature
+       development: an agent should not add state changes in journaling
+       because it does not know where they belong. They may be worth testing
+       in that context. For authors and plugins there are no hard rules;
+       off-label use is unsupported and theirs to own, and guards against it
+       are not worth building.
+     - So for the code: no runtime guard. The whole-graph hash taken before
+       JOURNAL can go from the runtime path (finding 53). If a check is
+       wanted, it belongs in the engine's own tests: assert that the engine's
+       built-in JOURNAL handlers do not change graph membership on the
+       in-repo worlds. Worlds and plugins are not checked. The replay note
+       and the frame docstring should state the contract in Derek's terms.
+     - The same scope applies to the serialization test (A11): it covers
+       `core`, `vm` and `story`, not worlds or mechanics.
 
 ### Performance (measured 2026-11-10)
 
@@ -1894,7 +1903,7 @@ Sizes are guesses.
 | 3af | Media: delete the one-line raster forge stub; move the #571 slices out of the package contract (findings 106, 107) | cleanup | S |
 | 3ag | Clients run the portable conformance fixtures: render or refuse explicitly (finding 112) | test | M |
 | 3ah | One shared session bridge for the in-process Python clients (finding 111) | simplify | M |
-| 3al | State the phase contract in Derek's terms (shape only in provisioning; state in UPDATE or FINALIZE when possible; the journal may change state on the concepts it discusses, in place; no new concepts in JOURNAL) in the replay note and the frame docstring, marked as a rule of thumb; remove the whole-graph hash before JOURNAL and add no replacement guard (findings 53, 123) | docs, fix | S |
+| 3al | State the phase contract in Derek's terms (shape only in provisioning; state in UPDATE or FINALIZE when possible; the journal may change state on the concepts it discusses, in place; no new concepts in JOURNAL) in the replay note and the frame docstring, saying it binds core development and not authors or plugins; remove the whole-graph hash before JOURNAL from the runtime path; optionally a test that the engine's own JOURNAL handlers do not change membership (findings 53, 123) | docs, fix | S |
 | 3aj | Dialog attitude falls back to the speaker concept's current attitude when the line gives none; one resolution order for line, concept, neutral (finding 122) | feature | S |
 | 3ak | Dialog speaker and hook lookup by protocol, without `getattr` probing or the broad `except` (finding 122) | cleanup | S |
 | 3ai | Split `tangl.prose` into the rendering substrate (below story) and the naming and portrait extensions (above it); state where prose, media, journal and presentation sit in the layer rule (findings 119, 120) | simplify, docs | S |
