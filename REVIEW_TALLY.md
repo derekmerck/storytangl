@@ -822,6 +822,24 @@ logic for the first graph entry, where it should be the ordinary source
 pattern any scene might have. Scenes have the same problem; it has not been
 hit hard enough to solve yet.
 
+Derek, 2026-11-12: episode containers conflate two ideas. They grew out of
+scopes: assign a villain or a hero to this scene, write "Aria the Bard" in
+the content, and if she is later replaced by "Darth Vader" every node in the
+region knows about the role change. But a scope is often jumped into and out
+of, from a table of contents or from one book to the next, so containers
+ended up carrying a lot of water for the VM's stepper, which wanted to move
+from group to group without knowing anything about groups.
+
+So a container is two things under one name: a scope (who and what is shared
+here) and a navigation unit (where you enter and leave). Scope is the origin
+and the primary meaning. In the code both hang off the same membership:
+`ancestors` feeds the namespace and provisioning folds, and `source_id` and
+`sink_id` feed descent. The two usually coincide in a scene. They need not: a
+table of contents is a navigation unit with nothing shared, and the sandbox
+already has a scope that is not a traversal container (`SandboxScope` holds
+the clock for its locations). P10 is about the navigation half; the scope
+half is finding 32 and the scene-as-scope reading in finding 126.
+
 79. **First entry is special-cased in at least five places.** (V)
     - `StoryGraph.initial_cursor_id`, set and overridden in
       `story/fabula/world.py`. (`initial_cursor_ids`, plural, is not a
