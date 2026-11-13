@@ -98,11 +98,12 @@ the traversal produced them.
 
 The syuzhet is presentation-agnostic.  The same journal can be rendered as
 terminal text, a rich web page, or an ebook.  Fragment types carry semantic
-roles (narrative content, dialog, choices, media) but not rendering instructions.
+roles (narrative content, dialog, choices, media).  Presentation advice travels
+with them as optional hints that a client may honour or ignore.
 The service layer translates fragments into a specific presentation format based
 on client capabilities.
 
-**Implementation:** `Journal` / `OrderedRegistry` of `BaseFragment` subclasses
+**Implementation:** an `OrderedRegistry` of `BaseFragment` subclasses
 (`ContentFragment`, `ChoiceFragment`, `MediaFragment`); service-layer render
 profiles transform fragments for specific clients.
 
@@ -117,8 +118,165 @@ The same fabula can produce radically different syuzhets depending on:
 
 This is not a theoretical nicety.  It means you can test structural properties
 (reachability, completability, role satisfaction) against the fabula *before*
-any traversal happens, and you can replay a specific syuzhet deterministically
-from a snapshot plus a choice log.
+any traversal happens, and you can reproduce a specific walk from its starting
+configuration and its choices (see Determinism and Replay).
+
+## Working Laws
+
+These are the rules the design is trying to obey, stated by the designer during
+a whole-project review in November 2026.  They name no classes on purpose: they
+should hold for any implementation.  They are intent.  Where the current code
+differs, the package design notes and the issues that own the area say so.
+
+### 1. Four orderings of one space
+
+The three models above are four levels once the possibility space is split into
+what is authored and what is instantiated.  Each level adds order to the one
+before it.
+
+| Level | What it is | Order |
+| --- | --- | --- |
+| World | templates and rules | none |
+| Story graph | one grounded configuration of that space | relations only |
+| Episodic process | the walk through the traversable concepts | partial |
+| Journal | what was told | total |
+
+The episodes mediate between the linear journal and the non-linear story
+graph, which is itself one configuration of the ambient story space: like using
+a graph to order data with a heapsort.  The fabula covers the first two rows.
+
+The order belongs to the walk, not to the authored graph.  Hubs and self-loops
+make the authored traversable graph cyclic; it is the sequence of occurrences
+that is ordered.
+
+Journal fragments were once leaves hanging off the episodes that produced them,
+and a journal was read out by walking any group of episodes.  They are stored
+apart from the graph now, for size and so that story state can be compared
+without the telling.  The full tree, from world to fragment, can still be
+reassembled.
+
+### 2. Concepts and episodes
+
+- Any node in a story graph is a **concept**.
+- A traversable concept is an **episode**.  One is a block.  A group is a scene,
+  which is primarily a scope for shared names.
+- Concepts that are not episodes are mostly a **person, place, or thing**.  They
+  are bound through roles and settings, or tracked as single tokens or fungible
+  holdings.
+- Themes, arcs and motifs are the same kind of concept, contributing narrowly
+  through their relationships to other concepts.
+
+### 3. Two readings of one rule
+
+A world can be written imperatively, in the manner of a gamebook: *if this and
+this, then go there*.  It can be written declaratively: *this is what can be
+reached when that and that hold*.  These are two readings of the same rule, and
+a world may be made entirely of either.  Both exist because episodes beg for
+the if-then form, while most concepts do not need to be ordered.
+
+Materialization assembles what was declared so that it can be walked.  Eager
+materialization assembles everything.  Provisional materialization assembles
+what is here and coming up.  A template is an affordance for the provisioner: a
+concept or episode that comes into being when its conditions are met.  It reads
+as an imperative only because it is created on demand.
+
+It follows that assembling is repeatable: the same declarations against the same
+state should change nothing.
+
+### 4. Pull and push
+
+An open link is an edge with one end fixed and a requirement describing the
+other.  A **dependency** is fixed at the one that needs something, and pulls.
+An **affordance** is fixed at the one that offers something, and waits.  A
+**fan-out** is a set of dependencies generated at a node, reaching for nearby
+satisfiers.  A **fan-in** is the set of latent affordances, created when their
+scope is entered, that can offer themselves on a node: home offers *go home*,
+a character offers *call her*.  See
+[AFFORDANCE_MODEL.md](../planning/AFFORDANCE_MODEL.md) for the canonical
+treatment.
+
+### 5. Shape and state
+
+- **Shape** should change only during provisioning.
+- **State** should change during update or finalize when possible.
+- There are two update phases because of prose.  If the text says the player
+  drops the sword they are carrying and the sword has already been dropped, the
+  text can no longer say what happened.  So the drop is recorded after the
+  telling, and the telling reads the starting state.
+- The **telling may change state on what it is talking about**: a speaker's
+  attitude as it moves through a conversation, whom they are addressing, what
+  they last said, what has been introduced to the reader.  It should not bring
+  new concepts into being, and should touch only what this piece of prose is
+  about.
+- Reading a journal that has already been committed changes nothing.
+
+### 6. Scope and navigation
+
+A container is two things under one name.
+
+| Role | What it answers |
+| --- | --- |
+| Scope | who and what is shared here |
+| Navigation unit | where a walk enters and leaves |
+
+Scope is the origin and the primary meaning: assign a villain to *this* scene,
+refer to them by name in the content, and if they are recast every episode in
+the region knows.  The navigation role accreted because scopes are jumped into
+and out of.
+
+A navigation unit has one source and one sink.  The source sets up wherever the
+walk should land and forwards it there.  The sink finalizes the container and
+forwards the walk out, back or onward.  Entered at the source and left at the
+sink, a whole container is a single node at the next level up, and the whole
+story is the outermost container.  An intended ending is a sink; running out of
+choices anywhere else is a softlock.
+
+A world may bind a place to an episode, so that moving between places is moving
+between episodes, as in a cave adventure.  It may instead bind a place to a
+scene as a setting, as in a calendar of events.  These are two lowerings of the
+same idea.
+
+### 7. What belongs to story
+
+Story is what affects the shape of, and the path through, a story space.
+Prose, media and mechanics refine appearance, presentation and interactivity.
+Voice and point of view belong to prose or media.
+
+The same test applies at other scales.  Two states belong to the same
+**equivalence class** when nothing downstream can tell them apart: leaving a
+room and returning with nothing changed is no move at all, and picking
+something up now or later is the same if nothing depends on when.  (The term
+follows Andrew Plotkin's
+[PlotEx](https://eblong.com/zarf/plotex/).)  At what scale "tell apart" is
+judged is left open.
+
+Games here are interactive storytelling affordances.  They may be fair, and a
+fair game is a good first step, but an author must be able to put a thumb on
+the scale to any degree.  Chance should dress an outcome more often than decide
+it.
+
+### 8. Two kinds of similarity
+
+- **Self-similarity.**  Given one starting configuration, the same walk
+  reproduces.
+- **Outcome similarity.**  A different starting configuration and the same
+  choices land on essentially the same story state, though identities differ
+  and the telling may differ entirely: the journal might be in French.
+
+A seed is an option for testing, not a requirement.  The second kind holds only
+where chance has little influence on provisioning and on which paths are open.
+Replay does not have to be draconian; determinism becomes fuzzier the lighter
+the author's thumb, and that is acceptable.
+
+### 9. Whom the rules bind
+
+These rules are firm for work on the engine itself.  For authors and plugins
+they are rules of thumb: off-label use is unsupported and theirs to own, and
+the engine does not guard against it.  Even the firm rules are negotiable.
+When a real case collides with one, the rule is kept and the smallest exception
+that meets the need is carved out.
+
+---
 
 ## Concepts As Continuity Anchors
 
@@ -437,31 +595,45 @@ Presenter → typed journal fragments + an application/client presentation adapt
 
 ## Determinism and Replay
 
-Every mutation in the engine is **event-sourced**: state changes are captured
-as patches in the ledger, and the complete history of a story instance is
-reproducible from a snapshot plus the patch log.
+Working law 8 states the intent: a walk reproduces from its starting
+configuration, and the same choices from a different start land on essentially
+the same story state.  This section says why that matters and what the engine
+currently does about it.
 
-This is not just an implementation convenience — it's a **narratological
-commitment**.  The syuzhet is a *particular* collapse of the fabula.  To
-study narrative structure, you need to be able to replay that collapse,
-branch from any point, and compare alternative collapses.  Without
-deterministic replay, the engine would be a storytelling tool.  With it,
-the engine is a **narratological instrument**.
+It is a **narratological commitment** as much as an implementation choice.  The
+syuzhet is a *particular* collapse of the fabula.  To study narrative
+structure, you need to be able to reproduce that collapse, branch from a point,
+and compare alternative collapses.  Without that, the engine would be a
+storytelling tool.  With it, the engine is a **narratological instrument**.
 
-Determinism requires discipline:
+What supports it today:
 
-- **Seeded RNG** — random choices during provisioning use a seed derived
-  from `(story_id, step, choice_hash)`, so the same choice at the same
-  point always produces the same outcome
-- **Ordered dispatch** — handler execution follows deterministic priority
-  ordering within each phase; receipts record exactly what ran
-- **External IO logging** — any non-deterministic input (LLM responses,
-  media generation) is recorded in the patch so replay doesn't need to
-  re-invoke external services
+- **A record per step.**  The ledger keeps a step record and a state delta for
+  every traversal hop, and a full checkpoint at the start and periodically
+  thereafter.  Rollback restores a checkpoint and applies the deltas after it;
+  each delta carries the state hash before and after, so a mismatch is
+  detected.
+- **Seeded chance.**  Random draws during a step come from a generator seeded
+  from the current story state, the cursor and the step, so re-planning the
+  same step gives the same result.
+- **Ordered dispatch.**  Handlers run in a defined priority order within each
+  phase, and receipts record what ran.
+- **Recorded realizations.**  The journal stores what was told, so reproducing
+  a telling does not depend on re-running whatever produced it.  Generated
+  media keeps the request it was made from and the hash of its content.
 
-**Implementation:** `Ledger` (event-sourced patch log); `DiffReplay`
-(snapshot + patches → reconstructed state); seeded RNG in resolver;
-`JobReceipt` audit trail on every dispatch.
+What it does not yet do:
+
+- Two stories created from the same world do not share identities, so a list
+  of choices from one cannot be applied to another by identifier.
+- The step record names the edge that was chosen but not any payload that came
+  with the choice.
+- Nothing re-executes a list of choices and compares the result with the
+  recorded one.
+
+**Implementation:** `Ledger` (step records, replay deltas, checkpoints);
+`DiffReplayEngine`; the seeded generator on `Frame`; `CallReceipt` on every
+dispatch.
 
 ---
 
