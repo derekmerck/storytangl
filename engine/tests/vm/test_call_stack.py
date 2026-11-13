@@ -675,9 +675,10 @@ class TestFrameCallReturn:
             return BaseFragment(fragment_type="content", content="The call closes.")
 
         with _cleanup_behaviors(emit_completion):
-            ledger = _ledger(g, caller)
+            ledger = Ledger.from_graph(g, entry_id=caller.uid)
             ledger.resolve_choice(call_edge.uid)
-            restored = Ledger.structure(ledger.unstructure())
+            from tangl.persistence.serializers import JsonSerializationHandler as Json
+            restored = Ledger.structure(Json.deserialize(Json.serialize(ledger.unstructure())))
             restored_choice = restored.graph.get(internal_choice.uid)
 
             assert isinstance(restored_choice, TraversableEdge)

@@ -285,12 +285,15 @@ approach and can be removed:
 - `ObservedEntity` concept — no longer needed, no proxy wrappers
 
 
+The default cadence is ten completed player choices. The initial checkpoint and
+explicitly forced snapshots remain; previously persisted explicit cadence values
+are honored. Automatic hops still produce individual StepRecords and replay deltas,
+so rollback can reconstruct intermediate traversal steps between checkpoints.
+
 ## Open Questions
 
-- **Snapshot frequency**: every step is safe but expensive.  Every N steps
-  means rollback to arbitrary step requires patch replay from last snapshot.
-  Snapshotting on player choice (not on redirects) might be the right
-  heuristic — those are the decision points worth rolling back to.
+- **Snapshot frequency**: the ten-choice default is an initial storage/work
+  tradeoff, not a measured optimum; rollback replays patches from the last checkpoint.
 
 - **Patch granularity**: field-level deltas vs. entity-level snapshots.
   The existing Event model supports field-level (`item_id` + `field` + `key`),

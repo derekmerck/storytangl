@@ -12,6 +12,7 @@ from tangl.core import Selector
 from tangl.vm import Ledger, TraversableEdge, TraversableNode
 from tangl.vm.dispatch import on_update
 from tangl.vm.replay import CheckpointRecord, OpEnum, Patch, get_replay_engine
+from tangl.vm.resolution_phase import ResolutionPhase
 
 
 class StatefulGraph(Graph, HasState):
@@ -157,3 +158,41 @@ def test_ledger_json_rollback_replays_owner_and_node_state_between_checkpoints()
     assert restored.graph.locals == {"marker": "one"}
     assert restored.graph.get(nodes[1].uid).locals["marker"] == "node-one"
     assert restored.graph.get(nodes[2].uid).locals == {}
+
+
+def test_json_rollback_inside_open_call_replays_owner_and_member_then_continues() -> None:
+    graph = StatefulGraph()
+    start, inside, next_node, later = [
+        TraversableNode(label=label, registry=graph) for label in ("start", "inside", "next", "later")
+    ]
+    call = TraversableEdge(predecessor_id=start.uid, successor_id=inside.uid,
+                           return_phase=ResolutionPhase.PLANNING, registry=graph)
+    onward = TraversableEdge(predecessor_id=inside.uid, successor_id=next_node.uid, registry=graph)
+    TraversableEdge(predecessor_id=next_node.uid, successor_id=later.uid, registry=graph)
+
+    @on_update
+    def update_state(*, caller, ctx, **_kwargs):
+        ctx.graph.locals["arrival"] = caller.label
+        caller.locals["visited"] = True
+
+    ledger = Ledger.from_graph(graph, entry_id=start.uid)
+    ledger.resolve_choice(call.uid)
+    assert ledger.call_stack_ids == [call.uid]
+    expected_at_one = ledger.graph.value_hash()
+    ledger.resolve_choice(onward.uid)
+    expected_at_two = ledger.graph.value_hash()
+    restored = Ledger.structure(Json.deserialize(Json.serialize(ledger.unstructure())))
+    assert [item.step for item in Selector(has_kind=CheckpointRecord).filter(restored.output_stream)] == [0]
+
+    restored.rollback_to_step(1)
+    assert restored.cursor_id == inside.uid and restored.call_stack_ids == [call.uid]
+    assert restored.cursor_history == [start.uid, inside.uid]
+    assert restored.choice_steps == restored.cursor_steps == 1
+    assert restored.graph.locals["arrival"] == "inside"
+    assert restored.graph.get(inside.uid).locals["visited"] is True
+    assert restored.graph.get(next_node.uid).locals == {}
+    assert restored.graph.value_hash() == expected_at_one
+
+    restored.resolve_choice(onward.uid)
+    assert restored.graph.value_hash() == expected_at_two
+    assert restored.call_stack_ids == [call.uid]

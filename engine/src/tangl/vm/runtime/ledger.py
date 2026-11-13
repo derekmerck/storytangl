@@ -68,7 +68,7 @@ class Ledger(Entity):
     cursor_history: list[UUID] = Field(default_factory=list)
 
     replay_algorithm_id: str = "diff_v1"
-    checkpoint_cadence: int = 1
+    checkpoint_cadence: int = 10  # Completed player choices between periodic checkpoints.
     causality_mode: CausalityMode = CausalityMode.CLEAN
     causality_break_reason: str | None = None
     causality_break_step_id: str | None = None
@@ -759,7 +759,9 @@ class Ledger(Entity):
             causality_break_step_id=data.get("causality_break_step_id"),
             user_id=_coerce_uuid(data["user_id"]) if data.get("user_id") else None,
             replay_algorithm_id=data.get("replay_algorithm_id", "diff_v1"),
-            checkpoint_cadence=data.get("checkpoint_cadence", 1),
+            checkpoint_cadence=data.get(
+                "checkpoint_cadence", cls.model_fields["checkpoint_cadence"].default,
+            ),
         )
 
     def save_snapshot(self, *, force: bool = False, cadence: int = 0) -> Optional[CheckpointRecord]:
