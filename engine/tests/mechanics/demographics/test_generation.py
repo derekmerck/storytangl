@@ -1,10 +1,10 @@
 """Explicit UPDATE generation, pre-event re-execution and committed-state replay."""
 from __future__ import annotations
-import os
 from pathlib import Path
 from random import Random
 import subprocess
 import sys
+from pytest_helpers.subprocess_env import REPO_ROOT, TESTS_ROOT, checkout_env
 from uuid import uuid4
 import pytest
 from tangl.core import EntityTemplate, Selector
@@ -94,8 +94,8 @@ with patch('tangl.mechanics.demographics.generation._sample_part',side_effect=As
     for _ in range(2): ledger.resolve_choice(next(ledger.cursor.edges_out()).uid)
     assert observed[-1][0]==observed[-1][1]
 '''
-    env={**os.environ,"PYTHONPATH":os.pathsep.join(filter(None,(str(Path(__file__).resolve().parents[2]),os.environ.get("PYTHONPATH"))))}
-    result=subprocess.run([sys.executable,"-c",script,str(path),world.label],env=env,capture_output=True,text=True)
+    env=checkout_env(TESTS_ROOT)
+    result=subprocess.run([sys.executable,"-c",script,str(path),world.label],cwd=REPO_ROOT,env=env,capture_output=True,text=True)
     assert result.returncode==0,result.stdout+result.stderr
 
 def test_pinned_names_do_not_choose_unused_mixture_or_draw() -> None:

@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import dbm
-import os
 import subprocess
 import sys
+from pytest_helpers.subprocess_env import REPO_ROOT, checkout_env
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Barrier, Event
@@ -133,8 +133,8 @@ def cached(x): return x
 with ThreadPoolExecutor(max_workers=1) as pool:
     assert pool.submit(cached, 'ok').result(timeout=5) == 'ok'
 """
-    env = {**os.environ, "TANGL_SERVICE__PATHS__CACHE_DATA": f"@path {tmp_path / 'child'}"}
-    result = subprocess.run([sys.executable, "-c", source], env=env, text=True,
+    env = {**checkout_env(), "TANGL_SERVICE__PATHS__CACHE_DATA": f"@path {tmp_path / 'child'}"}
+    result = subprocess.run([sys.executable, "-c", source], cwd=REPO_ROOT, env=env, text=True,
                             capture_output=True, timeout=20)
     assert result.returncode == 0, result.stderr
     assert not result.stderr

@@ -1,11 +1,11 @@
 """One owned personal name alongside durable facts through actual materialization."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from random import Random
 import subprocess
 import sys
+from pytest_helpers.subprocess_env import REPO_ROOT, TESTS_ROOT, checkout_env
 from uuid import uuid4
 
 import pytest
@@ -189,12 +189,9 @@ with patch.multiple(DemographicSampler, **{name: forbidden for name in methods})
     assert "personal_name" not in actor.demographic.unstructure()
     assert actor.name == ""
 '''
-    test_root = str(Path(__file__).resolve().parents[2])
-    env = {**os.environ, "PYTHONPATH": os.pathsep.join(
-        filter(None, (test_root, os.environ.get("PYTHONPATH"))),
-    )}
+    env = checkout_env(TESTS_ROOT)
     result = subprocess.run(
         [sys.executable, "-c", script, str(path), world.label, str(actor.uid)],
-        env=env, capture_output=True, text=True,
+        cwd=REPO_ROOT, env=env, capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stdout + result.stderr

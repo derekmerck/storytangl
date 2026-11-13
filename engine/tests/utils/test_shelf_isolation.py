@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from pytest_helpers.subprocess_env import REPO_ROOT, checkout_env
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
@@ -53,10 +54,10 @@ assert cached('second') == 'second'
     processes = []
     try:
         for number in range(2):
-            env = os.environ.copy()
+            env = checkout_env()
             env["TANGL_SERVICE__PATHS__CACHE_DATA"] = f"@path {tmp_path / f'process-{number}'}"
             processes.append(subprocess.Popen(
-                [sys.executable, "-c", source], env=env, stdin=subprocess.PIPE,
+                [sys.executable, "-c", source], cwd=REPO_ROOT, env=env, stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
             ))
         for process in processes:

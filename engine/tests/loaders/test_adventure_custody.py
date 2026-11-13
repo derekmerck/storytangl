@@ -7,11 +7,14 @@ from pathlib import Path
 import subprocess
 import sys
 from uuid import UUID
+import pytest
 
 
 def _run(root: Path, mode: str) -> None:
     os.environ["TANGL_SERVICE__PATHS__CACHE_DATA"] = f"@path {root / 'cache'}"
     os.environ["TANGL_SERVICE__PATHS__STORY_MEDIA"] = f"@path {root / 'media'}"
+    import tangl
+    assert Path(tangl.__file__).resolve().is_relative_to(Path(__file__).resolve().parents[2] / "src")
     from tangl.core import Selector, Token
     from tangl.persistence import PersistenceManagerFactory
     from tangl.service import ServiceManager, world_registry
@@ -148,10 +151,22 @@ def _run(root: Path, mode: str) -> None:
         assert cage.container.get_asset("keys") is graph.get(UUID(receipt["keys"]))
 
 
-def test_cold_service_custody_and_shared_grate(tmp_path: Path) -> None:
+@pytest.mark.parametrize("conflicting_path", [False, True])
+def test_cold_service_custody_and_shared_grate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, conflicting_path: bool,
+) -> None:
+    from pytest_helpers.subprocess_env import REPO_ROOT, checkout_env
+
+    if conflicting_path:
+        fake = tmp_path / "foreign" / "tangl"
+        fake.mkdir(parents=True)
+        (fake / "__init__.py").write_text('raise AssertionError("wrong checkout")\n')
+        monkeypatch.setenv("PYTHONPATH", str(fake.parent))
+    else:
+        monkeypatch.delenv("PYTHONPATH", raising=False)
     for mode in ("write", "read"):
         subprocess.run([sys.executable, __file__, mode, str(tmp_path)],
-                       check=True, env=os.environ.copy(), timeout=60)
+                       check=True, cwd=REPO_ROOT, env=checkout_env(), timeout=60)
 
 
 if __name__ == "__main__":

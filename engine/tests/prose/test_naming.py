@@ -3,6 +3,7 @@ from collections.abc import Iterator
 from pathlib import Path
 import subprocess
 import sys
+from pytest_helpers.subprocess_env import REPO_ROOT, checkout_env
 
 import pytest
 
@@ -284,7 +285,7 @@ print('bootstrapped cold restore and subsequent reference passed')
 """
     completed = subprocess.run(
         [sys.executable, "-c", code, str(tmp_path), str(user.uid)],
-        capture_output=True, text=True, check=True,
+        capture_output=True, text=True, check=True, cwd=REPO_ROOT, env=checkout_env(),
     )
     assert "bootstrapped cold restore" in completed.stdout
 
@@ -540,7 +541,8 @@ assert 'tangl.prose.naming' not in sys.modules
 assert 'personal_name' not in Actor.model_fields
 assert 'anonymous_name' not in Location.model_fields
 """
-    subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True,
+                   cwd=REPO_ROOT, env=checkout_env())
 
 
 def enter_linked(ledger: Ledger) -> None:
@@ -724,5 +726,5 @@ with manager.open_session(user_id=UUID(sys.argv[2])) as session:
 print('cold runtime source restore passed')
 """
     result = subprocess.run([sys.executable, "-c", code, str(tmp_path), str(user.uid)],
-                            capture_output=True, text=True, check=True)
+                            capture_output=True, text=True, check=True, cwd=REPO_ROOT, env=checkout_env())
     assert "cold runtime source restore passed" in result.stdout

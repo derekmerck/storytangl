@@ -5,6 +5,7 @@ from pathlib import Path
 from random import Random
 import subprocess
 import sys
+from pytest_helpers.subprocess_env import REPO_ROOT, checkout_env
 from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
@@ -273,6 +274,6 @@ assert NameBank.get_instance("fra") is None
 '''
     result = subprocess.run(
         [sys.executable, "-c", code, str(tmp_path), str(user_id), str(expected_path)],
-        capture_output=True, text=True,
+        capture_output=True, text=True, cwd=REPO_ROOT, env=checkout_env(),
     )
     assert result.returncode == 0, result.stdout + result.stderr
