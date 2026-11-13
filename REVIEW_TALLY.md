@@ -1190,6 +1190,29 @@ match it. It is less obvious how, so it has been deferred.
      Presentation is described elsewhere as a dependency floor. The others
      are placed only by their imports. (V)
 
+121. **Concept-linked naming is in the engine, and it is the dependency
+     declaration prose needed.** Derek described it as experimental downstream
+     work: content is written with proper names for ease of authoring, some
+     concepts are anonymous until introduced, and the journal renderer looks
+     each one up as it is encountered. In this repo, `prose/linking.py` scans
+     narration for the exact spellings in an adoption table (longest first,
+     whole words, backslash to escape, an `#intro` marker) and lowers the text
+     to a list of literal strings and `ConceptReference`s with source offsets.
+     `prose/naming.py` realizes each reference during JOURNAL as an automatic,
+     anonymous or proper form according to what the narrator knows, under a
+     per-concept `NamingPolicy` (concealed, proper, off), and `introduce`
+     changes that knowledge. `concept_naming_demo` is its witness.
+     Consequences for P13:
+     - A span of text now declares which concept it depends on. That was the
+       hard part of a prose request, and for names it is done.
+     - Renaming and regendering are the same lookup with other aspects. A
+       pronoun or a changed name is another form of the same reference, which
+       is where `tangl.lang` plugs in.
+     - Linking runs at render time, on each visit, when the namespace sets
+       `link_prose`. The scan depends only on the text and the adoption table,
+       so it could be done once when the world is compiled. (V; `linking.py`
+       read in full, `naming.py` in part)
+
 ### Performance (measured 2026-11-10)
 
 Workload: a large downstream world, about 4,800 graph members, driven through
