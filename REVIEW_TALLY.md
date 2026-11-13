@@ -51,6 +51,11 @@ with the project interpreter and `PYTHONPATH=engine/src`.
 
 ### B. Ready to write down: Derek's stated intent, not yet in the design notes
 
+Per finding 132 and P14, most of B1 to B10 belong together as one short
+section of laws in `philosophy.md`, with terms added to the glossary, not as
+ten insertions in ten files. The "suggested home" column below is where each
+would go if written separately.
+
 Each is a short section in an existing, already linked design file. Use his
 wording from the cited part of this tally.
 
@@ -65,6 +70,9 @@ wording from the cited part of this tally.
 | B8 | The phase contract: shape only in provisioning; state in UPDATE or FINALIZE when possible, and why FINALIZE exists; what the journal may and may not change | finding 123 | `VM_DESIGN.md`, replay note |
 | B10 | The ontology in Derek's words: concept, episode, block, scene, episodic process, person, place and thing; and the line between story and prose, media, mechanics | finding 126 | `ARCHITECTURE.md` |
 | B9 | The story overlay as a translation table: each narrative name, its VM or core base, and the namespace contract it adds | finding 124, 125 | `ARCHITECTURE.md` or the story design note |
+| B11 | Rewrite "Determinism and Replay" in `philosophy.md`: optional recorded seed, two kinds of similarity, what replay does and does not promise | finding 133, P5 | `philosophy.md` |
+| B12 | Restate the single source and single sink form, and sinks as intended endings distinct from softlocks, in current vocabulary; give the two February notes a status | finding 134 | `VM_DESIGN.md` or a traversal note |
+| B13 | Mechanical: remove or correct `Journal`, `DiffReplay`, `JobReceipt` and the seed formula in `philosophy.md`; align the glossary's definition of fabula with it | finding 133 | `philosophy.md`, glossary |
 | B7 | Authoring vocabulary: authors write `conditions` and `effects`; field is `availability`; type is `Predicate` | finding 72 | story or loader design note |
 
 ### C. Evidence to attach to existing issues
@@ -378,7 +386,8 @@ layer were read later): `tangl.media` beyond its
 provisioners, `tangl.prose` and `tangl.lang`, `tangl.presentation`, mechanics
 other than sandbox and game handlers (assemblies and components, progression,
 demographics, credentials internals), the four apps (CLI, pygame, web,
-server), the loaders, and the docs site as a whole. The demo worlds were read
+server), the loaders, and the docs site as a whole (its high-level notes
+were read on 2026-11-13). The demo worlds were read
 later the same day. Core was read for
 registry, graph, behaviour and entity basics only.
 
@@ -1471,6 +1480,114 @@ base was built as it was.
      provider with `getattr`, and `Actor` tests `hasattr(self, "locals")`.
      (V)
 
+### The documentation as a statement of the concepts (probe 2026-11-13)
+
+Derek's brief: the API pages are generated and the historical notes do not
+matter much; the design notes do. Having derived the conceptual basis from
+the code, review how the repo's own documents represent it.
+
+Read in full: `design/story/philosophy.md`, `design/SIMPLIFICATION_SPEC.md`,
+most of `design/CANON_AND_REALIZATION.md`, the two older traversal notes, and
+parts of the glossary. Listed: every design and notes file with size, last
+change and stated status. Searched all 160 design files for each theme this
+review arrived at. Earlier probes read the VM, media, rendering,
+presentation and replay notes. Not read: most of `design/story` (28 files),
+the widget vocabulary, the mechanics notes, the API pages.
+
+Size: about 27,700 lines under `docs/src`, 17,600 in notes beside the code,
+1,600 in the root files.
+
+130. **Keep. Three notes already hold the conceptual basis, at three
+     levels.** (V)
+     - `philosophy.md` is the why: a story as a structured collapse of
+       possibility; three models (fabula, episodic process, syuzhet);
+       concepts as continuity anchors; the compiler metaphor; narrative debt
+       and credit; the creator, navigator and presenter roles, with
+       multi-lane as several navigators. It labels its forward-looking
+       sections as not implemented.
+     - `SIMPLIFICATION_SPEC.md` is the what: per layer, the concepts a
+       reimplementation must keep and what is accidental. Sketch v1 in this
+       tally restates it. It already names resolver diagnostics, `getattr`
+       probing, legacy aliases and "parallel routing logic" beside the
+       service method metadata.
+     - `CANON_AND_REALIZATION.md` is the method: three registers (portable
+       canon, realization, residue); a mismatch is settled by deciding which
+       direction wins; consumer count is the wrong test for promotion; a
+       pattern can be named without being promoted; residue must not be
+       citable; dossiers are disposable.
+131. **This review rediscovered that method without reading it,** and breaks
+     one of its rules. The four-way classification agreed on day one is its
+     "three mismatch classes". Derek's point about the two-consumer rule is
+     its "upward admission test". And this tally is a dossier of 130 KB,
+     where the note says only conclusions should land in canon and a second
+     encyclopedia should not accumulate. (V)
+132. **What has no home in the documents.** Themes this review reached, by
+     how many of the 160 files mention them:
+
+     | Theme | Files | Where |
+     |---|---|---|
+     | The levels as progressive orderings | 0 | nowhere |
+     | A container as scope and as navigation unit | 0 | nowhere |
+     | Who a rule binds; hard rule or rule of thumb | 1 | in passing |
+     | Fan-in | 1 | one line in the affordance model |
+     | Person, place, thing as the concept categories | 1 | in passing |
+     | Shape changes only in provisioning | 3 | in passing |
+     | Equivalence classes | 3 | in passing, undefined |
+     | Shape versus texture; resolution | 6 | scattered |
+     | Games as narrative devices | 5 | scattered |
+     | Declarative and imperative as two readings | 14 | 22 mentions, no statement of the stance |
+
+     For contrast, well covered: fabula and syuzhet (36 files), fan-out (19),
+     open links (16), the readable client floor (27), content-derived
+     identity for media (12), structure and unstructure (16). The documents
+     state the pull side, the pipeline and the output surface thoroughly, and
+     the laws that sit between the why and the what hardly at all. (V)
+133. **Where a document disagrees with the code or with stated intent.**
+     - *Determinism and replay* in `philosophy.md` is stricter than both. It
+       says every mutation is event-sourced and history is reproducible from
+       a snapshot plus the patch log; that the seed derives from story id,
+       step and choice hash; that the same choices reproduce the same story.
+       The code seeds from graph hash, cursor and step (finding 11); two
+       stories from one world share no ids (finding 23); the choice log has
+       no payload (finding 24). Derek's position (P5) is an optional seed,
+       two kinds of similarity, and patches as a hand-wave.
+     - The same note says fragments carry semantic roles "but not rendering
+       instructions". They carry style dictionaries and staging coordinates
+       (finding 93).
+     - "Fabula" is the template bundle and then the graph in `philosophy.md`,
+       and "`StoryGraph` after compilation" in the glossary. The world and
+       the grounded graph are not distinguished. That is the gap the four
+       levels fill.
+     - `philosophy.md` advises deriving a speaker's first or last line from
+       the journal and not storing it on the concept. Derek's statement this
+       week is that the journal may own state such as a speaker's last words.
+       These can both hold, but nothing says how.
+     - Symbols named in its "Implementation" lines that do not exist:
+       `Journal`, `DiffReplay`, `JobReceipt`. By the method note's own rule,
+       that is canon naming symbols, which is where decay shows. (V)
+134. **Two older notes hold a better design than the code, unmarked.**
+     `traversal/notes-canonical_form.md` and `traversal/notes-sinks.md`, last
+     changed in February, with no status and retired names (`SceneDomain`,
+     `ChoiceEdge`). They specify: every structural domain has one abstract
+     source and one abstract sink, hidden from the reader, with the real
+     entries and exits linked to them; a sink is an intentional ending with
+     content, achievements and replay prompts; a softlock is an unmarked dead
+     end and a bug; a forward-progress guarantee at every non-sink node; and
+     a reset affordance as the escape hatch. That is the source and sink
+     intent Derek described (findings 77, 78), and it answers the missing end
+     of story (finding 80) and the issues agent's point that an ending is not
+     the same as running out of choices. (V)
+135. **Two homes, with arrows pointing both ways.** The design index says
+     notes beside the code "should eventually be folded into this section".
+     `philosophy.md` and the media page say the package note is the canonical
+     contract and the page under `docs/` is the entry point. The media pair
+     is the pattern that works: a short public page that states the place of
+     the subsystem and points at one authority. (V)
+136. **Status lines are mostly present and sometimes missing.** Fourteen
+     notes under `design/` have none, among them the two traversal notes and
+     the template scope note. Several stale notes are marked well, with a
+     pointer to their replacement. (V)
+
 ### Performance (measured 2026-11-10)
 
 Workload: a large downstream world, about 4,800 graph members, driven through
@@ -1959,6 +2076,32 @@ The journal already records what was told, so replay does not depend on a
 rewriter being repeatable; identity is for re-use and for re-voicing. Whether
 prose needs an open requirement on the graph, as media has, is the open
 question: text has no inventory to bind to today.
+
+### P14. Land this review in the documents, then retire the tally (mine)
+
+By the method in `CANON_AND_REALIZATION.md`: conclusions go into canon and
+the dossier is disposable.
+
+1. **One short section of laws, in Derek's words, with no symbol names.**
+   The B list is ten statements that mostly have no home today (finding 132).
+   They belong together, between the why and the what: the levels as
+   progressive orderings; the two readings of a rule; materialization as
+   assembling the declared set; the phase contract as shape and state; a
+   container as scope and as navigation unit; the ontology; the line between
+   story and prose, media, mechanics; the two kinds of similarity; who a
+   rule binds. `philosophy.md` is the natural place, with the terms added to
+   the glossary.
+2. **Rewrite "Determinism and Replay"** to the position in P5 and to what
+   the code does.
+3. **Bring the two traversal notes forward**: restate single source and
+   single sink, and sinks as intended endings, in current vocabulary, marked
+   as intent that the code only half implements.
+4. **Fix the decayed symbols** in `philosophy.md`, or move its
+   "Implementation" lines to the realization register.
+5. **Settle the arrow between the two homes** using the media pair as the
+   model.
+6. **Retire this tally** once 1 to 4 have landed, keeping the handoff list
+   and the probe scripts as evidence on the issues that own them.
 
 ### P4. The save is the choice list (not discussed; deprioritized by P5)
 
