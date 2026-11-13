@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from tangl.core import Entity, Graph, Registry, RegistryAware, Selector
+from tangl.core import BehaviorRegistry, Entity, Graph, Node, Registry, RegistryAware, Selector
 from tangl.vm.provision import (
     Affordance,
     Dependency,
@@ -151,102 +151,83 @@ class TestHasRequirement:
 
 
 # ============================================================================
-# Dependency — pull resource
+# Dependency / Affordance — shared provider binding
 # ============================================================================
 
 
-class TestDependency:
-    def test_unsatisfied_on_creation(self) -> None:
-        reg = Registry()
-        dep = Dependency(requirement=Requirement(has_identifier="foo"))
-        reg.add(dep)
-        assert not dep.satisfied
+@pytest.mark.parametrize("edge_kind", [Dependency, Affordance])
+class TestProviderEdgeContract:
+    def test_binding_validation_clearing_and_graph_hooks(self, edge_kind) -> None:
+        graph = Graph()
+        origin = Node(label="origin", registry=graph)
+        provider = Node(label="provider", tags={"suitable"}, registry=graph)
+        other = Node(label="other", tags={"suitable"}, registry=graph)
+        wrong = Node(label="wrong", registry=graph)
+        edge = edge_kind(predecessor_id=origin.uid, requirement=Requirement(has_tags={"suitable"}),
+                         registry=graph)
+        events = []
+        hooks = BehaviorRegistry()
+        hooks.register(task="link", func=lambda *, node, **_: events.append(("link", node.uid)))
+        hooks.register(task="unlink", func=lambda *, node, **_: events.append(("unlink", node.uid)))
+        ctx = PhaseCtx(graph=graph, cursor_id=origin.uid, step=7, local_authorities=[hooks])
 
-    def test_set_provider_syncs_successor(self) -> None:
-        reg = Registry()
-        dep = Dependency(requirement=Requirement(has_identifier="foo"))
-        reg.add(dep)
-        provider = RegistryAware(label="foo")
-        reg.add(provider)
+        assert not edge.satisfied
+        edge.set_provider(provider, _ctx=ctx)
+        assert edge.provider is edge.successor is provider
+        assert edge.requirement.resolved_step == 7
+        assert edge.requirement.resolved_cursor_id == origin.uid
+        assert list(graph.find_edges_to(provider)) == [edge]
+        for setter in (edge.set_provider, edge.set_successor):
+            with pytest.raises(ValueError, match="not satisfied"):
+                setter(wrong, _ctx=ctx)
+        assert edge.provider is edge.successor is provider
+        assert edge.requirement.resolved_step == 7
+        assert edge.requirement.resolved_cursor_id == origin.uid
+        assert list(graph.find_edges_to(provider)) == [edge]
 
-        dep.set_provider(provider)
-        assert dep.satisfied
-        assert dep.provider is provider
-        assert dep.successor is provider
+        edge.set_successor(None, _ctx=ctx)
+        assert edge.provider is edge.successor is None and not edge.satisfied
+        assert edge.requirement.resolved_step is edge.requirement.resolved_cursor_id is None
+        assert list(graph.find_edges_to(provider)) == []
+        edge.set_successor(other, _ctx=ctx)
+        assert edge.provider is edge.successor is other
+        assert edge.requirement.resolved_step == 7
+        assert edge.requirement.resolved_cursor_id == origin.uid
+        assert list(graph.find_edges_to(other)) == [edge]
+        edge.set_provider(None, _ctx=ctx)
+        assert edge.provider is edge.successor is None
+        assert edge.requirement.resolved_step is edge.requirement.resolved_cursor_id is None
+        assert list(graph.find_edges_to(other)) == []
+        assert events == [("link", provider.uid), ("unlink", provider.uid),
+                          ("link", other.uid), ("unlink", other.uid)]
 
-    def test_set_successor_syncs_provider(self) -> None:
-        reg = Registry()
-        dep = Dependency(requirement=Requirement(has_identifier="foo"))
-        reg.add(dep)
-        provider = RegistryAware(label="foo")
-        reg.add(provider)
+        edge.successor = provider
+        assert edge.provider is edge.successor is provider
+        edge.provider = None
+        assert edge.provider is edge.successor is None
+        edge.provider = other
+        assert edge.provider is edge.successor is other
+        edge.successor = None
+        assert edge.provider is edge.successor is None
 
-        dep.set_successor(provider)
-        assert dep.satisfied
-        assert dep.provider is provider
+    def test_successor_clear_calls_overridden_provider_policy(self, edge_kind) -> None:
+        calls = []
 
-    def test_set_provider_none_clears_linked_state(self) -> None:
-        reg = Registry()
-        dep = Dependency(requirement=Requirement(has_identifier="foo"))
-        reg.add(dep)
-        provider = RegistryAware(label="foo")
-        reg.add(provider)
+        class CustomEdge(edge_kind):
+            def set_provider(self, value, _ctx=None):
+                calls.append((value, _ctx))
+                super().set_provider(value, _ctx=_ctx)
 
-        dep.set_provider(provider)
-        dep.set_provider(None)
-        assert dep.provider is None
-        assert dep.successor is None
-        assert not dep.satisfied
-
-
-# ============================================================================
-# Affordance — push resource
-# ============================================================================
+        graph = Graph()
+        provider = Node(label="provider", registry=graph)
+        edge = CustomEdge(requirement=Requirement(has_identifier="provider"), registry=graph)
+        ctx = PhaseCtx(graph=graph, cursor_id=provider.uid, step=3)
+        edge.set_successor(provider, _ctx=ctx)
+        edge.set_successor(None, _ctx=ctx)
+        assert calls == [(provider, ctx), (None, ctx)]
 
 
 class TestAffordance:
-    def test_unsatisfied_on_creation(self) -> None:
-        reg = Registry()
-        aff = Affordance(requirement=Requirement(has_identifier="foo"))
-        reg.add(aff)
-        assert not aff.satisfied
-
-    def test_set_provider_syncs_successor(self) -> None:
-        reg = Registry()
-        aff = Affordance(requirement=Requirement(has_identifier="foo"))
-        reg.add(aff)
-        provider = RegistryAware(label="foo")
-        reg.add(provider)
-
-        aff.set_provider(provider)
-        assert aff.satisfied
-        assert aff.provider is provider
-        assert aff.successor is provider
-
-    def test_set_successor_syncs_provider(self) -> None:
-        reg = Registry()
-        aff = Affordance(requirement=Requirement(has_identifier="foo"))
-        reg.add(aff)
-        provider = RegistryAware(label="foo")
-        reg.add(provider)
-
-        aff.set_successor(provider)
-        assert aff.satisfied
-        assert aff.provider is provider
-
-    def test_set_successor_none_clears_provider(self) -> None:
-        reg = Registry()
-        aff = Affordance(requirement=Requirement(has_identifier="foo"))
-        reg.add(aff)
-        provider = RegistryAware(label="foo")
-        reg.add(provider)
-
-        aff.set_provider(provider)
-        aff.set_successor(None)
-        assert aff.provider is None
-        assert aff.successor is None
-        assert not aff.satisfied
-
     def test_set_predecessor_does_not_bind_provider(self) -> None:
         reg = Registry()
         aff = Affordance(requirement=Requirement(has_identifier="foo"))

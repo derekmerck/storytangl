@@ -289,8 +289,7 @@ class Dependency(Edge, HasRequirement[PT], Generic[PT]):
     ---
     - :meth:`set_provider` validates and stores the resolved provider while
       synchronizing ``successor``.
-    - :meth:`set_successor` provides a topology-first alias that also updates
-      requirement state.
+    - :meth:`set_successor` delegates binding and clearing to provider policy.
 
     Example:
         >>> reg = Registry()
@@ -328,12 +327,6 @@ class Dependency(Edge, HasRequirement[PT], Generic[PT]):
         super().set_successor(value, _ctx=_ctx)
 
     def set_successor(self, value: Optional[PT], _ctx=None) -> None:
-        if value is None:
-            self.requirement.provider_id = None
-            self.requirement.resolved_step = None
-            self.requirement.resolved_cursor_id = None
-            super().set_successor(None, _ctx=_ctx)
-            return
         self.set_provider(value, _ctx=_ctx)
 
 
@@ -358,8 +351,7 @@ class Affordance(Edge, HasRequirement[PT], Generic[PT]):
     ---
     - :meth:`set_provider` validates and stores the resolved provider while
       synchronizing ``successor``.
-    - :meth:`set_successor` provides a topology-first alias that also updates
-      requirement state.
+    - :meth:`set_successor` delegates binding and clearing to provider policy.
 
     Example:
         >>> reg = Registry()
@@ -390,12 +382,6 @@ class Affordance(Edge, HasRequirement[PT], Generic[PT]):
 
     def set_successor(self, value: Optional[PT], _ctx=None) -> None:
         """Provider alias for ``successor`` on affordance edges."""
-        if value is None:
-            self.requirement.provider_id = None
-            self.requirement.resolved_step = None
-            self.requirement.resolved_cursor_id = None
-            super().set_successor(None, _ctx=_ctx)
-            return
         self.set_provider(value, _ctx=_ctx)
 
 
