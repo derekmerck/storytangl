@@ -33,6 +33,7 @@ from .exceptions import (
 )
 from .response import (
     EdgeResolutionRequest,
+    PreflightReport,
     RuntimeEnvelope,
     RuntimeInfo,
     SystemInfo,
@@ -666,6 +667,17 @@ class RemoteServiceManager(ServiceManager):
             params=params,
         )
         return self._decode_model(ProjectedState, payload, label="projected state")
+
+    @service_method(
+        access=ServiceAccess.PUBLIC,
+        context=ServiceContext.WORLD,
+        writeback=ServiceWriteback.NONE,
+        operation_id="world.preflight",
+    )
+    def preflight_world(self, *, world_id: str) -> PreflightReport:
+        """Request the remote world's authoring diagnostics."""
+        payload = self._request("GET", f"/world/{world_id}/preflight", auth_required=False)
+        return self._decode_model(PreflightReport, payload, label="preflight report")
 
     @service_method(
         access=ServiceAccess.PUBLIC,

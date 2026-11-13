@@ -28,9 +28,11 @@ from tangl.service import (
     FindEdgeRequest,
 )
 from tangl.service.bootstrap import build_service_manager
-from tangl.service.exceptions import AccessDeniedError, InvalidOperationError, ServiceError
+from tangl.service.exceptions import AccessDeniedError, InvalidOperationError, ResourceNotFoundError, ServiceError
+from tangl.service.response import PreflightReport
 from tangl.service.remote_service_manager import RemoteServiceManager
 from tangl.service.service_manager import ServiceManager
+from pytest_helpers.service_routes import REMOTE_UNSUPPORTED, ROUTES
 
 
 class StubResponse:
@@ -136,6 +138,63 @@ def _runtime_envelope_payload() -> dict[str, object]:
 class TestRemoteTransportAndAuth:
     """Tests for request routing and auth semantics."""
 
+    def test_public_preflight_is_remote_and_preserves_error_diagnostics(self, monkeypatch) -> None:
+        payload = {"world_id": "remote-only", "status": "error", "diagnostics": [{
+            "phase": "compile", "severity": "error", "code": "bad-script", "message": "bad",
+        }]}
+        session = RecordingSession([StubResponse(200, payload)])
+        manager = RemoteServiceManager("https://example.test/api/v2", session=session)
+        def forbidden(*_args, **_kwargs):
+            raise AssertionError("local preflight or world lookup was called")
+        monkeypatch.setattr(ServiceManager, "preflight_world", forbidden)
+        monkeypatch.setattr("tangl.service.service_manager.WorldRegistry", forbidden)
+        report = manager.preflight_world(world_id="remote-only")
+        assert isinstance(report, PreflightReport)
+        assert report.status == "error" and report.diagnostics[0].code == "bad-script"
+        assert len(session.calls) == 1
+        assert session.calls[0]["method"] == "GET"
+        assert session.calls[0]["url"] == "https://example.test/api/v2/world/remote-only/preflight"
+        assert session.calls[0]["headers"] is None
+
+    @pytest.mark.parametrize("response,error", [
+        (StubResponse(404, {"detail": "missing"}), ResourceNotFoundError),
+        (StubResponse(200, {"world_id": "x", "status": "invalid"}), ServiceError),
+    ])
+    def test_preflight_uses_normal_transport_errors(self, response, error) -> None:
+        manager = RemoteServiceManager("https://example.test", session=RecordingSession([response]))
+        with pytest.raises(error):
+            manager.preflight_world(world_id="x")
+
+    def test_all_canonical_operations_have_matching_explicit_remote_implementations(self) -> None:
+        canonical = ServiceManager.get_service_methods()
+        remote = RemoteServiceManager.get_service_methods()
+        assert {spec.operation_id for spec in canonical.values()} == set(ROUTES) | REMOTE_UNSUPPORTED
+        assert len(canonical) == len(ROUTES) + len(REMOTE_UNSUPPORTED)
+        assert set(canonical) == set(remote)
+        for name, spec in canonical.items():
+            assert name in RemoteServiceManager.__dict__
+            assert remote[name] == spec
+
+    def test_unsupported_operations_do_not_request_or_open_local_resources(self, monkeypatch) -> None:
+        session = RecordingSession([])
+        manager = RemoteServiceManager("https://example.test", session=session)
+        def forbidden(*_args, **_kwargs):
+            raise AssertionError("local resource operation was called")
+        monkeypatch.setattr("tangl.service.service_manager.WorldRegistry", forbidden)
+        calls = [
+            lambda: manager.get_world_media(world_id="x", media="x"),
+            lambda: manager.load_world(), lambda: manager.unload_world(world_id="x"),
+            lambda: manager.reset_system(), lambda: manager.open_world("x"),
+        ]
+        for call in calls:
+            with pytest.raises(InvalidOperationError):
+                call()
+        for context in (manager.open_user(uuid4()), manager.open_ledger(uuid4()),
+                        manager.open_session(user_id=uuid4())):
+            with pytest.raises(InvalidOperationError), context:
+                pass
+        assert session.calls == []
+
     def test_public_call_works_without_auth(self) -> None:
         session = RecordingSession(
             [
@@ -156,6 +215,15 @@ class TestRemoteTransportAndAuth:
         assert session.calls[0]["url"] == "https://example.test/api/v2/system/worlds"
         assert session.calls[0]["headers"] is None
         assert session.calls[0]["params"] == {"render_profile": "raw"}
+
+    def test_public_key_alias_uses_system_route_without_auth(self) -> None:
+        session = RecordingSession([StubResponse(200, {"api_key": "key", "user_secret": "secret"})])
+        manager = RemoteServiceManager("https://example.test/api/v2", api_key="bound", session=session)
+        manager.get_key_for_secret(secret="secret")
+        assert session.calls[0]["method"] == "GET"
+        assert session.calls[0]["url"] == "https://example.test/api/v2/system/secret"
+        assert session.calls[0]["headers"] is None
+        assert session.calls[0]["params"] == {"secret": "secret", "render_profile": "raw"}
 
     def test_protected_call_without_auth_fails_before_request(self) -> None:
         session = RecordingSession([])
@@ -332,6 +400,8 @@ class TestRemoteTransportAndAuth:
             "user_id": str(user_id),
             "api_key": "new-key",
         }
+        assert session.calls[0]["method"] == "PUT"
+        assert session.calls[0]["url"] == "https://example.test/api/v2/user/secret"
         assert session.calls[0]["headers"] == {
             "X-API-Key": "old-key",
             "api-key": "old-key",
@@ -586,6 +656,7 @@ class TestRemoteResponseHydration:
         state = manager.get_world_info(world_id="large-stage", channels=["ui-stage"])
 
         assert state.sections[0].value == StageExtentValue(width=640, height=400)
+        assert session.calls[0]["method"] == "GET" and session.calls[0]["headers"] is None
         assert session.calls[0]["url"] == "https://example.test/api/v2/world/large-stage/info"
         assert session.calls[0]["params"] == {
             "channels": "ui-stage",
