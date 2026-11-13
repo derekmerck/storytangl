@@ -6,6 +6,9 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from fastapi.routing import APIRoute
+from functools import wraps
+from pytest_helpers.service_routes import REST_STUB_ROUTES, ROUTES
 
 from tangl.config import settings
 from tangl.core import Selector
@@ -23,6 +26,8 @@ from tangl.story.fabula.world import World
 from tangl.story.episode import Action
 from tangl.utils.hash_secret import key_for_secret, uuid_for_secret
 from tangl.vm.runtime.ledger import Ledger
+from tangl.service.remote_service_manager import RemoteServiceManager
+from tangl.service.service_manager import ServiceManager
 
 
 def _write_story_bundle(
@@ -307,6 +312,51 @@ def test_world_preflight_rest_returns_decode_diagnostics(tmp_path: Path, monkeyp
         assert {item["phase"] for item in diagnostics} == {"decode"}
         assert {item["severity"] for item in diagnostics} == {"warning"}
         assert any(item["code"].startswith("decode:unsupported_feature") for item in diagnostics)
+    finally:
+        client.close()
+        World.clear_instances()
+        reset_service_manager_for_testing()
+        reset_service_state_for_testing()
+
+
+def test_canonical_service_route_inventory_is_mounted() -> None:
+    mounted = {(method, route.path) for route in api_app.routes if isinstance(route, APIRoute)
+               for method in route.methods}
+    expected = set().union(*ROUTES.values())
+    assert expected <= mounted
+    assert REST_STUB_ROUTES == {("PUT", "/user/world")}
+    with TestClient(api_app) as client:
+        assert client.put("/user/world").status_code == 501
+
+
+def test_remote_preflight_through_world_router(tmp_path: Path, monkeypatch) -> None:
+    world_label = _write_lossy_story_bundle(tmp_path)
+    monkeypatch.setattr("tangl.service.world_registry.get_world_dirs", lambda: [tmp_path])
+    calls = []
+    original = ServiceManager.preflight_world
+
+    @wraps(original)
+    def record_preflight(self, *, world_id):
+        calls.append(world_id)
+        return original(self, world_id=world_id)
+
+    monkeypatch.setattr(ServiceManager, "preflight_world", record_preflight)
+    reset_service_state_for_testing()
+    reset_service_manager_for_testing()
+    World.clear_instances()
+    client = TestClient(app, base_url="http://test/api/v2/")
+
+    class Session:
+        def request(self, *, method, url, params, json, headers, timeout):
+            assert headers is None
+            return client.request(method, url, params=params, json=json, headers=headers)
+
+    try:
+        manager = RemoteServiceManager("http://test/api/v2", session=Session())
+        report = manager.preflight_world(world_id=world_label)
+        assert calls == [world_label]
+        assert report.world_id == world_label and report.status == "ok"
+        assert any(item.code.startswith("decode:unsupported_feature") for item in report.diagnostics)
     finally:
         client.close()
         World.clear_instances()

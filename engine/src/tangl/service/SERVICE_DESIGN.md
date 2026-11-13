@@ -161,6 +161,15 @@ session hydration, or resource-opening helpers. In current v1 relay mode,
 protected upstream calls execute under one configured upstream identity rather
 than forwarding each caller's auth context end-to-end.
 
+Public remote preflight calls the world's REST preflight endpoint and returns the
+same typed report, including error diagnostics. Manager metadata describes semantics,
+not HTTP paths: the transport explicitly maps aliases such as `world.list` to
+`GET /system/worlds`, `user.key` to `GET /system/secret`, and `user.update` to the
+world or secret update routes. The world-update route is currently a 501 stub;
+remote user updates support the secret only. Remote media lookup, world loading/unloading, system
+reset and local resource-opening contexts remain unsupported. Bounded conformance
+tests check manager metadata, explicit remote overrides and mounted route mappings.
+
 ### Deferred trusted live-debug interface
 
 The reference service retains the design for a privileged live-story console,
