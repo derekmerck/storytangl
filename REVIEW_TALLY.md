@@ -840,6 +840,21 @@ already has a scope that is not a traversal container (`SandboxScope` holds
 the clock for its locations). P10 is about the navigation half; the scope
 half is finding 32 and the scene-as-scope reading in finding 126.
 
+Derek, continuing: the sandbox is a stronger conflation still, and an
+intended one. It binds a setting to a particular episode, so moving between
+scenes and moving between settings are the same act. He likes graph nodes
+corresponding to places, after the map-as-graph of classic cave adventures.
+
+In the code, `SandboxLocation(HasAssets, MenuBlock)` is at once a place, an
+episode (a menu hub) and a holder of things: three of the ontology's
+categories in one class. The other lowering also exists downstream: one hub,
+with each scene binding its place as a setting, so the place is a concept and
+not a node. So "place as node" and "place as binding" are two lowerings of
+the same idea, suited to a spatial adventure and to a schedule of scenes
+respectively. Where the first one strains is where the two orders differ: two
+scenes at one place (which needs arbitration, finding 38), a scene that moves
+between rooms, or being somewhere with nothing to play.
+
 79. **First entry is special-cased in at least five places.** (V)
     - `StoryGraph.initial_cursor_id`, set and overridden in
       `story/fabula/world.py`. (`initial_cursor_ids`, plural, is not a
