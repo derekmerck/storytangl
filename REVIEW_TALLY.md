@@ -62,6 +62,7 @@ wording from the cited part of this tally.
 | B5 | Intrinsic contribution, extrinsic assembly (`get_ns` and `gather_ns`; journal handlers) | finding 33 | `VM_DESIGN.md` |
 | B6 | Two kinds of similarity; games as narrative devices with an authoring thumb on the scale | P5 | `VM_DESIGN.md` replay notes; mechanics design note |
 | B8 | The phase contract: shape only in provisioning; state in UPDATE or FINALIZE when possible, and why FINALIZE exists; what the journal may and may not change | finding 123 | `VM_DESIGN.md`, replay note |
+| B9 | The story overlay as a translation table: each narrative name, its VM or core base, and the namespace contract it adds | finding 124, 125 | `ARCHITECTURE.md` or the story design note |
 | B7 | Authoring vocabulary: authors write `conditions` and `effects`; field is `availability`; type is `Predicate` | finding 72 | story or loader design note |
 
 ### C. Evidence to attach to existing issues
@@ -311,8 +312,8 @@ to a frame when control leaves its scope, and why ids must survive relinking.
 | Downstream gamebook promotion ledger | done (private repo, read-only) |
 
 Not yet read in any depth (as of 2026-11-11; compiling, materializing,
-presentation, media's design, the client apps and prose were read later):
-`tangl.media` beyond its
+presentation, media's design, the client apps, prose and story's class
+layer were read later): `tangl.media` beyond its
 provisioners, `tangl.prose` and `tangl.lang`, `tangl.presentation`, mechanics
 other than sandbox and game handlers (assemblies and components, progression,
 demographics, credentials internals), the four apps (CLI, pygame, web,
@@ -1298,6 +1299,65 @@ match it. It is less obvious how, so it has been deferred.
        That is the history behind the present wording.
      - The same scope applies to the serialization test (A11): it covers
        `core`, `vm` and `story`, not worlds or mechanics.
+
+### Story (probe 2026-11-12)
+
+Before this probe the review had read, in `tangl.story`: the menu projection
+and parts of the journal handlers, the materializer and world outlines, scene
+contract finalizing, the action model in part, and narrator knowledge. It had
+not read the class layer. Now read: every class and its bases, the package
+docstring, `actor.py`, `Role` in part, and the outlines of
+`system_handlers.py` and `story_graph.py`.
+
+Derek's framing: in large part a narrative-feeling overlay on the VM that
+gives named classes to its parts, and doing that translation shows why the
+base was built as it was.
+
+124. **The overlay is as thin as described.**
+
+     | Story name | Base | Size |
+     |---|---|---|
+     | `Block` | `TraversableNode` | 54 lines, 10 fields |
+     | `Scene` | `TraversableNode`, as a container | 48 lines |
+     | `MenuBlock` | `Block` | 69 lines |
+     | `Action` | `TraversableEdge` | 101 lines |
+     | `Actor`, `Location`, `Player` | `Node` | 45, 42 and 77 lines |
+     | `Role` | `Dependency[Actor]` | 256 lines with its grant |
+     | `Setting` | `Dependency` | 106 lines |
+     | `StoryGraph` | `TraversableGraph` | 310 lines |
+
+     The episode and concept vocabulary is under a thousand lines. (V)
+125. **What each narrative class adds is a namespace contract.** An actor
+     publishes its label and name. A role publishes its bound provider under
+     the role's label, plus a `roles` map and an optional grant overlay. So
+     the story layer's content, beyond naming, is how a bound thing appears
+     to templates. That is the same surface prose references resolve against
+     (finding 121). (V)
+126. **"Concept" and "Episode" are package names and Derek's words, not
+     types.** There is no `Concept` or `Episode` class. Concepts are `Node`
+     subclasses in `story/concepts`, where the role and setting edges also
+     live; episodes are `Block` and `Scene`. Nothing can select "any concept"
+     or "any episode" by kind except through the VM bases. Whether that
+     matters depends on fan-in, which speaks of concepts affording episodes.
+     (V)
+127. **Where story is not thin.** (V, by outline and size)
+     - `system_handlers.py`, 978 lines: journal policy (content, media,
+       choices, dialog composition), menu projection, finding an action by
+       typed command, and about 200 lines of choice blockers and viability
+       preview. That is a third place where diagnosis is interleaved with the
+       main work, after the resolver and the compiler.
+     - `analysis.py`, 1,792 lines: graph projection and drawing. It is the
+       largest file in the package and is tooling.
+     - `concepts/asset/`, about 600 lines: wallets, holders and transactions,
+       an economy mechanic living under story concepts.
+     - `story_graph.py`: template lineage maps and four override hooks,
+       described in the package docstring as a compatibility alias.
+128. **Keep. The package docstring is an accurate map** of its five parts and
+     states the intent in one sentence: story owns narrative policy; traversal
+     and provisioning stay in the VM. (V)
+129. **The same probing appears here.** `Role` looks up `get_ns` on its
+     provider with `getattr`, and `Actor` tests `hasattr(self, "locals")`.
+     (V)
 
 ### Performance (measured 2026-11-10)
 
