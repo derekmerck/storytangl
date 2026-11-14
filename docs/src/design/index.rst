@@ -1,7 +1,9 @@
 Design Plans
 ============
 
-Stable architecture and rationale for the published StoryTangl subsystems.
+Architecture and rationale for the published StoryTangl subsystems. Current
+contracts come first; notes kept for their history are listed separately at
+the end.
 
 Prospective narratives and the capabilities they would exercise live in
 :doc:`../world-designs/index`; those briefs do not define implemented engine contracts.
@@ -22,7 +24,6 @@ See also
    SIMPLIFICATION_SPEC
    CANON_AND_REALIZATION
 
-   core/CONTENT_ADDRESSABLE
    core/DEREF_DESIGN
    core/HOOK_REF
 
@@ -46,7 +47,6 @@ See also
    story/PRESENCE_PROSE_CONTRACT
    story/CONDITIONAL_NARR
    story/ASSET_TYPE_DESIGN
-   story/CONCEPT_PROV_DESIGN
    story/HUB_FANOUT
    story/menu_block
    story/compilers
@@ -54,7 +54,6 @@ See also
 
    planning/AFFORDANCE_MODEL
    planning/COST_MODEL
-   planning/PLANNING_DESIGN
    planning/PROVISIONING
    planning/PROVISIONING_BEHAVIOR
    planning/TEMPLATE_SCOPE
@@ -62,8 +61,6 @@ See also
 
    traversal/NAV_DESIGN
    traversal/ENTRY_RESOLUTION
-   traversal/notes-canonical_form
-   traversal/notes-sinks
 
    service/SERVICE_DESIGN
    service/BACKEND_FRAGMENT_RECONCILIATION
@@ -72,3 +69,20 @@ See also
 
    MEDIA_DESIGN
    GENERATIVE_MEDIA_DESIGN
+
+Earlier notes
+-------------
+
+Kept for context. Each says at its top whether it is historical or stale. The
+two traversal notes use retired names but still describe the intended single
+source and single sink form for containers, which the current code only partly
+implements.
+
+.. toctree::
+   :maxdepth: 1
+
+   planning/PLANNING_DESIGN
+   story/CONCEPT_PROV_DESIGN
+   core/CONTENT_ADDRESSABLE
+   traversal/notes-canonical_form
+   traversal/notes-sinks
