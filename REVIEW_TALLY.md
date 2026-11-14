@@ -297,8 +297,12 @@ Hygiene items ride along where they are cheap. None of them should lead.
 | 678 | Cold-process and devref tests isolated (A5, A6) |
 | 679 | Checkpoint every ten completed choices, with rollback witnesses (A1) |
 | 680 | Remote preflight through the service API; operation-to-route inventory (part of A7) |
+| 682 | `set_successor` delegates to `set_provider` on both edge classes, with a shared contract test (A4) |
+| 683 | A synthetic service lifecycle benchmark: small and large generated stories, timed per stage (the measurement half of A3) |
 
-In review: PR 681, the working theses.
+In review: PR 681, the working theses; PR 685, the README and documentation
+landing pages (section 8a); PR 684, an authored-effects profile for the
+benchmark.
 
 Timing on `main` on 2026-11-13, same large graph, five choices, one run: 4.73 s
 per choice; 3.65 s with checkpoints off; 0.42 s with per-hop tracing also off.
@@ -309,8 +313,7 @@ Small and decided:
 
 | # | Work |
 |---|---|
-| A3 | Large-graph timing guard, with a generous threshold |
-| A4 | Optional: `set_successor` delegates to `set_provider`; one parametrized test over both edge classes |
+| A3 | A budget on top of the benchmark that PR 683 added, with a generous threshold |
 | A7 | Extend the route conformance check to every operation |
 | A8 | Report-only validator for edges that bypass a container's source or sink |
 | A9 | Invariant: planning a node twice changes nothing; expected to fail on hubs for now |
@@ -367,9 +370,8 @@ the published docs link exist.
 - `mechanics/overview.rst` reviews each family by shape, behaviour, attachment
   points and appearance, which is the project's own vocabulary. Keep.
 
-Suggested fixes, all small: a real opening for `docs/src/index.rst` with a
-reading order; the README slips above; "Current" and "Historical" captions in
-the design index; refresh or retire the code-adjacent inventory.
+These are fixed in PR 685, except the two that are Derek's to phrase: the
+pygame sentence and where the lineage is stated.
 
 ## 9. What the review got wrong, and what that taught
 
