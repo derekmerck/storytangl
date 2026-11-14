@@ -332,6 +332,45 @@ sink (P10), the story as root container, multi-lane, the parity basis (P3),
 a prose request (P13), presentation profiles (P11). Each is a direction with
 an owner issue or none yet. Both clean-slate sketches are hypotheses.
 
+## 8a. README and documentation landing pages (checked 2026-11-14)
+
+Read on `main`: `README.md` in full, `docs/src/index.rst`, and the index pages
+for design, API, notes, world designs, contributing and mechanics. Verified:
+the seven issues the README cites are open; its commands, files, images and
+the published docs link exist.
+
+**README: aligned and current, with a few slips.**
+
+| Item | Kind | Note |
+|---|---|---|
+| "A research platform", "use something else when you want to ship a game", the reskin example, the research directions | aligned | this is the lens, stated well |
+| "The compiler normalizes those scripts into StoryTangl's story graph. A materializer instantiates that graph" | inaccurate | compiling yields a world of templates; materializing yields the graph |
+| Project tree omits `presentation`, `lang`, `devref`; the design-note table omits presentation and prose | stale | |
+| "the non-web ports remain proofs of concept" | possibly stale | pygame is now the most developed client; Derek's call |
+| "Genette's discourse operations become phase-bus transformations" | overstated | `philosophy.md` marks the discourse layer as planned |
+| "a formally specified narrative engine with deterministic replay" | stricter than intent | thesis 8: reproducible up to an equivalence |
+| The imaging and shape-theory lineage | under-placed | it appears only in the acknowledgments; the motivating idea is not in "Why StoryTangl" |
+| Node.js 18+ | minor | CI runs Node 20 |
+
+**Landing pages: the front door is the weak one.**
+
+- `docs/src/index.rst` is three lines describing "the post-cutover" package
+  surface. It says nothing about what the project is or where to start.
+- `design/index.rst` calls itself "stable architecture and rationale" and
+  lists current, historical and stale notes in one flat sequence.
+- `notes/index.rst` says its contents do not define canonical architecture,
+  and includes active design notes.
+- `notes/reference/code_adjacent_design_docs.md` was last reviewed in August,
+  lists six notes beside the code where there are about thirty, and plans to
+  migrate them into `docs/`, which is not what has happened (F135).
+- `world-designs/index.rst` is current and carefully framed.
+- `mechanics/overview.rst` reviews each family by shape, behaviour, attachment
+  points and appearance, which is the project's own vocabulary. Keep.
+
+Suggested fixes, all small: a real opening for `docs/src/index.rst` with a
+reading order; the README slips above; "Current" and "Historical" captions in
+the design index; refresh or retire the code-adjacent inventory.
+
 ## 9. What the review got wrong, and what that taught
 
 - It rediscovered #560 from the code without reading it. Independent arrival
