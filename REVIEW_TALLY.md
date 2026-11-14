@@ -36,30 +36,31 @@ The board and the design notes are views, not authorities; neither is the code.
 
 ## 2. The conceptual design in brief
 
-Nine working laws, in Derek's words, are in review as PR 681 for
-`docs/src/design/story/philosophy.md`. In one line each:
+Eight working theses, in Derek's words, are in review as PR 681 for
+`docs/src/design/story/philosophy.md`. They are propositions, not rules, and
+they are not all one kind of statement. Each carries its design consequence,
+how far the code realizes it today, where the two disagree, and what would
+count as evidence.
 
-1. **Four orderings of one space.** World (rules, no order), story graph (one
-   grounded configuration), episodic process (the walk, partial order), journal
-   (what was told, total order).
-2. **Concepts and episodes.** Any node is a concept; a traversable one is an
-   episode; the rest are mostly a person, a place or a thing.
-3. **Two readings of one rule.** Imperative (if this, go there) and declarative
-   (this is reachable when that holds). Materialization assembles what was
-   declared so it can be walked.
-4. **Pull and push.** A dependency reaches for a provider; an affordance waits
-   and offers itself. Fan-out and fan-in.
-5. **Shape and state.** Shape changes in provisioning; state in update or
-   finalize when possible; the telling may change state on what it is about.
-6. **Scope and navigation.** A container is a scope first and a navigation
-   unit second, with one source and one sink.
-7. **What belongs to story.** Story is shape and path. Prose, media and
-   mechanics are appearance and interactivity. Two states are the same when
-   nothing downstream can tell them apart.
-8. **Two kinds of similarity.** The same start reproduces; a different start
-   with the same choices lands on essentially the same state.
-9. **Whom the rules bind.** Firm for work on the engine, rules of thumb for
-   authors and plugins, and changed by the smallest carve-out.
+| Kind | Thesis | If it turns out wrong |
+|---|---|---|
+| Vocabulary | 1. A story space is ordered in four steps: world, story graph, episodic process, journal | revisit the ontology |
+| Vocabulary | 2. Everything in a story graph is a concept; a traversable one is an episode; the rest are mostly a person, place or thing | revisit the ontology |
+| Unification | 3. Imperative and declarative are two readings of one rule; materialization assembles what was declared | check whether the difference is real |
+| Unification | 4. Pull and push are one link seen from either end: dependency and affordance, fan-out and fan-in | check whether the difference is real |
+| Commitment | 5. Shape changes in provisioning; state changes around the telling, which may change what it is about | ask whether the choice or the code is at fault |
+| Commitment | 6. A container is a scope first and a navigation unit second, with one source and one sink | ask whether the choice or the code is at fault |
+| Hypothesis | 7. Story is shape and path; prose, media and mechanics are appearance; two states are the same when nothing downstream can tell them apart | study the counterexample |
+| Hypothesis | 8. A walk is reproducible up to an equivalence: the same start reproduces; a different start with the same choices lands on essentially the same state | study the counterexample |
+
+Whom they guide and how they change is stated separately, not as a thesis:
+they guide work on the engine, not authors or plugins. On a collision, decide
+whether the implementation, the proposition or its scope is at fault, and
+prefer the smallest coherent revision.
+
+An earlier draft called these nine laws. The issues-board agent pointed out
+that the statements are heterogeneous and that "law" turns a question of
+evidence into one of compliance; Derek agreed.
 
 The connection to the imaging lineage, as this review reads it (mine):
 
@@ -94,7 +95,7 @@ The connection to the imaging lineage, as this review reads it (mine):
 | Service, persistence | outline | small; the service surface is stated three times |
 | Demo worlds (23) | scripts parsed | one subsystem each; the push side has almost no witness |
 | Two downstream worlds | read (private) | built the push side, arbitration and equivalence merging for themselves |
-| Design documents | high-level notes read, all searched | the why and the what are written; the laws were not |
+| Design documents | high-level notes read, all searched | the why and the what are written; the argument between them was not |
 
 Not read: mechanics internals, the Twine codec, core in depth, most of
 `design/story`.
@@ -130,7 +131,14 @@ Not read: mechanics internals, the Twine codec, core in depth, most of
 
 ## 5. Weaknesses relative to the design
 
-Ordered by how much they obscure the gestalt.
+**The overarching one: a missing middle.** The philosophy is documented and
+the implementation is documented. What connects them is not: what each belief
+commits the design to, how far the code realizes it, where they disagree, and
+what would settle it. That reasoning has lived in conversation and in issue
+threads. Most of the items below are instances of it, and the working theses
+are the first attempt to write it down.
+
+The rest, ordered by how much they obscure the gestalt.
 
 1. **"The same story state" has no instrument in the engine.** The claim is
    reproducibility up to an equivalence. The analysis that defines the
@@ -165,7 +173,7 @@ Ordered by how much they obscure the gestalt.
    for a realization, no selection step; the rewriting kit is not on the path
    (F117, F118). Attitude is read only from the line, not from the speaker
    (F122).
-9. **The laws were not written down.** Of ten themes this review reached, two
+9. **The working theses were not written down.** Of ten themes this review reached, two
    appear in no design file and four in three or fewer (F132). One section,
    on determinism, contradicted both the code and the intent (F133).
 10. **Accidental weight.** Replay bookkeeping is about 85% of a turn (F50).
@@ -197,12 +205,12 @@ rule-based process has states that differ only in ways nothing reads.
 
 | # | What | Shows |
 |---|---|---|
-| 1 | **One story, both readings.** A declarative calendar world beside the existing imperative schedule world (F75, P6) | law 3 |
-| 2 | **Same shape, another telling.** One walk journaled in two voices or two languages, ending in the same state; the existing art-pack swap is the media half | laws 7, 8 |
-| 3 | **The four levels as a picture.** A projection that reassembles world, graph, episodes and fragment leaves from a ledger (F130 note) | law 1 |
-| 4 | **An equivalence-class graph of a small world**, in the manner of PlotEx | law 7 |
-| 5 | **Witness worlds for the push side**: go home and call someone; a shared intro and outro; a companion who speaks before the choices; one world whose effects are all in script (P9) | laws 3, 4 |
-| 6 | **Two readers, one graph**: a duel in the simultaneous-move gamebook tradition (#346) | laws 1, 8 |
+| 1 | **One story, both readings.** A declarative calendar world beside the existing imperative schedule world (F75, P6) | thesis 3 |
+| 2 | **Same shape, another telling.** One walk journaled in two voices or two languages, ending in the same state; the existing art-pack swap is the media half | theses 7, 8 |
+| 3 | **The four levels as a picture.** A projection that reassembles world, graph, episodes and fragment leaves from a ledger (F130 note) | thesis 1 |
+| 4 | **An equivalence-class graph of a small world**, in the manner of PlotEx | thesis 7 |
+| 5 | **Witness worlds for the push side**: go home and call someone; a shared intro and outro; a companion who speaks before the choices; one world whose effects are all in script (P9) | theses 3, 4 |
+| 6 | **Two readers, one graph**: a duel in the simultaneous-move gamebook tradition (#346) | theses 1, 8 |
 
 Each is a few dozen lines of script and doubles as the example an agent copies
 from.
@@ -214,14 +222,14 @@ from.
 | 1 | **Instrument the parametric story space.** Start small: a signature for a walk built from its sequence of equivalence classes, and a distance between two walks | G, T |
 | 2 | **One witness from another domain.** The repo already has computation by topology, a queue simulation and document inspection. Add one process that is plainly not a story, written in the same vocabulary of requirements, roles and affordances | T |
 | 3 | **Classification, the other direction.** The compression work: recover shape from a told story, with the language kit as its substrate | G, T |
-| 4 | **A clean reimplementation as a test of the laws.** If the nine laws and `SIMPLIFICATION_SPEC.md` are enough to rebuild from, they are complete (#468) | G |
+| 4 | **A clean reimplementation as a test of the theses.** If the eight theses and `SIMPLIFICATION_SPEC.md` are enough to rebuild from, they are complete (#468) | G |
 
 ### Bolster: keep strong what the design rests on
 
 | # | What | Size |
 |---|---|---|
-| 1 | The law layer in the documents: PR 681, then glossary entries and the two February notes on sinks brought forward (P14) | S |
-| 2 | A few tests that pin laws, for engine development only: assembling twice changes nothing (A9); reading a committed journal changes nothing (A13); no ad hoc serialization in core, vm, story (A11) | S |
+| 1 | The argument between philosophy and implementation: PR 681, then glossary entries and the two February notes on sinks brought forward (P14) | S |
+| 2 | A few tests that are the evidence a thesis names, for engine development only: assembling twice changes nothing (A9); reading a committed journal changes nothing (A13); no ad hoc serialization in core, vm, story (A11) | S |
 | 3 | The client floor: run the portable conformance fixtures in each client; content, choices and inputs are rendered or refused, hints may be ignored (A12, F112) | M |
 | 4 | Media's contract as the model for prose and for presentation profiles (F105, P11, P13) | n/a |
 | 5 | The practice of small witness worlds and downstream promotion ledgers (F44) | n/a |
@@ -264,9 +272,9 @@ from.
 
 ## 7. Order of work under this lens
 
-1. Land the laws (PR 681), the glossary terms and the sinks notes.
+1. Land the working theses (PR 681), the glossary terms and the sinks notes.
 2. The equivalence instrument.
-3. Two ornaments that make laws 3 and 7 visible: one story in both readings;
+3. Two ornaments that make theses 3 and 7 visible: one story in both readings;
    one walk in two tellings.
 4. Fan-in in the VM.
 5. Identity by declaration.
@@ -290,7 +298,7 @@ Hygiene items ride along where they are cheap. None of them should lead.
 | 679 | Checkpoint every ten completed choices, with rollback witnesses (A1) |
 | 680 | Remote preflight through the service API; operation-to-route inventory (part of A7) |
 
-In review: PR 681, the working laws.
+In review: PR 681, the working theses.
 
 Timing on `main` on 2026-11-13, same large graph, five choices, one run: 4.73 s
 per choice; 3.65 s with checkpoints off; 0.42 s with per-hop tracing also off.
@@ -338,6 +346,8 @@ an owner issue or none yet. Both clean-slate sketches are hypotheses.
 - It described a visit counter as counting rendered visits; it counts executed
   ones.
 - Its first draft of the week's plan coupled too much and led with hygiene.
+- It wrote the design's propositions up as "laws". They are theses of
+  different kinds, each with its own way of being wrong.
 
 The pattern in these: what Derek states about how it is supposed to work
 outranks what the code currently does, and the documents often already say it.
