@@ -121,18 +121,38 @@ This is not a theoretical nicety.  It means you can test structural properties
 any traversal happens, and you can reproduce a specific walk from its starting
 configuration and its choices (see Determinism and Replay).
 
-## Working Laws
+## Working Theses
 
-These are the rules the design is trying to obey, stated by the designer during
-a whole-project review in November 2026.  They name no classes on purpose: they
-should hold for any implementation.  They are intent.  Where the current code
-differs, the package design notes and the issues that own the area say so.
+The sections above say what the project believes about stories.  The package
+design notes say how the code works.  This section is the argument between the
+two: what each belief commits the design to, how far the implementation
+realizes it today, where the two still disagree, and what would count as
+evidence either way.
 
-### 1. Four orderings of one space
+These are propositions, not rules.  Each can be sharpened, narrowed or
+dropped when an experiment says so, and a new one can be added without
+ceremony.  They are not all the same kind of statement, so they are grouped by
+what they are:
 
-The three models above are four levels once the possibility space is split into
-what is authored and what is instantiated.  Each level adds order to the one
-before it.
+| Group | Kind of statement | If it turns out wrong |
+| --- | --- | --- |
+| Vocabulary | a model of what there is | revisit the ontology |
+| Unifications | a claim that two things are one | check whether the difference is real |
+| Commitments | a choice about how the engine is arranged | ask whether the choice or the code is at fault |
+| Hypotheses | a property we expect to hold | treat a failure as a counterexample worth studying |
+
+They were stated by the designer during a whole-project review in November
+2026.  The "today" and "tension" entries describe the implementation at that
+time and will date; the package notes and the issues that own each area are
+the live record.
+
+### Vocabulary
+
+#### 1. A story space is ordered in four steps
+
+**Thesis.**  The three models above are four levels once the possibility space
+is split into what is authored and what is instantiated.  Each level adds order
+to the one before it.
 
 | Level | What it is | Order |
 | --- | --- | --- |
@@ -143,76 +163,129 @@ before it.
 
 The episodes mediate between the linear journal and the non-linear story
 graph, which is itself one configuration of the ambient story space: like using
-a graph to order data with a heapsort.  The fabula covers the first two rows.
+a graph to order data with a heapsort.
 
-The order belongs to the walk, not to the authored graph.  Hubs and self-loops
-make the authored traversable graph cyclic; it is the sequence of occurrences
-that is ordered.
+**Why.**  The space of possible stories is not any one story, and a story that
+happened is not any one telling of it.
 
-Journal fragments were once leaves hanging off the episodes that produced them,
-and a journal was read out by walking any group of episodes.  They are stored
-apart from the graph now, for size and so that story state can be compared
-without the telling.  The full tree, from world to fragment, can still be
-reassembled.
+**Consequence.**  Each level owns different information and is produced by a
+different operation: compiling makes a world, materializing grounds it, walking
+orders it, telling linearizes it.  A client can re-present a journal without
+reconstructing the walk, and a walk can be studied without its telling.
 
-### 2. Concepts and episodes
+**Today.**  The four operations are separate in the code.  Journal fragments
+are stored apart from the graph, each still pointing at what produced it.  They
+were once leaves on the episodes themselves, read out by walking; they moved
+for size and so that state can be compared without the telling.
 
-- Any node in a story graph is a **concept**.
-- A traversable concept is an **episode**.  One is a block.  A group is a scene,
-  which is primarily a scope for shared names.
-- Concepts that are not episodes are mostly a **person, place, or thing**.  They
-  are bound through roles and settings, or tracked as single tokens or fungible
-  holdings.
-- Themes, arcs and motifs are the same kind of concept, contributing narrowly
-  through their relationships to other concepts.
+**Tension.**  The order belongs to the walk, not to the authored graph: hubs
+and self-loops make the authored traversable graph cyclic.  "Fabula" has been
+used for both of the first two levels.
 
-### 3. Two readings of one rule
+**Evidence.**  The full tree, world to fragment, reassembled from a saved
+story.  A journal re-voiced from its sources without walking again.
 
-A world can be written imperatively, in the manner of a gamebook: *if this and
-this, then go there*.  It can be written declaratively: *this is what can be
-reached when that and that hold*.  These are two readings of the same rule, and
-a world may be made entirely of either.  Both exist because episodes beg for
-the if-then form, while most concepts do not need to be ordered.
+#### 2. Everything in a story graph is a concept
 
-Materialization assembles what was declared so that it can be walked.  Eager
-materialization assembles everything.  Provisional materialization assembles
-what is here and coming up.  A template is an affordance for the provisioner: a
-concept or episode that comes into being when its conditions are met.  It reads
-as an imperative only because it is created on demand.
+**Thesis.**  Any node in a story graph is a **concept**.  A traversable concept
+is an **episode**: one is a block; a group is a scene, which is primarily a
+scope for shared names.  Concepts that are not episodes are mostly a **person,
+place, or thing**, bound through roles and settings or tracked as single
+tokens or fungible holdings.  Themes, arcs and motifs are the same kind of
+concept, contributing narrowly through their relationships to others.
 
-It follows that assembling is repeatable: the same declarations against the same
-state should change nothing.
+**Consequence.**  Narrative vocabulary should be a naming of the base
+structures, not an addition to them.
 
-### 4. Pull and push
+**Today.**  It is.  The story-layer classes are thin, and what each adds is a
+contract for how a bound thing appears to templates.
 
-An open link is an edge with one end fixed and a requirement describing the
-other.  A **dependency** is fixed at the one that needs something, and pulls.
-An **affordance** is fixed at the one that offers something, and waits.  A
-**fan-out** is a set of dependencies generated at a node, reaching for nearby
-satisfiers.  A **fan-in** is the set of latent affordances, created when their
-scope is entered, that can offer themselves on a node: home offers *go home*,
-a character offers *call her*.  See
-[AFFORDANCE_MODEL.md](../planning/AFFORDANCE_MODEL.md) for the canonical
-treatment.
+**Tension.**  A place can be an episode one stands on, as in a cave adventure,
+or a setting a scene binds, as in a calendar of events.  Both lowerings exist
+and the choice is made per world.
 
-### 5. Shape and state
+**Evidence against.**  A kind of concept that cannot be expressed without new
+base machinery.
 
-- **Shape** should change only during provisioning.
-- **State** should change during update or finalize when possible.
-- There are two update phases because of prose.  If the text says the player
-  drops the sword they are carrying and the sword has already been dropped, the
-  text can no longer say what happened.  So the drop is recorded after the
-  telling, and the telling reads the starting state.
-- The **telling may change state on what it is talking about**: a speaker's
-  attitude as it moves through a conversation, whom they are addressing, what
-  they last said, what has been introduced to the reader.  It should not bring
-  new concepts into being, and should touch only what this piece of prose is
-  about.
-- Reading a journal that has already been committed changes nothing.
+### Unifications
 
-### 6. Scope and navigation
+#### 3. Imperative and declarative are two readings of one rule
 
-A container is two things under one name.
+**Thesis.**  A world can be written in the manner of a gamebook: *if this and
+this, then go there*.  It can be written as a model: *this is what can be
+reached when that and that hold*.  These are the same rule read from either
+end, and a world may be made entirely of either.  Both exist because episodes
+beg for the if-then form, while most concepts do not need to be ordered.
+
+**Consequence.**  Materialization is assembly of what was declared, so that it
+can be walked.  Eager materialization assembles everything; provisional
+materialization assembles what is here and coming up.  A template is an
+affordance for the provisioner, and reads as an imperative only because it is
+created on demand.  Assembly should therefore be repeatable: the same
+declarations against the same state change nothing.
+
+**Today.**  Authored actions, roles, settings and media needs all lower to the
+same kind of requirement-bearing edge.  Eager and provisional creation are one
+pipeline with two switches.
+
+**Tension.**  Identities given at creation are not determined by the
+declaration, and some generated edges are rebuilt with new identities, so
+assembling twice is not always a no-op.  The worlds in this repository are
+almost all written in the imperative reading.
+
+**Evidence.**  Planning the same node twice against unchanged state leaves the
+graph unchanged.  One story written in both readings reaches the same states.
+
+#### 4. Pull and push are one link seen from either end
+
+**Thesis.**  An open link is an edge with one end fixed and a requirement
+describing the other.  A **dependency** is fixed at the one that needs
+something, and pulls.  An **affordance** is fixed at the one that offers
+something, and waits.  A **fan-out** is a set of dependencies generated at a
+node, reaching for nearby satisfiers.  A **fan-in** is the set of latent
+affordances, created when their scope is entered, that can offer themselves on
+a node: home offers *go home*, a character offers *call her*.
+
+**Consequence.**  Menus, location hubs, scheduled events and game moves are
+the same thing at different coordinates, and should not each need their own
+machinery.  See [AFFORDANCE_MODEL.md](../planning/AFFORDANCE_MODEL.md).
+
+**Today.**  The pull side is one mechanism, and media re-uses it unchanged.
+
+**Tension.**  The push side is not yet a shared operator.  Each kind of hub
+projects its own offers.
+
+**Evidence.**  One mechanism serving a menu, a location and an arrival at a
+site, with no code particular to any of them.
+
+### Commitments
+
+#### 5. Shape changes in provisioning; state changes around the telling
+
+**Thesis.**  **Shape** should change only during provisioning.  **State**
+should change during update or finalize when possible.  The **telling may
+change state on what it is talking about**: a speaker's attitude as it moves
+through a conversation, whom they are addressing, what has been introduced to
+the reader.  It should not bring new concepts into being.
+
+**Why.**  There are two update phases because of prose.  If the text says the
+player drops the sword they are carrying and the sword has already been
+dropped, the text can no longer say what happened.  So the drop is recorded
+after the telling, and the telling reads the starting state.
+
+**Today.**  The phases are ordered this way.  Introducing a character changes
+what the narrator knows, during the telling.
+
+**Tension.**  A call that re-enters its caller tells the caller again, so a
+change made in the telling that is not idempotent is applied twice.
+
+**Evidence.**  Reading a journal that has already been committed changes
+nothing.  A case where the telling genuinely has to change shape would count
+against the proposition.
+
+#### 6. A container is a scope first and a navigation unit second
+
+**Thesis.**  A container answers two questions under one name.
 
 | Role | What it answers |
 | --- | --- |
@@ -224,38 +297,56 @@ refer to them by name in the content, and if they are recast every episode in
 the region knows.  The navigation role accreted because scopes are jumped into
 and out of.
 
-A navigation unit has one source and one sink.  The source sets up wherever the
-walk should land and forwards it there.  The sink finalizes the container and
-forwards the walk out, back or onward.  Entered at the source and left at the
-sink, a whole container is a single node at the next level up, and the whole
-story is the outermost container.  An intended ending is a sink; running out of
-choices anywhere else is a softlock.
+As a navigation unit, a container has one source and one sink.  The source
+sets up wherever the walk should land and forwards it there.  The sink
+finalizes the container and forwards the walk out, back or onward.  Entered at
+the source and left at the sink, a whole container is a single node at the
+next level up, and the whole story is the outermost container.  An intended
+ending is a sink; running out of choices anywhere else is a softlock.
 
-A world may bind a place to an episode, so that moving between places is moving
-between episodes, as in a cave adventure.  It may instead bind a place to a
-scene as a setting, as in a calendar of events.  These are two lowerings of the
-same idea.
+**Today.**  The scope half works as described.  Of the navigation half, entry
+is used.
 
-### 7. What belongs to story
+**Tension.**  The exit is not used, authored edges cross container boundaries
+directly, and nothing records that a story has ended.  The navigation half is
+partly a hypothesis: that a graph can be given one source and one sink does
+not show that passing through them has the right effect for direct links,
+nested scenes and hubs that are re-entered.
 
-Story is what affects the shape of, and the path through, a story space.
-Prose, media and mechanics refine appearance, presentation and interactivity.
-Voice and point of view belong to prose or media.
+**Evidence.**  Two worlds in which setup and cleanup placed at a source and a
+sink replace wiring at every entrance and exit.
 
-The same test applies at other scales.  Two states belong to the same
+### Hypotheses
+
+#### 7. Story is shape; the rest is appearance
+
+**Thesis.**  Story is what affects the shape of, and the path through, a story
+space.  Prose, media and mechanics refine appearance, presentation and
+interactivity.  Voice and point of view belong to prose or media.
+
+The same test applies to a single state.  Two states belong to the same
 **equivalence class** when nothing downstream can tell them apart: leaving a
 room and returning with nothing changed is no move at all, and picking
 something up now or later is the same if nothing depends on when.  (The term
-follows Andrew Plotkin's
-[PlotEx](https://eblong.com/zarf/plotex/).)  At what scale "tell apart" is
-judged is left open.
+follows Andrew Plotkin's [PlotEx](https://eblong.com/zarf/plotex/).)
 
-Games here are interactive storytelling affordances.  They may be fair, and a
-fair game is a good first step, but an author must be able to put a thumb on
-the scale to any degree.  Chance should dress an outcome more often than decide
-it.
+Games here are storytelling affordances.  They may be fair, and a fair game is
+a good first step, but an author must be able to put a thumb on the scale to
+any degree.  Chance should dress an outcome more often than decide it.
 
-### 8. Two kinds of similarity
+**Today.**  The package boundaries roughly follow the line.  Merging outcomes
+that nothing can tell apart has been built once, in a world's own compiler.
+
+**Tension.**  The engine has no way to compare two story states.  At what
+scale "tell apart" is judged is open.  Presentation hints have accumulated
+mechanism that is neither shape nor portable appearance.
+
+**Evidence.**  Replacing the prose, the media, or the dressing of a mechanic
+leaves the reachable equivalence classes unchanged.
+
+#### 8. A walk is reproducible up to an equivalence
+
+**Thesis.**  There are two kinds of similarity.
 
 - **Self-similarity.**  Given one starting configuration, the same walk
   reproduces.
@@ -263,18 +354,32 @@ it.
   choices land on essentially the same story state, though identities differ
   and the telling may differ entirely: the journal might be in French.
 
-A seed is an option for testing, not a requirement.  The second kind holds only
-where chance has little influence on provisioning and on which paths are open.
-Replay does not have to be draconian; determinism becomes fuzzier the lighter
-the author's thumb, and that is acceptable.
+A seed is an option for testing, not a requirement.  Outcome similarity holds
+only where chance has little influence on provisioning and on which paths are
+open.  Reproducibility is to a given equivalence, when the engine is used in a
+particular way, and becomes fuzzier the lighter the author's thumb.
 
-### 9. Whom the rules bind
+**Today.**  Self-similarity holds within one saved story.  "Determinism and
+Replay" below says what supports it.
 
-These rules are firm for work on the engine itself.  For authors and plugins
-they are rules of thumb: off-label use is unsupported and theirs to own, and
-the engine does not guard against it.  Even the firm rules are negotiable.
-When a real case collides with one, the rule is kept and the smallest exception
-that meets the need is carved out.
+**Tension.**  Two stories from one world share no identities and nothing
+compares their states, so outcome similarity cannot yet be checked.  Chance
+inside some mechanics is not drawn from the story's own generator.
+
+**Evidence.**  The same choices from two starts pass through the same sequence
+of equivalence classes.
+
+### How these change
+
+These propositions guide work on the engine.  Authors and plugins may do
+unsupported things; the engine does not guard against that.
+
+When an implementation collides with a proposition, decide whether the problem
+lies in the implementation, in the proposition, or in its scope.  Prefer the
+smallest coherent revision, and keep neither the abstraction nor the code
+merely because it came first.  Sometimes that is a narrow exception; sometimes
+several exceptions together show that the generalization was wrong.
+[CANON_AND_REALIZATION.md](../CANON_AND_REALIZATION.md) describes the method.
 
 ---
 
@@ -595,7 +700,7 @@ Presenter → typed journal fragments + an application/client presentation adapt
 
 ## Determinism and Replay
 
-Working law 8 states the intent: a walk reproduces from its starting
+Working thesis 8 states the intent: a walk reproduces from its starting
 configuration, and the same choices from a different start land on essentially
 the same story state.  This section says why that matters and what the engine
 currently does about it.
