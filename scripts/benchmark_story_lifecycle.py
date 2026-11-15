@@ -4,6 +4,10 @@ Run from the checkout::
 
     .venv/bin/python scripts/benchmark_story_lifecycle.py --presets small large --samples 5 --choices 10
 
+Compare the same topology with authored UPDATE effects::
+
+    .venv/bin/python scripts/benchmark_story_lifecycle.py --profiles baseline effects --presets small large --samples 5 --choices 10
+
 Each sample runs in a fresh interpreter with its own bundle, JSON store and caches.
 Imports and bundle generation precede timing. Bundle load reads the manifest; script
 decode occurs with compilation. Compilation and manual world registration are combined;
@@ -26,18 +30,23 @@ from time import perf_counter
 
 ROOT = Path(__file__).resolve().parents[1]
 PRESETS = {"small": 20, "large": 400}
+PROFILES = ("baseline", "effects")
+EFFECT = "graph.locals['benchmark_visits'] = graph.locals.get('benchmark_visits', 0) + 1"
 
 
-def story_data(blocks: int, fanout: int = 1) -> dict:
+def story_data(blocks: int, fanout: int = 1, profile: str = "baseline") -> dict:
     """Create stable near-native author data with a forward cyclic topology."""
     if blocks < 2 or not 1 <= fanout < blocks:
         raise ValueError("blocks must be >= 2 and fanout must be between 1 and blocks - 1")
+    if profile not in PROFILES:
+        raise ValueError(f"Unknown profile: {profile}")
     return {
         "label": "lifecycle_baseline",
         "metadata": {"title": "Lifecycle baseline", "start_at": "scene.block_0000"},
         "scenes": {"scene": {"blocks": {
             f"block_{index:04d}": {
                 "content": f"Static passage {index:04d}.",
+                **({"effects": [EFFECT]} if profile == "effects" else {}),
                 "actions": [
                     {"text": f"Continue {offset}",
                      "successor": f"block_{(index + offset) % blocks:04d}"}
@@ -49,7 +58,7 @@ def story_data(blocks: int, fanout: int = 1) -> dict:
     }
 
 
-def write_bundle(path: Path, blocks: int, fanout: int = 1) -> None:
+def write_bundle(path: Path, blocks: int, fanout: int = 1, profile: str = "baseline") -> None:
     import yaml
 
     path.mkdir(parents=True, exist_ok=True)
@@ -57,11 +66,11 @@ def write_bundle(path: Path, blocks: int, fanout: int = 1) -> None:
         "label": "lifecycle_baseline", "scripts": "script.yaml",
         "metadata": {"title": "Lifecycle baseline", "start_at": "scene.block_0000"},
     }, sort_keys=False), encoding="utf-8")
-    (path / "script.yaml").write_text(yaml.safe_dump(story_data(blocks, fanout), sort_keys=False),
+    (path / "script.yaml").write_text(yaml.safe_dump(story_data(blocks, fanout, profile), sort_keys=False),
                                        encoding="utf-8")
 
 
-def measure_sample(blocks: int, fanout: int, choices: int, root: Path) -> dict:
+def measure_sample(blocks: int, fanout: int, choices: int, root: Path, profile: str = "baseline") -> dict:
     """Exercise the public lifecycle once; caller isolates the process and paths."""
     from tangl.core import Edge, Node, Selector
     from tangl.journal.fragments import ChoiceFragment, ContentFragment
@@ -76,7 +85,7 @@ def measure_sample(blocks: int, fanout: int, choices: int, root: Path) -> dict:
     import tangl
 
     bundle_path = root / "lifecycle_baseline"
-    write_bundle(bundle_path, blocks, fanout)
+    write_bundle(bundle_path, blocks, fanout, profile)
     start = perf_counter()
     bundle = WorldBundle.load(bundle_path)
     loaded = perf_counter()
@@ -98,12 +107,14 @@ def measure_sample(blocks: int, fanout: int, choices: int, root: Path) -> dict:
 
         serialization = [encode(envelope)]
         choice_times = []
+        selected_choices = []
         for index in range(choices):
             offered = [item for item in envelope.fragments
                        if isinstance(item, ChoiceFragment) and item.available]
             if not offered or not any(isinstance(item, ContentFragment) for item in envelope.fragments):
                 raise RuntimeError(f"Missing content or available choice at iteration {index}")
             choice = offered[0]
+            selected_choices.append(choice.text)
             begin = perf_counter()
             envelope = manager.resolve_choice(
                 user_id=user_id,
@@ -130,20 +141,25 @@ def measure_sample(blocks: int, fanout: int, choices: int, root: Path) -> dict:
                 "cursor_label": ledger.cursor.label,
             }
             identity_and_state = (ledger.uid, graph.uid, ledger.cursor_id,
-                                  ledger.choice_steps, ledger.cursor_steps, list(ledger.cursor_history))
+                                  ledger.choice_steps, ledger.cursor_steps, list(ledger.cursor_history),
+                                  graph.locals.get("benchmark_visits"))
             cadence = ledger.checkpoint_cadence
         reopened = ServiceManager(PersistenceManagerFactory.json_file(base_path=store))
         with reopened.open_session(user_id=user_id) as session:
             saved = session.ledger
             if (saved.uid, saved.graph.uid, saved.cursor_id, saved.choice_steps,
-                    saved.cursor_steps, saved.cursor_history) != identity_and_state:
+                    saved.cursor_steps, saved.cursor_history,
+                    saved.graph.locals.get("benchmark_visits")) != identity_and_state:
                 raise AssertionError("JSON reopen changed ledger identity or traversal state")
         return {
+            "profile": profile,
+            "benchmark_visits": identity_and_state[-1],
             "source_file": str(Path(tangl.__file__).resolve()),
             "bundle_load_s": loaded - start,
             "compile_and_register_s": compiled - loaded,
             "create_story_s": created - start_create,
             "choice_s": choice_times,
+            "selected_choices": selected_choices,
             "dto_json_s": [duration for duration, _ in serialization],
             "response_bytes": [size for _, size in serialization],
             "counts": counts,
@@ -157,9 +173,11 @@ def summary(values: list[float]) -> dict[str, float]:
     return {"median": statistics.median(values), "min": min(values), "max": max(values)}
 
 
-def run(presets: list[str], samples: int, choices: int, fanout: int) -> dict:
+def run(presets: list[str], samples: int, choices: int, fanout: int,
+        profiles: list[str] | None = None) -> dict:
     if samples < 1 or choices < 1:
         raise ValueError("samples and choices must be positive")
+    profiles = profiles or ["baseline"]
     revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True,
                               capture_output=True, check=True).stdout.strip()
     dirty = bool(subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, text=True,
@@ -168,31 +186,42 @@ def run(presets: list[str], samples: int, choices: int, fanout: int) -> dict:
     env["PYTHONPATH"] = os.pathsep.join(filter(None, (str(ROOT / "engine/src"), env.get("PYTHONPATH"))))
     results = {}
     for preset in presets:
-        rows = []
+        series = {profile: [] for profile in profiles}
         for _ in range(samples):
-            worker = subprocess.run([
-                sys.executable, str(Path(__file__).resolve()), "--worker", "--blocks",
-                str(PRESETS[preset]), "--fanout", str(fanout), "--choices", str(choices),
-            ], cwd=ROOT, env=env, text=True, capture_output=True)
-            if worker.stderr:
-                sys.stderr.write(worker.stderr)
-            worker.check_returncode()
-            rows.append(json.loads(worker.stdout))
-        results[preset] = {
-            "blocks_requested": PRESETS[preset], "samples": rows,
-            "summary_s": {name: summary([row[name] for row in rows]) for name in
-                          ("bundle_load_s", "compile_and_register_s", "create_story_s")},
-            "choice_summary_s": summary([value for row in rows for value in row["choice_s"]]),
-            "choice_by_position_s": [summary([row["choice_s"][index] for row in rows])
-                                     for index in range(choices)],
-            "dto_json_summary_s": summary([value for row in rows for value in row["dto_json_s"]]),
-        }
+            for profile in profiles:
+                worker = subprocess.run([
+                    sys.executable, str(Path(__file__).resolve()), "--worker", "--blocks",
+                    str(PRESETS[preset]), "--fanout", str(fanout), "--choices", str(choices),
+                    "--profiles", profile,
+                ], cwd=ROOT, env=env, text=True, capture_output=True)
+                if worker.stderr:
+                    sys.stderr.write(worker.stderr)
+                worker.check_returncode()
+                series[profile].append(json.loads(worker.stdout))
+
+        def summarize(rows: list[dict]) -> dict:
+            return {
+                "profile": rows[0]["profile"], "blocks_requested": PRESETS[preset], "samples": rows,
+                "summary_s": {name: summary([row[name] for row in rows]) for name in
+                              ("bundle_load_s", "compile_and_register_s", "create_story_s")},
+                "choice_summary_s": summary([value for row in rows for value in row["choice_s"]]),
+                "choice_by_position_s": [summary([row["choice_s"][index] for row in rows])
+                                         for index in range(choices)],
+                "dto_json_summary_s": summary([value for row in rows for value in row["dto_json_s"]]),
+            }
+
+        results[preset] = (summarize(series[profiles[0]]) if len(profiles) == 1 else {
+            "blocks_requested": PRESETS[preset],
+            "profiles": {profile: summarize(rows) for profile, rows in series.items()},
+        })
     return {"revision": revision, "dirty": dirty, "python": sys.version, "platform": platform.platform(),
-            "profile": "baseline", "init_mode": "EAGER", "persistence": "json_file",
+            "profile": profiles[0] if len(profiles) == 1 else "matched", "profiles": profiles,
+            "init_mode": "EAGER", "persistence": "json_file",
             "conditions": (
                 "fresh worker and store per sample; imports, bundle writing and user creation excluded; "
                 "direct manifest load; script decode, compile and manual registration combined; "
-                "choices reload persisted sessions; no network or browser"
+                "choices reload persisted sessions; profiles run in listed order per repetition; "
+                "no network or browser"
             ),
             "samples_per_preset": samples, "choices_per_sample": choices, "fanout": fanout,
             "results": results}
@@ -204,6 +233,7 @@ def main() -> None:
     parser.add_argument("--samples", type=int, default=5)
     parser.add_argument("--choices", type=int, default=10)
     parser.add_argument("--fanout", type=int, default=1)
+    parser.add_argument("--profiles", nargs="+", choices=PROFILES, default=["baseline"])
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--blocks", type=int, help=argparse.SUPPRESS)
     args = parser.parse_args()
@@ -214,9 +244,11 @@ def main() -> None:
             os.environ["TANGL_SERVICE__PATHS__STORY_MEDIA"] = f"@path {root / 'media'}"
             os.environ["MPLCONFIGDIR"] = str(root / "matplotlib")
             sys.path.insert(0, str(ROOT / "engine/src"))
-            print(json.dumps(measure_sample(args.blocks, args.fanout, args.choices, root)))
+            if len(args.profiles) != 1:
+                parser.error("a worker requires exactly one profile")
+            print(json.dumps(measure_sample(args.blocks, args.fanout, args.choices, root, args.profiles[0])))
     else:
-        print(json.dumps(run(args.presets, args.samples, args.choices, args.fanout), indent=2))
+        print(json.dumps(run(args.presets, args.samples, args.choices, args.fanout, args.profiles), indent=2))
 
 
 if __name__ == "__main__":
