@@ -1,4 +1,34 @@
-"""Small deterministic controls for the opt-in lifecycle benchmark."""
+"""Small deterministic controls for the opt-in lifecycle benchmark.
+
+Timing reference (2026-11-14)
+----------------------------
+These are observed ranges on one host, not portable expectations or CI limits.
+At clean revision 5413a6cb617b9bc9519a8e34523052ab2f57dd08, Python 3.12.5,
+macOS 26.5.2 arm64, the normal EAGER/JSON lifecycle with fanout 1 and checkpoint
+cadence 10 produced the following inclusive Service choice times::
+
+    Blocks  Profile   Median    Observed min-max
+        20  baseline   19.6 ms    16.9-41.2 ms
+        20  effects    21.3 ms    17.8-45.2 ms
+       400  baseline  268.3 ms   227.9-362.9 ms
+       400  effects   282.4 ms   264.6-343.1 ms
+
+Each case used ten fresh-process samples, five in each profile order, with ten
+choices per sample. Checkpoints and per-hop tracing remained enabled. The large
+preset had 801 graph members; authored block count is not total graph size.
+
+Host contention can produce an approximately 10x slowdown on large graphs.
+An earlier same-revision run under suspected heavy host load reported large
+choice medians of 2.37 s (baseline) and 2.71 s (effects), with calls up to 4.16 s.
+The quieter reruns returned to the ranges above. This supports host contention
+as the explanation; no individual competing application was isolated as the cause.
+
+Before investigating an apparent regression, repeat the benchmark on a quiet
+machine with the same revision, interpreter and parameters, in both profile
+orders. Compare repeated medians and spread rather than one call. See the command
+and timing boundaries in scripts/benchmark_story_lifecycle.py; correctness tests
+deliberately contain no wall-clock assertions.
+"""
 from __future__ import annotations
 
 import json
