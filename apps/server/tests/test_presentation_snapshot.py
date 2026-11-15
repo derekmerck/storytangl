@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from tangl.core import Graph
-from tangl.journal.fragments import ControlFragment, MediaFragment
+from tangl.journal.fragments import ContentFragment, ControlFragment, MediaFragment
 from tangl.journal.presentation import desired_music
 from tangl.media import MediaDataType
 from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT, MediaRITStatus
@@ -19,6 +19,45 @@ from tangl.rest.routers.story_router import _serialize_runtime_envelope
 from tangl.service.remote_service_manager import RemoteServiceManager
 from tangl.service.response import PresentationSnapshot, RuntimeEnvelope, RuntimeEnvelopePayload
 from tangl.vm import Ledger
+
+
+@pytest.mark.parametrize("profile", ["raw", "html", "no_audio"])
+def test_committed_fragment_projection_is_observational(tmp_path: Path, profile: str) -> None:
+    graph = Graph()
+    start = graph.add_node(label="start")
+    ledger = Ledger.from_graph(graph, entry_id=start.uid)
+    fragment = ContentFragment(content="**Committed** prose", source_id=start.uid)
+    ledger.output_stream.append(fragment)
+    audio = tmp_path / "cue.wav"
+    with wave.open(str(audio), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(8000)
+        output.writeframes(b"\0\0" * 80)
+    ledger.output_stream.append(MediaFragment(
+        content=MediaRIT.from_source(audio), content_format="rit", media_role="music",
+    ))
+    calls: list[str] = []
+
+    @ledger.local_behaviors.register(task="render_journal")
+    def realize(*, caller, ctx, **kwargs):
+        calls.append("journal")
+        ctx.graph.locals["visits"] = ctx.graph.locals.get("visits", 0) + 1
+
+    before = Json.serialize(ledger.unstructure())
+    graph_hash = graph.value_hash()
+    envelope = RuntimeEnvelope(fragments=ledger.get_journal())
+    first = _serialize_runtime_envelope(envelope, render_profile=profile)
+    second = _serialize_runtime_envelope(envelope, render_profile=profile)
+    assert first == second
+    assert first["fragments"]
+    assert any(f.get("fragment_type") == "media" for f in first["fragments"]) == (
+        profile != "no_audio"
+    )
+    assert calls == []
+    assert graph.value_hash() == graph_hash
+    assert Json.serialize(ledger.unstructure()) == before
+    assert ledger.get_journal()[0].unstructure() == fragment.unstructure()
 
 
 @pytest.mark.parametrize(

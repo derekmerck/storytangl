@@ -127,6 +127,72 @@ def _first_choice_edge(ledger: Ledger) -> Action:
     return next(ledger.cursor.edges_out(Selector(has_kind=Action, trigger_phase=None)))
 
 
+def test_committed_journal_reads_do_not_realize_again(tmp_path: Path) -> None:
+    from tangl.core import BehaviorRegistry, DispatchLayer
+    from tangl.persistence.serializers import JsonSerializationHandler as Json
+
+    calls: list[str] = []
+    authority = BehaviorRegistry(default_dispatch_layer=DispatchLayer.AUTHOR)
+
+    @authority.register(task="render_journal")
+    def realize(*, caller, ctx, **kwargs):
+        if caller.label != "start":
+            return None
+        calls.append("journal")
+        ctx.graph.locals["journal_visits"] = ctx.graph.locals.get("journal_visits", 0) + 1
+        return ContentFragment(content="Policy output", source_id=caller.uid)
+
+    for task in ("apply_update", "finalize_step"):
+        def observe(*, caller, ctx, _task=task, **kwargs):
+            if caller.label == "start":
+                calls.append(_task)
+        authority.register(observe, task=task)
+
+    world = World.from_script_data(script_data=_story_script())
+    world.extra_authorities.append(authority)
+    persistence = PersistenceManagerFactory.json_file(base_path=tmp_path)
+    manager = ServiceManager(persistence)
+    user = User(label="journal-observer")
+    persistence.save(user)
+    manager.create_story(user_id=user.uid, world_id=world.label, world=world,
+                         init_mode=InitMode.EAGER.value)
+    committed_calls = list(calls)
+    assert {"journal", "apply_update", "finalize_step"} <= set(committed_calls)
+
+    with manager.open_session(user_id=user.uid, write_back=False) as session:
+        ledger = session.ledger
+        assert ledger.graph.locals["journal_visits"] == committed_calls.count("journal")
+        assert any(getattr(f, "content", None) == "Policy output" for f in ledger.get_journal())
+        before = Json.serialize(ledger.unstructure())
+        graph_hash = ledger.graph.value_hash()
+        requests = ({}, {"since_step": ledger.step}, {"limit": 1})
+        expected_reads = []
+        for options in requests:
+            expected = [f.unstructure() for f in ledger.get_journal(**options)]
+            assert expected
+            expected_reads.append(expected)
+            for _ in range(2):
+                assert [f.unstructure() for f in ledger.get_journal(**options)] == expected
+        assert ledger.graph.value_hash() == graph_hash
+        assert Json.serialize(ledger.unstructure()) == before
+        restored = Ledger.structure(ledger.unstructure())
+        assert [f.unstructure() for f in restored.get_journal()] == [
+            f.unstructure() for f in ledger.get_journal()
+        ]
+
+    reopened = ServiceManager(PersistenceManagerFactory.json_file(base_path=tmp_path))
+    for reader in (manager, reopened):
+        for options, expected in zip(requests, expected_reads, strict=True):
+            first = reader.get_story_update(user_id=user.uid, **options)
+            second = reader.get_story_update(user_id=user.uid, **options)
+            assert [f.unstructure() for f in first.fragments] == expected
+            assert [f.unstructure() for f in second.fragments] == expected
+        with reader.open_session(user_id=user.uid, write_back=False) as session:
+            assert session.ledger.graph.value_hash() == graph_hash
+            assert Json.serialize(session.ledger.unstructure()) == before
+    assert calls == committed_calls
+
+
 @pytest.fixture(autouse=True)
 def _clear_manual_worlds() -> None:
     from tangl.service.world_registry import clear_manual_worlds, iter_manual_worlds
