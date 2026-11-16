@@ -231,10 +231,14 @@ pipeline with two switches.
 **Tension.**  Identities given at creation are not determined by the
 declaration, and some generated edges are rebuilt with new identities, so
 assembling twice is not always a no-op.  The worlds in this repository are
-almost all written in the imperative reading.
+almost all written in the imperative reading, so the claim that the two
+readings are one has not been put to a test.
 
 **Evidence.**  Planning the same node twice against unchanged state leaves the
 graph unchanged.  One story written in both readings reaches the same states.
+The second is worth building before the declarative operators are settled,
+not after: what has to be wired by hand in the declarative version is the
+finding.
 
 #### 4. Pull and push are one link seen from either end
 
@@ -279,6 +283,17 @@ what the narrator knows, during the telling.
 **Tension.**  A call that re-enters its caller tells the caller again, so a
 change made in the telling that is not idempotent is applied twice.
 
+A speaker's attitude shows the commitment at small scale.  The intended
+arrangement has one authority: the actor holds its attitude, and whatever
+tells or shows a line asks the actor for it.  An actor with no attitude offers
+none, and a look or a voice that has no variant for it uses its ordinary
+form.  An attitude noted beside a line of dialog is then a change to the
+speaker, not a second place the attitude lives.  Today the attitude is read
+only from the note and the actor is never asked.  Open: whether a note changes
+the speaker past its own line, and whether a line can be delivered against the
+speaker's attitude, an angry character speaking cheerfully, without changing
+it.
+
 **Evidence.**  Reading a journal that has already been committed changes
 nothing.  A case where the telling genuinely has to change shape would count
 against the proposition.
@@ -313,8 +328,35 @@ partly a hypothesis: that a graph can be given one source and one sink does
 not show that passing through them has the right effect for direct links,
 nested scenes and hubs that are re-entered.
 
+A scope boundary is not automatically a traversal boundary, and several open
+questions meet where the two are confused.  They are one question asked from
+different sides: *what does it mean for a destination to be admissible,
+provisioned and entered across a scope boundary?*
+
+- **Reasons to jump.**  One mechanism serves a shared introduction or ending,
+  a nested conversation, an interjection, an excursion from a hub, a redirect
+  between scenes and a scene that is re-entered.  Each wants something
+  different on arrival and on return: continue after the edge that was taken,
+  plan the caller afresh, or do not come back.  Whether jump, resume and
+  re-enter are enough to say all of these is untested.
+- **Readiness.**  A jump can land outside the current scope and beyond what
+  has been provisioned.  What must already exist there, and who assembles it,
+  is not stated.
+- **Donation.**  A concept can offer an action.  How a concept offers a whole
+  contained episode, one that may not be materialized yet, is not stated
+  either.
+- **Leaving.**  What passing through the sink guarantees about completion and
+  cleanup, to the caller and to the level above.
+
+It may be that source and sink are a way of *viewing* a container as one node
+and not a requirement that every edge physically pass through them.  A check
+that reports where edges cross a boundary directly is then a way to look, not
+a finding that a world is wrong.
+
 **Evidence.**  Two worlds in which setup and cleanup placed at a source and a
-sink replace wiring at every entrance and exit.
+sink replace wiring at every entrance and exit.  A table of the reasons to
+jump against the behaviour wanted on return, each row expressed with the
+existing operations or shown to need another.
 
 ### Hypotheses
 
@@ -341,6 +383,14 @@ that nothing can tell apart has been built once, in a world's own compiler.
 scale "tell apart" is judged is open.  Presentation hints have accumulated
 mechanism that is neither shape nor portable appearance.
 
+Media and prose are both appearance, and media has the fuller arrangement: a
+need is stated, candidates are authored or generated, one is selected, and it
+is identified by what it was derived from.  Prose could be arranged the same
+way, which would make two tellings of one event directly comparable.  The
+symmetry is named here and the machinery is not adopted: prose has no request
+object or selection step, and should not gain one only because media has
+them.
+
 **Evidence.**  Replacing the prose, the media, or the dressing of a mechanic
 leaves the reachable equivalence classes unchanged.
 
@@ -366,8 +416,33 @@ Replay" below says what supports it.
 compares their states, so outcome similarity cannot yet be checked.  Chance
 inside some mechanics is not drawn from the story's own generator.
 
+"The same" has several meanings, and the thesis cannot be checked until one
+is chosen.  They are distinct relations, not steps on one scale: two things
+can share an identity and differ in state, or share bytes and differ in role.
+
+| Relation | The question |
+| --- | --- |
+| Nominal | same declared kind and label? |
+| Provenance | same originating declaration or template? |
+| Construction | same template and the same effective parameters? |
+| Identity | the same continuing thing? |
+| Value | the same relevant data now? |
+| Content | the same wrapped content, by digest? |
+| Observational | can a stated set of readers tell them apart? |
+| Behavioural | can any continuation tell them apart? |
+
+Each matters somewhere: reattaching a rebuilt edge wants construction, a media
+file wants content, merging outcomes wants the last two.  The engine's general
+equality is value, computed by serializing.  An identity derived from the
+declaration would supply construction and no more, and must be a fingerprint
+of how a thing was made, not of what it has since become.  The observational
+relation needs its readers named: what one walk did not read, another branch
+may.
+
 **Evidence.**  The same choices from two starts pass through the same sequence
-of equivalence classes.
+of equivalence classes.  A comparison of two states or walks that states which
+relation it used and, where they differ, names the reader or the next step
+that tells them apart.
 
 ### How these change
 
@@ -380,6 +455,10 @@ smallest coherent revision, and keep neither the abstraction nor the code
 merely because it came first.  Sometimes that is a narrow exception; sometimes
 several exceptions together show that the generalization was wrong.
 [CANON_AND_REALIZATION.md](../CANON_AND_REALIZATION.md) describes the method.
+
+A tension entry names a question so that it is not lost.  It approves no
+mechanism and schedules no work; whether and when anything is built is decided
+in the issue that owns the area.
 
 ---
 
