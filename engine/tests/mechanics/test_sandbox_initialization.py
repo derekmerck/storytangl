@@ -184,7 +184,11 @@ def test_frozen_setup_rejects_a_static_target_that_cannot_be_bound() -> None:
 
 
 def test_lazy_initialization_does_not_force_static_event_targets_eager() -> None:
-    world = World.from_script_data(script_data=_script("lazy_setup"))
+    from tangl.persistence.serializers import JsonSerializationHandler as Json
+
+    script = _script("lazy_setup")
+    script["scenes"]["hub"]["blocks"]["start"]["wait_enabled"] = False
+    world = World.from_script_data(script_data=script)
     graph = world.create_story("run", init_mode=InitMode.LAZY).graph
     assert graph.find_one(Selector(label="target")) is None
     start = graph.get(graph.initial_cursor_id)
@@ -203,10 +207,36 @@ def test_lazy_initialization_does_not_force_static_event_targets_eager() -> None
     }
     assert choices["Now"].available
     assert not choices["Later"].available
-    do_provision(start, ctx=ctx)
+    do_provision(start, ctx=PhaseCtx(graph=graph, cursor_id=start.uid))
     assert {text: action.uid for text, action in _offers(start).items()} == ids
     assert list(graph.find_all(Selector(has_kind=Dependency, label="destination"))) == dependencies
     assert graph.find_one(Selector(label="target")) is None
+
+    def snapshot(current_graph: StoryGraph, receiver: SandboxLocation) -> tuple:
+        offers = _offers(receiver)
+        fresh = PhaseCtx(graph=current_graph, cursor_id=receiver.uid)
+        return (
+            list(current_graph.members),
+            [edge.uid for edge in receiver.edges_out()],
+            [(a.uid, a.predecessor_id, a.successor_id, a.text, a.available(ctx=fresh),
+              a.unstructure()) for a in offers.values()],
+            [(d.uid, d.predecessor_id, d.successor_id, d.unstructure())
+             for d in current_graph.find_all(Selector(has_kind=Dependency, label="destination"))],
+            current_graph.unstructure(), current_graph.value_hash(),
+        )
+
+    expected = snapshot(graph, start)
+    assert len(expected[3]) == 2
+    for _ in range(2):
+        do_provision(start, ctx=PhaseCtx(graph=graph, cursor_id=start.uid))
+        assert snapshot(graph, start) == expected
+    ledger = Ledger.from_graph(graph, entry_id=start.uid)
+    restored = Ledger.structure(Json.deserialize(Json.serialize(ledger.unstructure())))
+    restored_start = restored.graph.get(start.uid)
+    assert snapshot(restored.graph, restored_start) == expected
+    for _ in range(2):
+        do_provision(restored_start, ctx=PhaseCtx(graph=restored.graph, cursor_id=start.uid))
+        assert snapshot(restored.graph, restored_start) == expected
 
 
 def test_materialized_receiver_respects_automatic_provisioning_opt_out() -> None:

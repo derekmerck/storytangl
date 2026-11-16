@@ -1287,6 +1287,59 @@ def test_retained_event_reuses_its_bound_target_without_lookup(
     assert revisited.successor is target
 
 
+@pytest.mark.parametrize("sponsor_kind", ["location", "scope"])
+def test_retained_events_repeat_at_fixed_step_and_after_json_restore(sponsor_kind: str) -> None:
+    from tangl.persistence.serializers import JsonSerializationHandler as Json
+    from tangl.vm import Dependency
+
+    graph = Graph(label=f"repeat_{sponsor_kind}")
+    scope = SandboxScope(label="scope", locals={"world_turn": 1})
+    road = SandboxLocation(label="road", wait_enabled=False)
+    target = Block(label="target", content="Target")
+    for member in (scope, road, target):
+        graph.add(member)
+    scope.add_child(road)
+    sponsor = road if sponsor_kind == "location" else scope
+    sponsor.scheduled_events = [
+        ScheduledEvent(label="open", target="target", text="Open"),
+        ScheduledEvent(label="gated", target="target", text="Gated", period=3),
+    ]
+
+    def snapshot(current_graph: Graph, current_road: SandboxLocation) -> tuple:
+        ctx = PhaseCtx(graph=current_graph, cursor_id=current_road.uid)
+        actions = _dynamic_sandbox_actions_with_tag(current_road, "event")
+        dependencies = list(current_graph.find_edges(Selector(has_kind=Dependency)))
+        return (
+            list(current_graph.members),
+            [edge.uid for edge in current_road.edges_out()],
+            [(a.uid, a.predecessor_id, a.successor_id, a.text, a.available(ctx=ctx),
+              a.unstructure()) for a in actions],
+            [(d.uid, d.predecessor_id, d.successor_id, d.unstructure()) for d in dependencies],
+            current_graph.unstructure(),
+            current_graph.value_hash(),
+        )
+
+    do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+    expected = snapshot(graph, road)
+    actions = _dynamic_sandbox_actions_with_tag(road, "event")
+    assert [(action.text, action.available(ctx=PhaseCtx(graph=graph, cursor_id=road.uid)))
+            for action in actions] == [("Open", True), ("Gated", False)]
+    assert all(action.successor_id == target.uid for action in actions)
+    assert all(str(sponsor.uid) in str(action.availability) for action in actions)
+    assert all(action.ui_hints.source_kind == sponsor_kind for action in actions)
+    for _ in range(2):
+        do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
+        assert snapshot(graph, road) == expected
+
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    restored = Ledger.structure(Json.deserialize(Json.serialize(ledger.unstructure())))
+    restored_road = restored.graph.get(road.uid)
+    assert snapshot(restored.graph, restored_road) == expected
+    for _ in range(2):
+        do_provision(restored_road, ctx=PhaseCtx(graph=restored.graph, cursor_id=road.uid))
+        assert snapshot(restored.graph, restored_road) == expected
+
+
 def test_retained_events_are_scoped_to_same_label_receivers_and_survive_restore() -> None:
     graph = Graph(label="same_label_receivers")
     target = Block(label="target", content="Target")
