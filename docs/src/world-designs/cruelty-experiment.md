@@ -200,7 +200,7 @@ forecloses_base(s, a, g) := R_base(s, g) and not R_base(s', g)
 Evaluate that property **before** applying a Merciful action filter or
 recovery rule; otherwise the policy may eliminate the very transition
 we are trying to characterize. A pre-action witness, a successor-state
-counterexample/negative result, and the source action/goal references
+negative reachability result, and the source action/goal references
 constitute the author-facing finding. Bounded non-reachability remains
 bounded evidence, not an unqualified impossibility proof.
 
