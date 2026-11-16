@@ -282,6 +282,43 @@ class TestResolveFrontierNode:
 
         assert constructions == 0
 
+    def test_first_provision_then_fresh_context_repeats_preserve_binding(self, monkeypatch) -> None:
+        from tangl.story import Block, Scene
+        from tangl.vm.provision.resolver import provision_node
+        from tangl.vm.runtime.frame import PhaseCtx
+
+        graph = Graph()
+        scope = Scene(label="scope", registry=graph)
+        node = Block(label="frontier", registry=graph)
+        provider = Block(label="provider", registry=graph)
+        scope.add_child(node)
+        scope.add_child(provider)
+        dependency = Dependency(
+            registry=graph, predecessor_id=node.uid,
+            requirement=Requirement.from_identifier("provider"),
+        )
+        provision_node(node, ctx=PhaseCtx(graph=graph, cursor_id=node.uid))
+        assert dependency.provider is provider
+        binding = (dependency.uid, dependency.predecessor_id, dependency.successor_id,
+                   dependency.unstructure())
+        members = list(graph.members)
+        edges = [edge.uid for edge in node.edges_out()]
+        before = graph.unstructure()
+        value_hash = graph.value_hash()
+
+        def unexpected(cls, ctx):
+            raise AssertionError("bound dependency constructed a Resolver")
+
+        monkeypatch.setattr(Resolver, "from_ctx", classmethod(unexpected))
+        for _ in range(3):
+            provision_node(node, ctx=PhaseCtx(graph=graph, cursor_id=node.uid))
+            assert (dependency.uid, dependency.predecessor_id, dependency.successor_id,
+                    dependency.unstructure()) == binding
+            assert list(graph.members) == members
+            assert [edge.uid for edge in node.edges_out()] == edges
+            assert graph.unstructure() == before
+            assert graph.value_hash() == value_hash
+
     def test_generic_provision_constructs_resolver_for_open_dependency(self, monkeypatch) -> None:
         from tangl.vm.provision.resolver import provision_node
         from tangl.vm.runtime.frame import PhaseCtx
