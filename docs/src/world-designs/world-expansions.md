@@ -35,6 +35,14 @@ callback, retaining the existing preparation/outcome witnesses. This is the lowe
 risk test of authored rhythm and voice over current mechanics. Choose a sibling
 if added content would obscure the compact proof.
 
+**Further research opportunity (matrix A01 / A08).** Distinguish one-shot
+failure and state-change-gated retry (A01) from a later *memory derived from
+what actually occurred* (A08): a training week or court encounter could mint
+a specific retrospective memory used in a subsequent challenge. This is
+not a shipped memory-card mechanic, and a prefabricated card keyed only to
+the activity would fail the matrix's history-derived-content claim. It should
+remain a separate follow-on to the small connective-scene proof.
+
 **Separate platform work.** [#448](https://github.com/derekmerck/storytangl/issues/448)
 owns account achievements and a Coronate NG+ entry. Story-local achievements do not
 establish account persistence. That work may support returning-player content but
@@ -100,6 +108,12 @@ friction without importing Patient Zero's entire configuration problem.
 
 **Unresolved question.** How does remembered aid and the companion's own schedule
 or willingness change exploration without making every room an event hunt?
+
+**Related, separate experiment.** [Cruelty Experiment](cruelty-experiment.md)
+would use a *sibling* four-room puzzle to test alternative failure, disclosure,
+and recovery contracts over one authored world (matrix A14/A15/A20).
+Grand Grotto is precedent for locations, inventory, and action projection;
+its existing companion expansion need not absorb that proof.
 
 ## Hungry Colony: attrition gets names
 

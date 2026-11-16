@@ -77,6 +77,21 @@ rows about something else.
 *Referenced by A04, A14, A15, A20. This is a parameter of the analysis, not a property of any one
 row.*
 
+**StoryTangl interpretation / provenance (2026-11).** Plotkin's
+[1996 categories](https://eblong.com/zarf/essays/cruelty.html) distinguish
+*when an irreversible mistake is recognizable*, not numeric rewind
+budgets. His [reconsideration](https://eblong.com/zarf/essays/cruelty-revisited.html)
+explores undo as a separate factor. The budget table here is a proposed
+*StoryTangl formalization*, not a quotation of his definitions.
+Existentially, a successful path normally requires **zero** rewind;
+the interesting nontrivial budget question concerns **recoverability
+after a mistake** or **guaranteed completion under limited information**.
+The latter requires an observation/strategy model, not only a
+satisfiability query. The proposed
+[Cruelty Experiment](../../world-designs/cruelty-experiment.md) makes
+failure, disclosure, and recovery distinct configurable dimensions.
+
+
 **Soft-lock is not a property of the graph. It is a property of the graph plus a traversal model.**
 "Is this completable?" is malformed until you say under which model, because a dead end under
 unlimited rewind is not a dead end — it's a leaf you visit and back out of.
@@ -187,6 +202,11 @@ sinking; it can never tell you it will.
 
 **Facets:** R, S · **Build:** high · **Argument:** high · **Status:** _____
 
+**StoryTangl follow-through.** {ref}`The Council in Your Head <wd-council-voices>`
+distinguishes the speaking skills from retry/one-shot check semantics;
+[Coronate's expansion](../../world-designs/world-expansions.md)
+is a separate candidate for persistent-failure and history-derived progression.
+
 **Exemplars.** **Disco Elysium** (white/red checks), Long Live the Queen, Citizen Sleeper.
 
 **Formal object.** Red checks are one-shot; failure is consumed and becomes canon. White checks are
@@ -290,6 +310,11 @@ tokens without proving anything competitive.
 
 **Facets:** R, S · **Build:** high · **Argument:** high · **Status:** _____
 
+**StoryTangl follow-through.** {ref}`Second Chances <wd-second-chances>`
+preserves the knowledge-persistence-across-reset witness; see also
+[Cruelty Experiment](../../world-designs/cruelty-experiment.md)
+for *non-diegetic* recovery/disclosure profiles.
+
 **Exemplars.** **Long Live the Queen**, Save the Date, Outer Wilds, Overboard!, Elsinore.
 
 **Formal object.** One line: knowledge persists across reset, resources don't. The token split made
@@ -323,6 +348,10 @@ must forfeit that mint or the economy collapses. See the cross-cutting section.
 ## A05 — Syuzhet manipulation as mechanic
 
 **Facets:** P, R · **Build:** medium · **Argument:** highest · **Status:** _____
+
+**StoryTangl follow-through.** [Salon Season](../../world-designs/salon-season.md)
+captures a one-history/two-readings test, including later reinterpretation
+without editing prior events.
 
 **Exemplars.** **Spider and Web**, Her Story, Photopia, Sorcery! rewind, Umineko perspective stacking.
 
@@ -391,6 +420,12 @@ progression, and persistence rails. Natural next slice.
 
 **Facets:** R, S, A · **Build:** high · **Argument:** high · **Status:** _____
 
+**StoryTangl follow-through.** {ref}`Second Bell <wd-second-bell>`
+keeps the distinct *author-facing* rule-conflict enumeration test;
+[Hall Monitor](https://github.com/derekmerck/storytangl/tree/main/worlds/hall_monitor)
+currently proves a specific credential ruling and delayed consequence, not
+automatic conflict discovery.
+
 **Exemplars.** **Papers, Please**, Beholder, Not Tonight, Orwell, *hall monitor*.
 
 **Formal object.** Rules accrete; new rules conflict with old ones on constructible cases; the player
@@ -422,6 +457,10 @@ and none of it transfers. Put that in the README rather than pretending otherwis
 ## A08 — Schedules and legible opportunity cost
 
 **Facets:** R, A, P · **Build:** high · **Argument:** medium · **Status:** _____
+
+**StoryTangl follow-through.** [Coronate's expansion](../../world-designs/world-expansions.md)
+retains the proposed memory *derived from the actual event history*, not
+a hand-authored activity-to-card lookup.
 
 **Exemplars.** **I Was a Teenage Exocolonist**, Princess Maker, Citizen Sleeper, Pentiment.
 
@@ -455,6 +494,10 @@ generation; opportunity-cost reachability under a slot budget.
 
 **Facets:** R · **Build:** high · **Argument:** medium · **Status:** _____
 
+**StoryTangl follow-through.** {ref}`The Unobserved Day <wd-unobserved-day>`
+preserves the autonomous-agent falsifier. Night Shift's discrete-event
+queue is precedent, not proof of independent NPC knowledge/schedules.
+
 **Exemplars.** **Deadline** (1982), Overboard!, Elsinore.
 
 **Formal object.** NPC schedules execute whether observed or not; knowledge propagates between
@@ -486,6 +529,10 @@ program.
 ## A10 — Attrition-driven emergent narrative + sifting
 
 **Facets:** R, P, A · **Build:** high · **Argument:** high · **Status:** _____
+
+**StoryTangl follow-through.** {ref}`The Long Way There <wd-long-way-there>`
+separates its modest authored road journal from the stronger post-hoc
+history-sifting claim.
 
 **Exemplars.** **Keep Driving**, Dustland Delivery, Death Road to Canada, Oregon Trail,
 Where the Water Tastes Like Wine (negative), Sunless Sea.
@@ -551,6 +598,10 @@ projection from the gate language.
 ## A12 — Obligation tokens: promises now, constraints later
 
 **Facets:** S, R · **Build:** medium · **Argument:** high · **Status:** _____
+
+**StoryTangl follow-through.** [Salon Season](../../world-designs/salon-season.md)
+records long-range promise/obligation diagnostics as a proposed, source-mapped
+analysis experiment; no generic obligation checker is claimed.
 
 **Exemplars.** **Suzerain**, Fabled Lands (codewords), Lone Wolf.
 
@@ -620,6 +671,11 @@ which is precisely why an IR beats a content dump.
 
 **Facets:** A, S, M · **Build:** low · **Argument:** high · **Status:** _____
 
+**StoryTangl follow-through.** [Cruelty Experiment](../../world-designs/cruelty-experiment.md)
+preserves gamebook-style traversal budgets and alternate recovery/disclosure
+realizations. A minimum *existential* rewind budget is generally zero;
+nontrivial guarantees need a player-information model.
+
 **Exemplars.** **Fighting Fantasy**, Lone Wolf, Fabled Lands, For the Queen / Microscope / Kingdom,
 Demian's Gamebook Web Page (corpus of record).
 
@@ -657,6 +713,11 @@ passes, and hobbyist reconstructions already exist.
 
 **Facets:** R, S · **Build:** medium · **Argument:** high · **Status:** _____
 
+**StoryTangl follow-through.** [Cruelty Experiment](../../world-designs/cruelty-experiment.md)
+is the canonical demo brief: one four-room source, Cruel/Polite/Merciful
+realizations, source-mapped foreclosure report, and the falsifier that three
+separately authored sources prove nothing.
+
 **Exemplars.** **Zork** / Colossal Cave, Sierra AGI/SCI, Monkey Island (as the reaction against),
 Anchorhead.
 
@@ -690,6 +751,12 @@ against Inform is the fastest way to lose the audience most likely to care.**
 ## A16 — Story compression: pre-articulation vs. dynamic assembly
 
 **Facets:** A, M · **Build:** low · **Argument:** highest · **Status:** _____
+
+**StoryTangl follow-through.** Keep this a **measurement**, not a demo.
+[#210](https://github.com/derekmerck/storytangl/issues/210)
+is the research home for bounded, provenance-preserving reconstruction
+experiments; source-line/variant/bad-variant comparisons require actual
+corpus evidence, not assumed compression gains.
 
 **Exemplars.** **Minuet** (negative), Dream Daddy (negative), Hatoful Boyfriend (negative),
 Class of '09 (negative but funny), Loathing games and Monkey Island tables (positive).
@@ -805,6 +872,11 @@ same, they weren't coupled and the demo is a sampler.
 ## A20 — Structural navigation as a player affordance
 
 **Facets:** C, P, S · **Build:** medium · **Argument:** high · **Status:** _____
+
+**StoryTangl follow-through.** [Cruelty Experiment](../../world-designs/cruelty-experiment.md)
+retains derived navigation and diegetic rewind as **later** experiments.
+Its initial three-profile proof does not require a graphical flowchart
+or a shipped generic history navigator.
 
 **Exemplars.** **428: Shibuya Scramble** and the Zero Escape flowchart (branch graph as navigable
 UI), Steins;Gate, inkle's *Sorcery!* (designed rewind), **Elsinore's prophecy board** and Outer

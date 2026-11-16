@@ -32,6 +32,21 @@ session reuse particular earlier facts in two cases. It would establish whether
 institutional rereading changes the meaning of the player's own decisions. The
 source/inspiration and rejected alternatives below remain part of the design.
 
+**Recovered research opportunities (capability matrix A05 / A12; not selected
+implementation work).** A05 suggests realizing a **single six-event history**
+both chronologically and as an interrogation or institutional retelling,
+including a later reclassification of an earlier assertion without mutating
+its historical record. Two independently authored versions would not
+demonstrate a genuine fabula/syuzhet separation.
+
+A12 suggests analyzing promises as long-range obligations. Can an authoring
+tool discover a promise never checked, a later demand without a reachable
+producer, or two mutually unkeepable commitments, all from ordinary
+world declarations rather than a separate list of flags? This is a possible
+source-mapped [#396](https://github.com/derekmerck/storytangl/issues/396)
+analysis consumer, not a prerequisite for the literary proof in Section 6.
+
+
 > **The Season teaches you to make people useful. The Terror asks what you're
 > willing to do to them. Thermidor reveals what they remember about you.**
 

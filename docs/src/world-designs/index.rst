@@ -31,12 +31,16 @@ The collection
    * - :doc:`geopolitical-constellations`
      - Competing interventions create consequential international crises and changing political possibilities.
      - Role-bound incident episodes, scoped affordance fanout, re-entrant world updates, and causal replay.
+   * - :doc:`cruelty-experiment`
+     - The same four-room puzzle is Cruel, Polite, or Merciful depending on the player's failure contract.
+     - Source-derived foreclosure analysis, disclosure, and recovery policy over one authored world.
 
 :doc:`concept-seeds` collects Constraint-Collapse Mystery, The Apartment
 Commune (open-ended tenant stories, Clingo questline reachability, and
 iterative narrative/symbolic reconstruction), Causal Spine and Narrative
 Grafting (source-anchored branching from a linear corpus), The Council in Your
-Head, The Long Way There, Two Readers, One Graph,
+Head, The Long Way There, Second Chances (knowledge across resets),
+The Unobserved Day (autonomous incidents), Two Readers, One Graph,
 Automata Chop-Shop, Second Bell, and a Fogbound Manifest showcase.
 :doc:`world-expansions` records possible extensions to Coronate the Regent,
 Marmoset Island, the Grand Grotto companion story, and Hungry Colony. Existing
@@ -48,6 +52,7 @@ worlds remain playable independently of these proposals.
    salon-season
    patient-zero
    geopolitical-constellations
+   cruelty-experiment
    concept-seeds
    world-expansions
 
@@ -63,8 +68,10 @@ Constraint-Collapse Mystery carry larger open channel/coordination and runtime
 constraint questions. The Council in Your Head proposes a compact #340
 attributed-contributor proof; The Long Way There is a broader journey, passenger,
 and presentation composition, with its precedent recorded in the research matrix.
-Their story value does not make those contracts implemented or make them the
-cheapest next demo. These are selection considerations, not an execution order
+Cruelty Experiment is a bounded one-world/multiple-policy proposal tied to
+Grand Grotto and Red Paperclip; it does not inherit a shipped generic
+rewind or solver-authoritative runtime. Their story value does not make those
+contracts implemented or make them the cheapest next demo. These are selection considerations, not an execution order
 or a replacement for the linked issues.
 
 How to develop a design

@@ -290,6 +290,7 @@ StoryTangl traversal. This tests reproducible narrative expansion without
 promising automatic corpus understanding, exhaustive path coverage, or a
 general grafting engine.
 
+(wd-council-voices)=
 ## The Council in Your Head: competing inner voices
 
 **Stage:** concept seed; no new implementation selected.
@@ -327,6 +328,13 @@ an interesting disagreement is not automatically permission to remove player
 agency. Two contexts should let the same voices recur with changed relevance,
 not merely deliver one-liners in a single exposition scene.
 
+**Related but distinct check semantics (matrix A01).** *Disco Elysium*'s
+one-shot red checks, retryable white checks, and delayed thoughts are a
+separate progression/finishability experiment from its speaking skills.
+If selected, test persistent failure history and a retry enabled only by
+a specified world-state change. Competing voices alone do not establish
+a reusable check mechanic.
+
 **StoryTangl connection.** Scope and concept ownership nominate contributions;
 the current namespace and ordinary phase dispatch determine what is relevant.
 Prose contributions belong in attributed JOURNAL, and action offers or
@@ -350,6 +358,7 @@ player's response has a durable callback on returning to a prior context.
 Test the normal JOURNAL/Service/text-client path first. Keep all personality,
 setting, and conflict policy world-owned until a second consumer justifies more.
 
+(wd-long-way-there)=
 ## The Long Way There: emergent road-trip narrative
 
 **Stage:** showcase concept seed; implementation not selected.
@@ -404,6 +413,13 @@ provide presentation lineage, **not** a requirement that the engine adopt a
 pygame-specific travel clock. Web and text clients should retain the same
 causal story floor even if their journey presentation differs.
 
+**Research-strengthening option (matrix A10).** The stricter story-sifting
+test derives memorable moments *after the journey* from actual receipts:
+resource nadirs, near-misses, and which passengers were present. A
+pre-authored `memorable_event` flag at encounter time would falsify that
+claim. The first world-owned road journal is a legitimate smaller story
+proof, not evidence that automatic sifting already ships.
+
 **Unresolved questions.** What constitutes a committed travel leg versus an
 interrupting encounter? How do cooldowns, NPC availability, and obligations
 survive travel, return journeys, and reload? Which events earn a place in the
@@ -420,6 +436,46 @@ several prior events. Prove the same transitions and consequences through
 Service/text before adding a modest pygame traveling presentation; no new
 vehicle runtime, full trade economy, or automatic story-sifting system is a
 prerequisite.
+
+(wd-second-chances)=
+## Second Chances: knowledge across reset
+
+**Stage:** unselected research seed, not an executable loop world.
+**Provenance:** capability matrix A04; *Long Live the Queen*,
+*Outer Wilds*, *Save the Date*, *Overboard!*, and *Elsinore*.
+
+**Premise and invariant.** Each failed attempt teaches something durable,
+while the physical world resets. The next run is a different story
+because a player or protagonist carries knowledge that cannot be spent
+like a consumable. **Knowledge persists; resources and locations reset.**
+
+**StoryTangl connection / first proof.** Four lessons, a recurring
+assassination, and three failed runs that each yield a knowledge token.
+A later run becomes viable through the carried information. Test the
+reset/persistence boundary and per-run reachability; merely using
+ad-hoc outer-scope flags is not evidence of a reusable invariant.
+[Cruelty Experiment](cruelty-experiment.md) separately studies
+non-diegetic disclosure and recovery. No general loop engine is selected.
+
+(wd-unobserved-day)=
+## The Unobserved Day: autonomous incidents
+
+**Stage:** unselected research seed.
+**Provenance:** capability matrix A09; *Deadline*, *Overboard!*, *Elsinore*.
+**Existing precedent:** [Night Shift](https://github.com/derekmerck/storytangl/tree/main/worlds/ed_queue_demo)
+proves deterministic discrete-event processing, *not* autonomous
+characters with private knowledge.
+
+**Premise and invariant.** Four residents move through three locations
+over twenty ticks; a critical event and witness knowledge propagate
+even if the player never visits the relevant rooms. The player can
+intervene but does not cause the world to exist by observing it.
+
+**StoryTangl connection / falsifier.** Compare identical seeded runs
+with the player absent: autonomous event traces should agree unless
+intervention occurs. If NPC activity happens only as scene-enter
+content, the experiment is a scripted sequence, not autonomous fabula.
+Do not promote a generic character scheduler before this proof.
 
 ## Two Readers, One Graph
 
@@ -471,6 +527,7 @@ for Patient Zero without requiring a universal robot framework or paperdoll firs
 A showcase expansion would add recurring people and pressures to the workshop,
 rather than only more mechanics screens.
 
+(wd-second-bell)=
 ## Second Bell
 
 **Stage:** showcase seed. **Implementation direction:**
@@ -486,6 +543,14 @@ later as a consequence for a recognizable person.
 over credentials. A sibling could add bell pressure, changing announcements, and
 competing obligations over the same facts. Mira's inhaler proof should remain a
 narrow fixture, not become a fragile full-day script.
+
+**Author-facing experiment (matrix A07).** Given accreting
+credential/rule declarations, *enumerate a satisfiable case where two
+rules conflict* and cite the source rules, **without first authoring
+the conflicting case**. If the author must supply the witness, no
+rule-conflict discovery has been shown. Hall Monitor currently proves
+evaluation of a particular case and its delayed effect, not this
+stronger static-analysis claim.
 
 **Unresolved question.** How does the reader learn that institutional success and
 helping someone can diverge, without a hidden morality score doing the explaining?
