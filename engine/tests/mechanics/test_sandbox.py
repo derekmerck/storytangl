@@ -1326,7 +1326,7 @@ def test_retained_events_repeat_at_fixed_step_and_after_json_restore(sponsor_kin
             for action in actions] == [("Open", True), ("Gated", False)]
     assert all(action.successor_id == target.uid for action in actions)
     assert all(str(sponsor.uid) in str(action.availability) for action in actions)
-    assert all(action.ui_hints.model_dump()["source_kind"] == sponsor_kind for action in actions)
+    assert all(action.ui_hints.source_kind == sponsor_kind for action in actions)
     for _ in range(2):
         do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
         assert snapshot(graph, road) == expected
