@@ -618,6 +618,8 @@ re-executes fragments to reconstruct any point-in-time state.
 **Journal retrieval is one bounded slice primitive.** `Ledger.get_slice()` returns
 fragments in the half-open step span `[since_step, until_step)`, with optional
 `Selector` filtering; `get_journal()` is compatibility sugar over that primitive.
+Retrieving committed fragments is observational: it does not realize JOURNAL or
+repeat its policy effects. Service reads and transport project those stored results.
 Higher-level reads compute bounds and then call the same primitive: `get_current_update()`
 uses the most recent resolution watermark, bookmarks resolve to a marker step, and
 section-style reads run from one marker to the next compatible marker or the current
