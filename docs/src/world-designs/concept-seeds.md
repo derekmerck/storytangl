@@ -290,6 +290,7 @@ StoryTangl traversal. This tests reproducible narrative expansion without
 promising automatic corpus understanding, exhaustive path coverage, or a
 general grafting engine.
 
+(wd-council-voices)=
 ## The Council in Your Head: competing inner voices
 
 **Stage:** concept seed; no new implementation selected.
@@ -357,6 +358,7 @@ player's response has a durable callback on returning to a prior context.
 Test the normal JOURNAL/Service/text-client path first. Keep all personality,
 setting, and conflict policy world-owned until a second consumer justifies more.
 
+(wd-long-way-there)=
 ## The Long Way There: emergent road-trip narrative
 
 **Stage:** showcase concept seed; implementation not selected.
@@ -435,6 +437,7 @@ Service/text before adding a modest pygame traveling presentation; no new
 vehicle runtime, full trade economy, or automatic story-sifting system is a
 prerequisite.
 
+(wd-second-chances)=
 ## Second Chances: knowledge across reset
 
 **Stage:** unselected research seed, not an executable loop world.
@@ -454,6 +457,7 @@ ad-hoc outer-scope flags is not evidence of a reusable invariant.
 [Cruelty Experiment](cruelty-experiment.md) separately studies
 non-diegetic disclosure and recovery. No general loop engine is selected.
 
+(wd-unobserved-day)=
 ## The Unobserved Day: autonomous incidents
 
 **Stage:** unselected research seed.
@@ -523,6 +527,7 @@ for Patient Zero without requiring a universal robot framework or paperdoll firs
 A showcase expansion would add recurring people and pressures to the workshop,
 rather than only more mechanics screens.
 
+(wd-second-bell)=
 ## Second Bell
 
 **Stage:** showcase seed. **Implementation direction:**
