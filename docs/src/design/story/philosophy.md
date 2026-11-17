@@ -840,13 +840,13 @@ Key correspondences:
 
 | Theorist | Concept | Engine Mapping |
 |----------|---------|----------------|
-| **Bal** | Fabula / Story / Text | Graph / Frame / Journal |
-| **Genette** | Order, duration, frequency, focalization | Phase bus operations (planned discourse layer) |
-| **Chatman** | Kernels vs. satellites | Required vs. optional dependency edges |
-| **Barthes** | Nuclei vs. catalyzers | Planning-phase offers (critical) vs. provisioning backfill (optional) |
-| **Propp** | Morphological functions | Re-entrant subgraph templates (cycle patterns) |
-| **Aarseth** | Scriptons / textons | Journal output / graph + ledger |
-| **Short** | Storylets + QBN | Offer system with dependency preconditions |
+| **Bal** {cite}`bal_narratology_2017` | Fabula / Story / Text | Graph / Frame / Journal |
+| **Genette** {cite}`genette_narrative_1980` | Order, duration, frequency, focalization | Phase bus operations (planned discourse layer) |
+| **Chatman** {cite}`chatman_story_1978` | Kernels vs. satellites | Required vs. optional dependency edges |
+| **Barthes** {cite}`barthes_introduction_1975` | Nuclei vs. catalyzers | Planning-phase offers (critical) vs. provisioning backfill (optional) |
+| **Propp** {cite}`propp_morphology_1968` | Morphological functions | Re-entrant subgraph templates (cycle patterns) |
+| **Aarseth** {cite}`aarseth_cybertext_1997` | Scriptons / textons | Journal output / graph + ledger |
+| **Short** {cite}`short_beyond_2016,short_storylets_2019` | Storylets + QBN | Offer system with dependency preconditions |
 
 The engine is designed to validate these theories empirically: if Bal's
 three layers genuinely capture independent concerns, then modifying the
@@ -860,9 +860,7 @@ research-direction summary in the root README.
 
 ### Crawford's Erasmatron — research antecedent
 
-Chris Crawford, "[Assumptions Underlying the Erasmatron Interactive Storytelling
-Engine](https://www.cs.cmu.edu/~michaelm/nidocs/Crawford.pdf)" (1999), in *Narrative Intelligence*, AAAI Fall Symposium,
-Technical Report FS-99-01, pp. 112–114, argues for **verb-centered**
+Chris Crawford {cite}`crawford_assumptions_1999` argues for **verb-centered**
 interactive drama rather than choosing character or plot as its primary atom.
 An authored dramatic *sentence* binds a verb to participating actors and
 secondary objects; each role carries options for plausible reactions. The
