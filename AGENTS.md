@@ -305,6 +305,15 @@ full type map and rationale.**
 - Do not write docstrings that merely restate the function signature. If the
   name and types are self-explanatory, a one-line summary suffices.
 
+## References
+- The project library lives in Zotero. `docs/src/bibliography/storytangl.bib` is
+  its Better BibTeX export: do not edit it by hand, and do not invent cite keys.
+  A missing reference is a note to the maintainer, not a new `.bib` entry.
+- Cite in Sphinx pages with `` {cite}`key` `` (Markdown) or `` :cite:`key` ``
+  (reStructuredText). Entries carry `devref:<topic>` keywords.
+- For READMEs and other files Sphinx does not index, paste the output of
+  `poetry run python scripts/mini_bib.py -k <topic>` (or explicit keys) at the end.
+
 ## Testing
 - Run `pytest engine/tests` before submitting changes.
 - Use the poetry-managed venv. Add test paths to `PYTHONPATH` if needed.

@@ -28,9 +28,14 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx_markdown_builder',
     'myst_parser',
+    'sphinxcontrib.bibtex',
+    'bib_style',
     'service_api_docs',
     'storytangl_topic',
 ]
+
+bibtex_bibfiles = ["bibliography/storytangl.bib"]
+bibtex_default_style = "storytangl"
 
 OFFLINE_MODE = os.environ.get("STORYTANGL_OFFLINE", "").lower() in {"1", "true", "yes"}
 

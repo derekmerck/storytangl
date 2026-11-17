@@ -1424,6 +1424,17 @@ files = [
 ]
 
 [[package]]
+name = "latexcodec"
+version = "3.0.1"
+description = "A lexer and codec to work with LaTeX code in Python."
+optional = false
+python-versions = ">=3.9"
+files = [
+    {file = "latexcodec-3.0.1-py3-none-any.whl", hash = "sha256:a9eb8200bff693f0437a69581f7579eb6bca25c4193515c09900ce76451e452e"},
+    {file = "latexcodec-3.0.1.tar.gz", hash = "sha256:e78a6911cd72f9dec35031c6ec23584de6842bfbc4610a9678868d14cdfb0357"},
+]
+
+[[package]]
 name = "linkify-it-py"
 version = "2.2.0"
 description = "Links recognition library with FULL unicode support."
@@ -2272,6 +2283,36 @@ files = [
     {file = "pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec"},
     {file = "pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8"},
 ]
+
+[[package]]
+name = "pybtex"
+version = "0.26.1"
+description = "A BibTeX-compatible bibliography processor in Python"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "pybtex-0.26.1-py3-none-any.whl", hash = "sha256:e26c0412cc54f5f21b2a6d9d175762a2d2af9ccf3a8f651cdb89ec035db77aa1"},
+    {file = "pybtex-0.26.1.tar.gz", hash = "sha256:2e5543bea424e60e9e42eef70bff597be48649d8f68ba061a7a092b2477d5464"},
+]
+
+[package.dependencies]
+latexcodec = ">=1.0.4"
+pyyaml = ">=3.01"
+
+[[package]]
+name = "pybtex-docutils"
+version = "1.0.3"
+description = "A docutils backend for pybtex."
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "pybtex-docutils-1.0.3.tar.gz", hash = "sha256:3a7ebdf92b593e00e8c1c538aa9a20bca5d92d84231124715acc964d51d93c6b"},
+    {file = "pybtex_docutils-1.0.3-py3-none-any.whl", hash = "sha256:8fd290d2ae48e32fcb54d86b0efb8d573198653c7e2447d5bec5847095f430b9"},
+]
+
+[package.dependencies]
+docutils = ">=0.14"
+pybtex = ">=0.16"
 
 [[package]]
 name = "pycparser"
@@ -3347,6 +3388,26 @@ standalone = ["Sphinx (>=5)"]
 test = ["pytest"]
 
 [[package]]
+name = "sphinxcontrib-bibtex"
+version = "2.7.0"
+description = "Sphinx extension for BibTeX style citations."
+optional = false
+python-versions = ">=3.10"
+files = [
+    {file = "sphinxcontrib_bibtex-2.7.0-py3-none-any.whl", hash = "sha256:28cf0ec7a957d1c7548d5749317ed472ce877e1b629f430f88e3789aa51f87b1"},
+    {file = "sphinxcontrib_bibtex-2.7.0.tar.gz", hash = "sha256:fee700f7aae29bb8f654c62913f00d34ac44fc0b8ca0fa67ac922ff4453addee"},
+]
+
+[package.dependencies]
+docutils = ">=0.20"
+pybtex = ">=0.25"
+pybtex-docutils = ">=1.0.2"
+Sphinx = ">=7.4"
+
+[package.extras]
+test = ["pytest", "pytest-cov", "sphinx-autoapi"]
+
+[[package]]
 name = "sphinxcontrib-devhelp"
 version = "2.0.0"
 description = "sphinxcontrib-devhelp is a sphinx extension which outputs Devhelp documents"
@@ -3714,7 +3775,7 @@ files = [
 cli = ["cmd2"]
 cli-rich = ["cmd2", "rich"]
 dicebear = ["dicebear-core", "dicebear-styles"]
-docs = ["fastapi", "furo", "linkify-it-py", "myst-parser", "sphinx", "sphinx-markdown-builder"]
+docs = ["fastapi", "furo", "linkify-it-py", "myst-parser", "sphinx", "sphinx-markdown-builder", "sphinxcontrib-bibtex"]
 server = ["cmd2", "fastapi", "pymongo", "redis", "uvicorn"]
 solver = ["clingo"]
 svg-png = ["playwright"]
@@ -3722,4 +3783,4 @@ svg-png = ["playwright"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<4"
-content-hash = "e072e6ac82d741772debf15ba769a65f6b3d13f685c16472cc34dea2ecc2b6bb"
+content-hash = "11dfc4517187428a1b3e55a613399b399976f86e94ae66c2ee595d0230e5a712"
