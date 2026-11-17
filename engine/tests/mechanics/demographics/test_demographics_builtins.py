@@ -120,12 +120,13 @@ from tangl.mechanics.demographics import (
 assert reads == []
 assert all(not list(cls.all_instances()) for cls in (Country, NameBank, Region, Subtype))
 # _read_yaml joins resources/ below the package root.
-try:
-    load_pack("full")
-except PackUnavailableError as exc:
-    assert "world_names.yaml" in str(exc)
-else:
-    raise AssertionError("Missing full data was accepted")
+for kwargs in ({}, {"banks": {"fra"}}):
+    try:
+        load_pack("full", **kwargs)
+    except PackUnavailableError as exc:
+        assert "world_names.yaml" in str(exc)
+    else:
+        raise AssertionError("Missing full data was accepted")
 assert all(not list(cls.all_instances()) for cls in (Country, NameBank, Region, Subtype))
 register_pack(load_pack("sample"))
 assert set(NameBank.all_instance_labels()) == {"fra", "jpn"}
@@ -151,6 +152,106 @@ def test_repeat_pack_loads_are_served_from_the_shelved_yaml_cache(
     assert load_pack("sample") == first
     # Metadata, geography and names: every resource read is a cache hit.
     assert shelved2.hit_count == hits + 3
+
+
+@pytest.fixture
+def subset_resources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
+    root = tmp_path / "resources"
+    root.mkdir()
+    for name in ("sample_metadata.yaml", "full_metadata.yaml"):
+        metadata = files(packs.__package__).joinpath("resources", name)
+        (root / name).write_text(metadata.read_text())
+    geography = {
+        "subset_region": {
+            "id": "subset_region", "name": "Subset", "demonym": "Subset",
+            "population": 2, "eth_mix": {"subset_ethnicity": 1},
+            "countries": {
+                "tst": {"id": "tst", "name": "Test", "demonym": "Test", "population": 1},
+                "oth": {"id": "oth", "name": "Other", "demonym": "Other", "population": 1},
+            },
+        },
+    }
+    names = {
+        "tst": {"female": ["Ada"], "surname": ["One"]},
+        "tst_subset_ethnicity": {"female": ["Bea"], "surname": ["Two"]},
+        "oth": {"female": ["Cia"], "surname": ["Three"]},
+    }
+    (root / "nationalities.yaml").write_text(yaml.safe_dump(geography, sort_keys=False))
+    (root / "sample_names.yaml").write_text(yaml.safe_dump(names, sort_keys=False))
+    (root / "world_names.yaml").write_text(yaml.safe_dump(names, sort_keys=False))
+    monkeypatch.setattr(packs, "files", lambda _package: tmp_path)
+    monkeypatch.setattr(shelved2, "cache_dir", tmp_path / "cache")
+    monkeypatch.setattr(shelved2, "SHELVED_CACHE_ENABLED", True)
+    return names
+
+
+def test_subset_selection_preserves_source_order_cache_and_coverage(subset_resources: dict) -> None:
+    before = deepcopy(subset_resources)
+    assert packs._read_yaml("sample_names.yaml") == before
+    hits = shelved2.hit_count
+    all_banks = load_pack("sample")
+    selected = load_pack("sample", banks={"oth", "tst"})
+    subtype = load_pack("sample", banks={"tst_subset_ethnicity"})
+    assert list(all_banks.names) == ["tst", "tst_subset_ethnicity", "oth"]
+    assert list(selected.names) == ["tst", "oth"]
+    assert list(subtype.names) == ["tst_subset_ethnicity"]
+    assert selected.metadata == subtype.metadata == all_banks.metadata
+    assert selected.regions == subtype.regions == all_banks.regions
+    assert subtype.countries_without_banks() == ("oth",)
+    assert subtype.uncovered_subtypes() == (("oth", "subset_ethnicity"),)
+    assert packs._read_yaml("sample_names.yaml") == before == subset_resources
+    assert shelved2.hit_count >= hits + 7
+    assert list(load_pack("sample").names) == list(all_banks.names)
+    assert load_pack("sample", banks=None) == all_banks
+    full_subset = load_pack("full", banks={"tst_subset_ethnicity"})
+    assert full_subset.metadata.label == "full"
+    assert full_subset.regions == all_banks.regions
+    assert list(full_subset.names) == ["tst_subset_ethnicity"]
+
+
+def test_subset_registration_is_isolated_and_reuses_equal_definitions(subset_resources: dict) -> None:
+    unrelated = NameBank(label="subset_unrelated", forms={"plain": NameForm(
+        given=NamePart(pool=NamePool(candidates=["Unrelated"])),
+    )})
+    selected = load_pack("sample", banks={"tst"})
+    assert NameBank.get_instance("tst") is None
+    first = register_pack(selected)
+    first_bank = NameBank.get_instance("tst")
+    second = register_pack(load_pack("sample", banks={"oth"}))
+    repeated = register_pack(load_pack("sample", banks={"tst"}))
+    assert [bank.label for bank in first.find_all()] == ["tst"]
+    assert [bank.label for bank in second.find_all()] == ["oth"]
+    assert list(repeated.find_all()) == [first_bank]
+    assert next(repeated.find_all()) is first_bank
+    assert NameBank.get_instance("subset_unrelated") is unrelated
+    assert NameBank.get_instance("tst_subset_ethnicity") is None
+    assert list(first.find_all()) == [first_bank]
+    selected.names["tst"]["female"] = NameForm(given=NamePart(pool=NamePool(candidates=["Changed"])))
+    with pytest.raises(ValueError, match="Conflicting NameBank.*tst"):
+        register_pack(selected)
+    assert next(first.find_all()) is first_bank
+    assert [bank.label for bank in second.find_all()] == ["oth"]
+
+
+def test_subset_rejects_empty_unknown_and_invalid_requested_data(
+    subset_resources: dict, tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="requires geography and name banks"):
+        load_pack("sample", banks=set())
+    with pytest.raises(ValueError, match="Unknown name banks: aaa, zzz"):
+        load_pack("sample", banks={"zzz", "tst", "aaa"})
+    with pytest.raises(ValueError, match="Unknown name banks: tst_missing"):
+        load_pack("sample", banks={"tst_missing"})
+
+    subset_resources["oth"] = {"female": [], "surname": ["Broken"]}
+    (tmp_path / "resources/sample_names.yaml").write_text(
+        yaml.safe_dump(subset_resources, sort_keys=False)
+    )
+    assert list(load_pack("sample", banks={"tst"}).names) == ["tst"]
+    with pytest.raises(ValidationError):
+        load_pack("sample", banks={"oth"})
+    with pytest.raises(ValidationError):
+        load_pack("sample")
 
 
 @pytest.mark.parametrize("contents", ["[broken", "- wrong shape", "fra: {female: []}"])

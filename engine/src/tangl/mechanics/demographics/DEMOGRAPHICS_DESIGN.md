@@ -107,6 +107,9 @@ optional data pack, not mandatory fields for all generated characters.
 ### Implemented scope/reference shape (slice 2)
 
 `register_pack` returns a `TokenCatalog[NameBank]` with exactly that pack's banks.
+`load_pack(..., banks={...})` can first select exact resource keys before bank
+validation; geography and provenance stay whole, and coverage describes the
+selected pack. The names file is still read through the existing cache in full.
 `NameBank.selection_key` uses Core's existing identifier field marker; internal
 identity remains `(class, label)`. Two worlds can offer different internally named
 banks for the same local key. The collision witness passes through actual World,
