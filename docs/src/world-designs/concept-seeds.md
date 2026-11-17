@@ -460,22 +460,43 @@ non-diegetic disclosure and recovery. No general loop engine is selected.
 (wd-unobserved-day)=
 ## The Unobserved Day: autonomous incidents
 
-**Stage:** unselected research seed.
+**Stage:** unselected research seed, closely related to an existing demo.
 **Provenance:** capability matrix A09; *Deadline*, *Overboard!*, *Elsinore*.
-**Existing precedent:** [Night Shift](https://github.com/derekmerck/storytangl/tree/main/worlds/ed_queue_demo)
-proves deterministic discrete-event processing, *not* autonomous
-characters with private knowledge.
+**Existing precursor:** [Night Shift](https://github.com/derekmerck/storytangl/tree/main/worlds/ed_queue_demo)
+already executes deterministic future events for several patients and stations,
+without player decisions for each arrival, service completion, or discharge.
+The player explicitly advances the simulation through **Run next event** or
+**Run until complete**; this is not background wall-clock execution. Events
+mutate ordinary game state and contribute normal JOURNAL fragments.
 
-**Premise and invariant.** Four residents move through three locations
-over twenty ticks; a critical event and witness knowledge propagate
-even if the player never visits the relevant rooms. The player can
-intervene but does not cause the world to exist by observing it.
+**The smallest adjacent experiment (Night Shift extension).** Add read-only
+observer focus (or demonstrably zero-time navigation), one well-defined
+intervention such as delaying a queued service start, and resumed advancement.
+Observing another station must neither advance time nor change the causal
+event trace; an actual intervention must change later events, including at
+stations not currently observed. Do not assume moving the ordinary VM cursor
+is observation-only: traversal may itself run handlers or commit state.
+A control run, an observation-only run, and an intervention run supply
+three compact, comparable witnesses. Reuse the existing event calendar,
+state transitions, and journal rather than introducing a second simulator.
 
-**StoryTangl connection / falsifier.** Compare identical seeded runs
-with the player absent: autonomous event traces should agree unless
-intervention occurs. If NPC activity happens only as scene-enter
-content, the experiment is a scripted sequence, not autonomous fabula.
-Do not promote a generic character scheduler before this proof.
+**Distinct narrative experiment.** Four residents move through three
+locations over twenty ticks. A critical incident and character-to-character
+knowledge transfer occur even when the player is elsewhere; a subsequent
+character acts on what *they* learned, not only on globally known state.
+The player can intervene to change that later causal chain. Sandbox already
+offers scheduled actor presence, but Night Shift does **not** demonstrate
+per-character knowledge or its propagation. These are story-domain and
+epistemic pressures beyond the ED queueing extension.
+
+**Falsifiers and boundary.** For equal initial conditions, an absent player
+and a merely observing player must produce the same underlying event trace.
+One causal intervention should alter the appropriate downstream trace;
+observation alone must not. In the stronger social case, knowledge and later
+behavior must still propagate without the reader visiting the incident
+location. If events only happen when their scene is entered, this is authored
+scene sequencing rather than autonomous fabula. Neither experiment requires
+real-time unattended execution or a new general actor scheduler.
 
 ## Two Readers, One Graph
 
