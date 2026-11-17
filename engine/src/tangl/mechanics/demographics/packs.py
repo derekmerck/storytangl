@@ -147,18 +147,22 @@ def _read_yaml(filename: str) -> object:
     return load_yaml_path(resource)
 
 
-def load_pack(pack: Literal["sample", "full"]) -> DemographicPack:
-    """Load exactly the selected pack; no fallback or Singleton registration."""
+def load_pack(pack: Literal["sample", "full"], *, banks: set[str] | None = None) -> DemographicPack:
+    """Load a pack or exact bank subset, without fallback or Singleton registration."""
     if pack not in ("sample", "full"):
         raise ValueError(f"Unknown demographics pack: {pack!r}")
     metadata = PackMetadata.model_validate(_read_yaml(f"{pack}_metadata.yaml"))
     if metadata.label != pack:
         raise ValueError(f"Metadata label does not match requested pack {pack!r}")
-    return parse_pack(
-        metadata,
-        _read_yaml("nationalities.yaml"),
-        _read_yaml("sample_names.yaml" if pack == "sample" else "world_names.yaml"),
-    )
+    geography = _read_yaml("nationalities.yaml")
+    names = _read_yaml("sample_names.yaml" if pack == "sample" else "world_names.yaml")
+    if banks is not None:
+        source = TypeAdapter(dict[str, object]).validate_python(names)
+        missing = banks - source.keys()
+        if missing:
+            raise ValueError(f"Unknown name banks: {', '.join(sorted(missing))}")
+        names = {label: value for label, value in source.items() if label in banks}
+    return parse_pack(metadata, geography, names)
 
 
 def register_pack(pack: DemographicPack) -> TokenCatalog[NameBank]:

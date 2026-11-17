@@ -55,6 +55,14 @@ name = DemographicSampler.sample_name(
 )
 ```
 
+For a bounded offer set, use `load_pack("sample", banks={"fra"})` before
+registration. Keys must match exactly, including any subtype suffix; unknown or
+empty selections fail, and the coverage audits describe the selected subset.
+Geography and metadata remain unchanged. The loader still reads the entire
+names resource into its existing cache, so selecting from `full` still requires
+the full file and its LFS content. Per-country files and borrowing another world's
+banks remain separate work ([issue #673](https://github.com/derekmerck/storytangl/issues/673)).
+
 - Import performs no resource loading or registration. `load_pack("full")` requests
   the optional historical LFS bank; absent files and LFS pointers raise
   `PackUnavailableError`. Callers can catch that exception and explicitly select
