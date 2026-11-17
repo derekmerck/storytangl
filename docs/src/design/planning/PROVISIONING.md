@@ -99,4 +99,4 @@ committed non-topological state changes, belong in UPDATE.
 - [Template Scope](TEMPLATE_SCOPE.md) — authored admission and scope rules.
 - [Provisioning Behavior](PROVISIONING_BEHAVIOR.md) — historical author-facing
   guidance retained for provenance; its cost examples are not current.
-- `engine/src/tangl/vm/VM_DESIGN.md` — VM phase and authority contract.
+- [`engine/src/tangl/vm/VM_DESIGN.md`](../../api/vm/VM_DESIGN.md) — VM phase and authority contract.

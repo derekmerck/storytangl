@@ -7,6 +7,7 @@ Typed response and envelope models returned by canonical service methods.
 
 .. rubric:: Related design docs
 
+- :doc:`SERVICE_DESIGN`
 - :doc:`../../design/service/RESPONSE_TYPES`
 
 .. rubric:: Related notes

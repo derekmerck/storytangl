@@ -2,7 +2,7 @@
 
 **Status:** Current manager-first contract
 
-**Implementation companion:** `engine/src/tangl/service/SERVICE_DESIGN.md`
+**Implementation companion:** [`engine/src/tangl/service/SERVICE_DESIGN.md`](../../api/service/SERVICE_DESIGN.md)
 
 ## Position in the Architecture
 
@@ -120,7 +120,7 @@ its tutorials or examples as live guidance.
 ## Current References
 
 - The implementation-adjacent details live in
-  `engine/src/tangl/service/SERVICE_DESIGN.md`.
+  [`engine/src/tangl/service/SERVICE_DESIGN.md`](../../api/service/SERVICE_DESIGN.md).
 - The generated public method catalog is in the
   [Service API](../../api/service/index.rst).
 - Typed response vocabulary is summarized in

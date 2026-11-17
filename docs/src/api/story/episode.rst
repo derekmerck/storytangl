@@ -7,6 +7,7 @@ Traversable node and edge types that define the story cursor vocabulary.
 
 .. rubric:: Related design docs
 
+- :doc:`STORY_DESIGN`
 - :doc:`../../design/story/menu_block`
 - :doc:`../../design/traversal/NAV_DESIGN`
 

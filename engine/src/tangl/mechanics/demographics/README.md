@@ -32,7 +32,7 @@ It provides:
   helpers retain their existing optional RNG policy.
 - Slices 1–3 and 4a (one name owner plus durable profile/Actor composition) are
   implemented. Explicit UPDATE completion (4b) and the text-first
-  [Casting Desk consumer](../../../../../worlds/casting_desk/README.md) (5) are implemented. See the
+  [Casting Desk consumer](https://github.com/derekmerck/storytangl/blob/main/worlds/casting_desk/README.md) (5) are implemented. See the
   [design contract](DEMOGRAPHICS_DESIGN.md) and
   [staged retrofit plan](DEMOGRAPHICS_RETROFIT_PLAN.md), tracked by
   [issue #285](https://github.com/derekmerck/storytangl/issues/285).

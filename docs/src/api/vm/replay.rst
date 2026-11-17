@@ -7,6 +7,8 @@ Replay records and engines used to persist, diff, and roll back runtime state.
 
 .. rubric:: Related design docs
 
+- :doc:`VM_DESIGN`
+- :doc:`replay/design_notes`
 - :doc:`../../design/traversal/NAV_DESIGN`
 
 .. rubric:: Related notes

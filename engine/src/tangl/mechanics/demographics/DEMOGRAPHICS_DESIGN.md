@@ -286,7 +286,7 @@ sampling weights during conversion.
 
 ## Projection and the first consumer
 
-The implemented text-first [Casting Desk](../../../../../worlds/casting_desk/README.md)
+The implemented text-first [Casting Desk](https://github.com/derekmerck/storytangl/blob/main/worlds/casting_desk/README.md)
 demo leaves Hall Monitor's fixed proofs untouched. Two distinct human origins
 share one world-authored bank, and a grove sprite uses a world-local compound recipe.
 Its banks are authored YAML resources; it registers no national pack.

@@ -13,6 +13,7 @@ contribute runtime, provisioning, and replay behavior.
 
 .. rubric:: Related design docs
 
+- :doc:`VM_DESIGN`
 - :doc:`../../design/planning/PROVISIONING_BEHAVIOR`
 
 .. rubric:: Related notes

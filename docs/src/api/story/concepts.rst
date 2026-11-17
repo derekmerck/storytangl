@@ -8,6 +8,8 @@ contributions.
 
 .. rubric:: Related design docs
 
+- :doc:`STORY_DESIGN`
+- :doc:`concepts/asset/ASSET_DESIGN`
 - :doc:`../../design/story/CONCEPT_PROV_DESIGN`
 
 .. rubric:: Related notes

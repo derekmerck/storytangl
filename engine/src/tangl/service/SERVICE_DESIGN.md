@@ -396,7 +396,7 @@ The web client owns a deliberately small, codename-backed persistence
 capability: the server stores a derived secret hash and stable user UUID, while
 the browser retains the plaintext codename needed to restore that user. The
 derived API key is request transport, not a second identity. See the canonical
-[player-session bootstrap note](../../../../apps/web/notes/PLAYER_SESSION_BOOTSTRAP.md)
+[player-session bootstrap note](https://github.com/derekmerck/storytangl/blob/main/apps/web/notes/PLAYER_SESSION_BOOTSTRAP.md)
 for create-or-restore, rotation, and explicitly deferred security policy.
 
 ## World Support

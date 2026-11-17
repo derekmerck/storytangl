@@ -8,7 +8,7 @@ phase-bus integration, and service-layer response profiles.
 **Implementation order:** Sync-first (§3.5–3.6 prove the architecture without workers),
 then server-side async lifecycle, then concrete worker backends, then anticipatory affordances.
 
-> Package-level architecture now lives in `engine/src/tangl/media/MEDIA_DESIGN.md`.
+> Package-level architecture now lives in [`engine/src/tangl/media/MEDIA_DESIGN.md`](../api/media/MEDIA_DESIGN.md).
 > This document extends that inline note for the generative slice: pending-RIT
 > lifecycle, sync/async creation flow, and the worker-backed roadmap.
 
@@ -1166,7 +1166,7 @@ instances are working.
 
 ## Relationship to Existing Design Documents
 
-- **`engine/src/tangl/media/MEDIA_DESIGN.md`** — Authoritative for package layers, roles,
+- **[`engine/src/tangl/media/MEDIA_DESIGN.md`](../api/media/MEDIA_DESIGN.md)** — Authoritative for package layers, roles,
   static lifecycle, and fragment contract. This document extends it for the
   generative pipeline.
 - **[`MEDIA_DESIGN.md`](MEDIA_DESIGN.md)** — Broader published subsystem design note;

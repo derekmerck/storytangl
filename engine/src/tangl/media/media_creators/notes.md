@@ -1,5 +1,5 @@
 Media Services
---------------
+==============
 namespace subpackage
 
 takes a MediaSpec, returns a revised spec and media object

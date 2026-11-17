@@ -8,6 +8,7 @@ preview, and journaling.
 
 .. rubric:: Related design docs
 
+- :doc:`STORY_DESIGN`
 - :doc:`../../design/story/philosophy`
 - :doc:`../../design/story/JOURNAL_COMPOSE_CONTRACT`
 - :doc:`../../design/traversal/NAV_DESIGN`

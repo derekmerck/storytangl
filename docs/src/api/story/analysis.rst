@@ -11,6 +11,8 @@ become a second source of truth.
 
 .. rubric:: Related design docs
 
+- :doc:`STORY_DESIGN`
+- :doc:`OBSERVATION_DESIGN`
 - :doc:`../../design/story/philosophy`
 - :doc:`../../design/traversal/NAV_DESIGN`
 

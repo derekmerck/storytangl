@@ -15,4 +15,4 @@ ordering, persistence, and runtime linking in more detail.
 handlers, and explicitly configured `TextRenderSession`/Jinja environments.
 
 The executable reference is
-[concept_naming_demo](../../../../worlds/concept_naming_demo/README.md).
+[concept_naming_demo](https://github.com/derekmerck/storytangl/blob/main/worlds/concept_naming_demo/README.md).

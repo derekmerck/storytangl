@@ -10,5 +10,10 @@ Curated API reference grouped by subsystem rather than a single flat package pag
    vm/index
    story/index
    presentation/index
+   prose/index
+   media/index
+   journal/index
    service/index
    server/index
+   mechanics/index
+   devref/index

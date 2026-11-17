@@ -11,6 +11,7 @@ metadata attached to those methods.
 
 .. rubric:: Related design docs
 
+- :doc:`SERVICE_DESIGN`
 - :doc:`../../design/service/SERVICE_DESIGN`
 
 .. rubric:: Related pages

@@ -2,7 +2,7 @@
 
 **Document Version:** 0.3
 **Status:** DESIGN NOTE — originating vision, prior art, and phasing. **The current,
-detailed model lives in `engine/src/tangl/mechanics/assembly/COMPONENT_DESIGN.md`**
+detailed model lives in [`engine/src/tangl/mechanics/assembly/COMPONENT_DESIGN.md`](../api/mechanics/assembly/COMPONENT_DESIGN.md)**
 (channel/facet_type discriminators, the four forced positions, produces/consumes
 evaluation order, conflict resolution, the v3.2 association substrate, and the staged
 build plan). This note keeps the *why* and prior art; consult COMPONENT_DESIGN for the

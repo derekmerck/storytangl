@@ -81,7 +81,7 @@ boundary before comparing echoes. Host/cost substitutions reject before
 traversal or clock payment. Allocation remains zero-duration; ``end_cycle``
 still pays one tick and production is resolved by the existing tick observer.
 
-### Downstream migration: CarWars ``visits.submitted_move``
+## Downstream migration: CarWars ``visits.submitted_move``
 
 Declare the concrete move schema on the existing handler and remove the
 downstream read-back/reconstruction workaround once using this contract:

@@ -7,6 +7,7 @@ Graph topology primitives used by the story and vm layers.
 
 .. rubric:: Related design docs
 
+- :doc:`CORE_DESIGN`
 - :doc:`../../design/traversal/NAV_DESIGN`
 
 .. rubric:: Related notes

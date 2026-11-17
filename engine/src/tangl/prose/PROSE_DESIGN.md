@@ -47,7 +47,7 @@ or fragment hierarchy; its behaviors use normal Story/VM dispatch tasks.
 intent, and introduction. `MuBlock` and its existing `DialogMuBlock` specialization
 are the shared authored vocabulary for ordered bodies and symbolic speakers.
 The authoritative ownership boundary is
-[Registry-owned entities and owner-local embedded values](../../../../ARCHITECTURE.md#registry-owned-entities-and-owner-local-embedded-values).
+[Registry-owned entities and owner-local embedded values](https://github.com/derekmerck/storytangl/blob/main/ARCHITECTURE.md#registry-owned-entities-and-owner-local-embedded-values).
 Mu-blocks are non-graph authored values, not Entities or graph children. They have
 no UID; `source_id` names a donating entity. The block is their owner, not a
 hierarchical parent. Render context supplies access without stored owner fields

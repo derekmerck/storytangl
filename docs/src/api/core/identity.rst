@@ -12,6 +12,7 @@ Identity, selection, and registry primitives used throughout the engine.
 
 .. rubric:: Related design docs
 
+- :doc:`CORE_DESIGN`
 - :doc:`../../design/core/DEREF_DESIGN`
 
 .. rubric:: Related notes

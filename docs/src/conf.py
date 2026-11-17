@@ -67,6 +67,9 @@ source_suffix = {
 }
 
 # useful MyST extras
+# Resolve links to headings across pages, e.g. note.md#a-section.
+myst_heading_anchors = 4
+
 myst_enable_extensions = [
     "colon_fence",   # ::: fenced blocks
     "deflist",       # definition lists

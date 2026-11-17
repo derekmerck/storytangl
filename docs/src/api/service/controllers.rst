@@ -11,6 +11,7 @@ Its public methods are the source of truth for service behavior. See
 
 .. rubric:: Related design docs
 
+- :doc:`SERVICE_DESIGN`
 - :doc:`../../design/service/SERVICE_DESIGN`
 
 .. rubric:: Related notes

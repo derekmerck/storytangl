@@ -3,7 +3,7 @@
 > **Historical core38 audit note.** This file records transition-era findings
 > against the retired `tangl.core38` package. It is evidence about the migration,
 > not current API or architecture authority. Current contracts live in
-> `engine/src/tangl/core/CORE_DESIGN.md` and the `tangl.core` API pages.
+> [`engine/src/tangl/core/CORE_DESIGN.md`](../../api/core/CORE_DESIGN.md) and the `tangl.core` API pages.
 
 ## Scope
 - Package: `engine/src/tangl/core38`

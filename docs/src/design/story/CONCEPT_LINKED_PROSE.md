@@ -36,7 +36,7 @@ landed. The dated checkpoint below records the earlier salvage decision.
 >
 > **Neighbouring contracts:** `EPISODE_SYUZHET_RENDERING.md` remains the current
 > rendering contract; `JOURNAL_COMPOSE_CONTRACT.md` remains the current journal
-> composition contract; `engine/src/tangl/story/OBSERVATION_DESIGN.md` owns the
+> composition contract; [`engine/src/tangl/story/OBSERVATION_DESIGN.md`](../../api/story/OBSERVATION_DESIGN.md) owns the
 > proposed vantage/observation boundary. This note fills the missing middle:
 > **referent linking and re-realization of authored prose**.
 
@@ -743,7 +743,7 @@ covered by `engine/tests/prose/test_naming.py`. Raw worlds need no adoption.
 `NamedConcept` composes existing narrator knowledge with minimal optional wording
 and pure `adopts()`/`get_nominal()` plus explicit `introduce()`. Named actors,
 locations, and graph-owned non-person items use this one contract. The canonical
-`engine/src/tangl/prose/PROSE_DESIGN.md` section "Generic named concepts (slice 2)"
+[`engine/src/tangl/prose/PROSE_DESIGN.md`](../../api/prose/PROSE_DESIGN.md) section "Generic named concepts (slice 2)"
 defines signatures, dispatch, ownership and duplicate-form precedence.
 
 Adoption is data-only: spelling maps to serializable realization parameters, not

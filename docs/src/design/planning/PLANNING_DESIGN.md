@@ -5,9 +5,9 @@
 > Edges and the Planning Matrix", CANONICAL): the open link as the planning
 > primitive, the dependency/affordance duality, the planning matrix, and the
 > filled audit table. Do not use this file's vocabulary in new docs, code, or
-> issues. Implementation references: `engine/src/tangl/vm/VM_DESIGN.md`
+> issues. Implementation references: [`engine/src/tangl/vm/VM_DESIGN.md`](../../api/vm/VM_DESIGN.md)
 > (provisioning section) and
-> `engine/src/tangl/vm/provision/SCOPE_MATCHING_DESIGN.md` (scope matching);
+> [`engine/src/tangl/vm/provision/SCOPE_MATCHING_DESIGN.md`](../../api/vm/provision/SCOPE_MATCHING_DESIGN.md) (scope matching);
 > planning dispatch is now in `tangl.vm.dispatch` and resolution logic in
 > `tangl.vm.provision.resolver`. This file is retained for historical context
 > only.
@@ -924,5 +924,5 @@ def test_softlock_with_impossible_requirement():
 **Document Status:** ⚠️ **STALE / HISTORICAL**
 
 This document reflects the v3.7-era planning/provisioning shape as of November 2025.
-Use `engine/src/tangl/vm/VM_DESIGN.md` and
-`engine/src/tangl/vm/provision/SCOPE_MATCHING_DESIGN.md` for current architecture.
+Use [`engine/src/tangl/vm/VM_DESIGN.md`](../../api/vm/VM_DESIGN.md) and
+[`engine/src/tangl/vm/provision/SCOPE_MATCHING_DESIGN.md`](../../api/vm/provision/SCOPE_MATCHING_DESIGN.md) for current architecture.
