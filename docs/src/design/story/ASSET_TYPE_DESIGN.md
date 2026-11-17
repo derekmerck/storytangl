@@ -1,5 +1,5 @@
 > **⚠️ Largely superseded.** The Token/Singleton architectural pattern described
-> here is now covered authoritatively in `engine/src/tangl/core/CORE_DESIGN.md`
+> here is now covered authoritatively in [`engine/src/tangl/core/CORE_DESIGN.md`](../../api/core/CORE_DESIGN.md)
 > (Token and Singleton sections). Author-facing examples in this doc may still
 > have reference value.
 

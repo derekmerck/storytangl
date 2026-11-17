@@ -60,4 +60,4 @@ See also
 --------
 
 For the broader family taxonomy and future-shape note, see the code-adjacent
-design doc at ``engine/src/tangl/mechanics/games/GAME_MECHANICS_DESIGN.md``.
+design doc at :doc:`engine/src/tangl/mechanics/games/GAME_MECHANICS_DESIGN.md <../api/mechanics/games/GAME_MECHANICS_DESIGN>`.

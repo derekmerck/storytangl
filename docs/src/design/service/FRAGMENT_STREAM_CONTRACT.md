@@ -184,7 +184,7 @@ opaque media dictionary inside `payload`. An ordinary media cue starts/replaces
 selection; a matching delete stops it without needing an introducing occurrence
 id. Restart retains repetition mode, and control UID remains available for later
 client deduplication. The canonical code-adjacent note
-`engine/src/tangl/media/MEDIA_DESIGN.md` records wire examples and the explicit
+[`engine/src/tangl/media/MEDIA_DESIGN.md`](../../api/media/MEDIA_DESIGN.md) records wire examples and the explicit
 physical-playback deferrals; the [media overview](../MEDIA_DESIGN.md) records
 the subsystem boundaries.
 

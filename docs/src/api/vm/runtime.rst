@@ -13,6 +13,7 @@ time.
 
 .. rubric:: Related design docs
 
+- :doc:`VM_DESIGN`
 - :doc:`../../design/traversal/NAV_DESIGN`
 - :doc:`../../design/traversal/ENTRY_RESOLUTION`
 

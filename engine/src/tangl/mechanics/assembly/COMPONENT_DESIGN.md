@@ -47,7 +47,7 @@ graph-owned wallet; empty prepared wallets persist.
 ## Implementation Status: Owner-Bound Managers
 
 The authoritative ownership contract is
-[Registry-owned entities and owner-local embedded values](../../../../../ARCHITECTURE.md#registry-owned-entities-and-owner-local-embedded-values).
+[Registry-owned entities and owner-local embedded values](https://github.com/derekmerck/storytangl/blob/main/ARCHITECTURE.md#registry-owned-entities-and-owner-local-embedded-values).
 An embedded manager is an owner-local Unstructurable value, not a registry-owned
 Entity or graph child. Use `owner` for embedding and reserve `parent`/`children`
 for graph hierarchy. Concrete supported embedded variants must be declared at

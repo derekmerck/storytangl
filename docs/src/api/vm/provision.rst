@@ -8,6 +8,8 @@ dependencies.
 
 .. rubric:: Related design docs
 
+- :doc:`VM_DESIGN`
+- :doc:`provision/SCOPE_MATCHING_DESIGN`
 - :doc:`../../design/planning/PROVISIONING`
 - :doc:`../../design/planning/PROVISIONING_BEHAVIOR`
 

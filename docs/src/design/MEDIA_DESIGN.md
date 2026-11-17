@@ -2,7 +2,7 @@
 
 > **Status:** Current public entry point
 > **Canonical package contract:**
-> ``engine/src/tangl/media/MEDIA_DESIGN.md``
+> [`engine/src/tangl/media/MEDIA_DESIGN.md`](../api/media/MEDIA_DESIGN.md)
 
 This page records media's place in the episode-to-syuzhet and delivery pipeline.
 The code-adjacent package note is the single authority for media types,
@@ -78,7 +78,7 @@ adapter, but it does not parse narrative output to recover that projection.
 
 ## Related Contracts
 
-- ``engine/src/tangl/media/MEDIA_DESIGN.md`` — canonical package architecture
+- [`engine/src/tangl/media/MEDIA_DESIGN.md`](../api/media/MEDIA_DESIGN.md) — canonical package architecture
 - [Generative Media Design](GENERATIVE_MEDIA_DESIGN.md) — creator and worker
   lifecycle
 - [Episode-to-Syuzhet Rendering](story/EPISODE_SYUZHET_RENDERING.md) — shared

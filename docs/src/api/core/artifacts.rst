@@ -8,6 +8,7 @@ construction.
 
 .. rubric:: Related design docs
 
+- :doc:`CORE_DESIGN`
 - :doc:`../../design/core/CONTENT_ADDRESSABLE`
 
 .. rubric:: Related notes

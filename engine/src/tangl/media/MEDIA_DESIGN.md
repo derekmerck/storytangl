@@ -9,7 +9,7 @@
 
 > Status: Current contract; #571 slice 1 adds file-backed audio transport.
 > #661 P0 indexes selected groups from an admitted SVG resource with original IDs,
-> registration, channel metadata and integrity diagnostics. The [Modiste catalogue](../../../../worlds/modiste_demo/README.md)
+> registration, channel metadata and integrity diagnostics. The [Modiste catalogue](https://github.com/derekmerck/storytangl/blob/main/worlds/modiste_demo/README.md)
 > witnesses world-owned Afreet conventions and bounded coverage.
 > #661 P1 adds pure explicit selection/rule and palette resolution to ordered,
 > source-referenced plans; Modiste exercises choices and JSON Service reopen.

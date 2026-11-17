@@ -433,7 +433,7 @@ For a working world and implementation contracts, see:
 
 - `worlds/concept_naming_demo`: executable actor/place/item, dialog, template,
   runtime-linking, and CLI examples.
-- `engine/src/tangl/prose/PROSE_DESIGN.md`: projection, ownership, and naming policy.
+- [`engine/src/tangl/prose/PROSE_DESIGN.md`](../../api/prose/PROSE_DESIGN.md): projection, ownership, and naming policy.
 - [Concept-linked prose](CONCEPT_LINKED_PROSE.md): rationale and deferred directions.
 - [Journal composition](JOURNAL_COMPOSE_CONTRACT.md): output transformation boundary.
 - `engine/tests/prose/test_naming.py`, `test_named_concept.py`, and `test_linking.py`:

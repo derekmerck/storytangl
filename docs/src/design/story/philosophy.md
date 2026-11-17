@@ -2,7 +2,7 @@
 
 > Why the system works the way it does, and the metaphors that keep it honest.
 > Package-level runtime architecture now lives in
-> `engine/src/tangl/story/STORY_DESIGN.md`; this page remains the higher-level
+> [`engine/src/tangl/story/STORY_DESIGN.md`](../../api/story/STORY_DESIGN.md); this page remains the higher-level
 > conceptual rationale.
 
 StoryTangl models interactive narrative as a **graph of interdependent possibilities**
@@ -888,8 +888,8 @@ implemented in StoryTangl.
 
 ## What This Document Does Not Cover
 
-- **How** the phase pipeline works → see `engine/src/tangl/vm/VM_DESIGN.md`
-- **How** the graph primitives work → see `engine/src/tangl/core/CORE_DESIGN.md`
+- **How** the phase pipeline works → see [`engine/src/tangl/vm/VM_DESIGN.md`](../../api/vm/VM_DESIGN.md)
+- **How** the graph primitives work → see [`engine/src/tangl/core/CORE_DESIGN.md`](../../api/core/CORE_DESIGN.md)
 - **How** story concepts are modeled → see `engine/src/tangl/story/`
 - **Where** a narrative distinction should live (prose, structure, or a
   contributed affordance) → see [NARRATIVE_CONTROL.md](NARRATIVE_CONTROL.md)

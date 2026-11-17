@@ -10,8 +10,12 @@ Prospective narratives and the capabilities they would exercise live in
 
 See also
 --------
-- :doc:`../notes/reference/code_adjacent_design_docs` for design notes that still
-  live beside source modules and should eventually be folded into this section.
+- The practical design note for each package lives beside its code and is
+  included in the API reference, for example :doc:`../api/vm/VM_DESIGN`,
+  :doc:`../api/story/STORY_DESIGN` and :doc:`../api/service/SERVICE_DESIGN`.
+  Pages here describe the models; those notes say how a package realizes them,
+  and lead on to the package's API. :doc:`../notes/reference/code_adjacent_design_docs`
+  lists them all.
 
 .. toctree::
    :maxdepth: 4

@@ -276,7 +276,7 @@ Current gap:
   slice 5; automatic setup generation and media remain outside this boundary.
 
 The source-local design and retrofit plan live in
-`engine/src/tangl/mechanics/demographics/DEMOGRAPHICS_DESIGN.md` and
+[`engine/src/tangl/mechanics/demographics/DEMOGRAPHICS_DESIGN.md`](../../api/mechanics/demographics/DEMOGRAPHICS_DESIGN.md) and
 `DEMOGRAPHICS_RETROFIT_PLAN.md`, tracked by issue #285. They separate shared
 definitions from sampled individuals and retain custom world origins without
 requiring a geographic demographic model for every species.

@@ -770,7 +770,7 @@ shape.
 thread a dedicated lifecycle/provenance channel through `Action` +
 `ChoiceFragment` + the wire DTO, distinct from `UIHints`. That is the
 "general provenance/receipt shape for phase outputs" promotion candidate already
-named in `engine/src/tangl/mechanics/sandbox/SANDBOX_DESIGN.md`
+named in [`engine/src/tangl/mechanics/sandbox/SANDBOX_DESIGN.md`](../../api/mechanics/sandbox/SANDBOX_DESIGN.md)
 ("General Contribution Pattern"), gated on a second non-sandbox consumer — not
 on this pass. The `source_kind` / `contribution` conflation and the game
 `fanout`-tag drift are likewise *recorded, not fixed* here; each needs its own

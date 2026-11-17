@@ -3,7 +3,7 @@ Presence/Prose Contract Spike
 
 > Status: Partially landed
 > Authority: Current `compose_journal` rules live in `docs/src/design/story/JOURNAL_COMPOSE_CONTRACT.md`; this note remains the spike record for presence/prose integration.
-> Current contract: see `docs/src/design/story/JOURNAL_COMPOSE_CONTRACT.md` for the live journal-composition boundary and `engine/src/tangl/story/STORY_DESIGN.md` for current story runtime layering.
+> Current contract: see `docs/src/design/story/JOURNAL_COMPOSE_CONTRACT.md` for the live journal-composition boundary and [`engine/src/tangl/story/STORY_DESIGN.md`](../../api/story/STORY_DESIGN.md) for current story runtime layering.
 
 **Scope:** partially landed prose and presence integration. Ordinary authored
 block content is `format_map`-based unless its namespace declares

@@ -13,6 +13,7 @@ hooks.
 
 .. rubric:: Related design docs
 
+- :doc:`CORE_DESIGN`
 - :doc:`../../design/core/HOOK_REF`
 
 .. rubric:: Related notes

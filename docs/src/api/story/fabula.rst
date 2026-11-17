@@ -8,6 +8,7 @@ story graphs.
 
 .. rubric:: Related design docs
 
+- :doc:`STORY_DESIGN`
 - :doc:`../../design/story/compilers`
 - :doc:`../../design/planning/TEMPLATE_SCOPE`
 - :doc:`../../design/traversal/ENTRY_RESOLUTION`
