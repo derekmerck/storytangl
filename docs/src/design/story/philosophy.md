@@ -98,11 +98,12 @@ the traversal produced them.
 
 The syuzhet is presentation-agnostic.  The same journal can be rendered as
 terminal text, a rich web page, or an ebook.  Fragment types carry semantic
-roles (narrative content, dialog, choices, media) but not rendering instructions.
+roles (narrative content, dialog, choices, media).  Presentation advice travels
+with them as optional hints that a client may honour or ignore.
 The service layer translates fragments into a specific presentation format based
 on client capabilities.
 
-**Implementation:** `Journal` / `OrderedRegistry` of `BaseFragment` subclasses
+**Implementation:** an `OrderedRegistry` of `BaseFragment` subclasses
 (`ContentFragment`, `ChoiceFragment`, `MediaFragment`); service-layer render
 profiles transform fragments for specific clients.
 
@@ -117,8 +118,357 @@ The same fabula can produce radically different syuzhets depending on:
 
 This is not a theoretical nicety.  It means you can test structural properties
 (reachability, completability, role satisfaction) against the fabula *before*
-any traversal happens, and you can replay a specific syuzhet deterministically
-from a snapshot plus a choice log.
+any traversal happens, and you can reproduce a specific walk from its starting
+configuration and its choices (see Determinism and Replay).
+
+## Working Theses
+
+The sections above say what the project believes about stories.  The package
+design notes say how the code works.  This section is the argument between the
+two: what each belief commits the design to, how far the implementation
+realizes it today, where the two still disagree, and what would count as
+evidence either way.
+
+These are propositions, not rules.  Each can be sharpened, narrowed or
+dropped when an experiment says so, and a new one can be added without
+ceremony.  They are not all the same kind of statement, so they are grouped by
+what they are:
+
+| Group | Kind of statement | If it turns out wrong |
+| --- | --- | --- |
+| Vocabulary | a model of what there is | revisit the ontology |
+| Unifications | a claim that two things are one | check whether the difference is real |
+| Commitments | a choice about how the engine is arranged | ask whether the choice or the code is at fault |
+| Hypotheses | a property we expect to hold | treat a failure as a counterexample worth studying |
+
+They were stated by the designer during a whole-project review in November
+2026.  The "today" and "tension" entries describe the implementation at that
+time and will date; the package notes and the issues that own each area are
+the live record.
+
+### Vocabulary
+
+#### 1. A story space is ordered in four steps
+
+**Thesis.**  The three models above are four levels once the possibility space
+is split into what is authored and what is instantiated.  Each level adds order
+to the one before it.
+
+| Level | What it is | Order |
+| --- | --- | --- |
+| World | templates and rules | none |
+| Story graph | one grounded configuration of that space | relations only |
+| Episodic process | the walk through the traversable concepts | partial |
+| Journal | what was told | total |
+
+The episodes mediate between the linear journal and the non-linear story
+graph, which is itself one configuration of the ambient story space: like using
+a graph to order data with a heapsort.
+
+**Why.**  The space of possible stories is not any one story, and a story that
+happened is not any one telling of it.
+
+**Consequence.**  Each level owns different information and is produced by a
+different operation: compiling makes a world, materializing grounds it, walking
+orders it, telling linearizes it.  A client can re-present a journal without
+reconstructing the walk, and a walk can be studied without its telling.
+
+**Today.**  The four operations are separate in the code.  Journal fragments
+are stored apart from the graph, each still pointing at what produced it.  They
+were once leaves on the episodes themselves, read out by walking; they moved
+for size and so that state can be compared without the telling.
+
+**Tension.**  The order belongs to the walk, not to the authored graph: hubs
+and self-loops make the authored traversable graph cyclic.  "Fabula" has been
+used for both of the first two levels.
+
+**Evidence.**  The full tree, world to fragment, reassembled from a saved
+story.  A journal re-voiced from its sources without walking again.
+
+#### 2. Everything in a story graph is a concept
+
+**Thesis.**  Any node in a story graph is a **concept**.  A traversable concept
+is an **episode**: one is a block; a group is a scene, which is primarily a
+scope for shared names.  Concepts that are not episodes are mostly a **person,
+place, or thing**, bound through roles and settings or tracked as single
+tokens or fungible holdings.  Themes, arcs and motifs are the same kind of
+concept, contributing narrowly through their relationships to others.
+
+**Consequence.**  Narrative vocabulary should be a naming of the base
+structures, not an addition to them.
+
+**Today.**  It is.  The story-layer classes are thin, and what each adds is a
+contract for how a bound thing appears to templates.
+
+**Tension.**  A place can be an episode one stands on, as in a cave adventure,
+or a setting a scene binds, as in a calendar of events.  Both lowerings exist
+and the choice is made per world.
+
+**Evidence against.**  A kind of concept that cannot be expressed without new
+base machinery.
+
+### Unifications
+
+#### 3. Imperative and declarative are two readings of one rule
+
+**Thesis.**  A world can be written in the manner of a gamebook: *if this and
+this, then go there*.  It can be written as a model: *this is what can be
+reached when that and that hold*.  These are the same rule read from either
+end, and a world may be made entirely of either.  Both exist because episodes
+beg for the if-then form, while most concepts do not need to be ordered.
+
+**Consequence.**  Materialization is assembly of what was declared, so that it
+can be walked.  Eager materialization assembles everything; provisional
+materialization assembles what is here and coming up.  A template is an
+affordance for the provisioner, and reads as an imperative only because it is
+created on demand.  Assembly should therefore be repeatable: the same
+declarations against the same state change nothing.
+
+**Today.**  Authored actions, roles, settings and media needs all lower to the
+same kind of requirement-bearing edge.  Eager and provisional creation are one
+pipeline with two switches.
+
+**Tension.**  Identities given at creation are not determined by the
+declaration, and some generated edges are rebuilt with new identities, so
+assembling twice is not always a no-op.  The worlds in this repository are
+almost all written in the imperative reading, so the claim that the two
+readings are one has not been put to a test.
+
+**Evidence.**  Planning the same node twice against unchanged state leaves the
+graph unchanged.  One story written in both readings reaches the same states.
+The second is worth building before the declarative operators are settled,
+not after: what has to be wired by hand in the declarative version is the
+finding.
+
+#### 4. Pull and push are one link seen from either end
+
+**Thesis.**  An open link is an edge with one end fixed and a requirement
+describing the other.  A **dependency** is fixed at the one that needs
+something, and pulls.  An **affordance** is fixed at the one that offers
+something, and waits.  A **fan-out** is a set of dependencies generated at a
+node, reaching for nearby satisfiers.  A **fan-in** is the set of latent
+affordances, created when their scope is entered, that can offer themselves on
+a node: home offers *go home*, a character offers *call her*.
+
+**Consequence.**  Menus, location hubs, scheduled events and game moves are
+the same thing at different coordinates, and should not each need their own
+machinery.  See [AFFORDANCE_MODEL.md](../planning/AFFORDANCE_MODEL.md).
+
+**Today.**  The pull side is one mechanism, and media re-uses it unchanged.
+
+**Tension.**  The push side is not yet a shared operator.  Each kind of hub
+projects its own offers.
+
+**Evidence.**  One mechanism serving a menu, a location and an arrival at a
+site, with no code particular to any of them.
+
+### Commitments
+
+#### 5. Shape changes in provisioning; state changes around the telling
+
+**Thesis.**  **Shape** should change only during provisioning.  **State**
+should change during update or finalize when possible.  The **telling may
+change state on what it is talking about**: a speaker's attitude as it moves
+through a conversation, whom they are addressing, what has been introduced to
+the reader.  It should not bring new concepts into being.
+
+**Why.**  There are two update phases because of prose.  If the text says the
+player drops the sword they are carrying and the sword has already been
+dropped, the text can no longer say what happened.  So the drop is recorded
+after the telling, and the telling reads the starting state.
+
+**Today.**  The phases are ordered this way.  Introducing a character changes
+what the narrator knows, during the telling.
+
+**Tension.**  A call that re-enters its caller tells the caller again, so a
+change made in the telling that is not idempotent is applied twice.
+
+A speaker's attitude shows the commitment at small scale.  The intended
+arrangement has one authority: the actor holds its attitude, and whatever
+tells or shows a line asks the actor for it.  An actor with no attitude offers
+none, and a look or a voice that has no variant for it uses its ordinary
+form.  An attitude noted beside a line of dialog is then a change to the
+speaker, not a second place the attitude lives, and it persists past its own
+line until something changes it again.  Today the attitude is read only from
+the note and the actor is never asked.  An actor's attitude and how a line is
+performed are different things, but the base actor does not model them
+separately: in this representation a cheerful line from an angry speaker makes
+them cheerful, and the next line can make them angry again.  That is a
+limitation of the representation, not a rule about narrative.  An actor with a
+deeper model, an attitude that depends on whom they are addressing for
+instance, is a richer actor class, not a second carrier in the text.
+
+**Evidence.**  Reading a journal that has already been committed changes
+nothing.  A case where the telling genuinely has to change shape would count
+against the proposition.
+
+#### 6. A container is a scope first and a navigation unit second
+
+**Thesis.**  A container answers two questions under one name.
+
+| Role | What it answers |
+| --- | --- |
+| Scope | who and what is shared here |
+| Navigation unit | where a walk enters and leaves |
+
+Scope is the origin and the primary meaning: assign a villain to *this* scene,
+refer to them by name in the content, and if they are recast every episode in
+the region knows.  The navigation role accreted because scopes are jumped into
+and out of.
+
+As a navigation unit, a container has one source and one sink.  The source
+sets up wherever the walk should land and forwards it there.  The sink
+finalizes the container and forwards the walk out, back or onward.  Entered at
+the source and left at the sink, a whole container is a single node at the
+next level up, and the whole story is the outermost container.  An intended
+ending is a sink; running out of choices anywhere else is a softlock.
+
+**Today.**  The scope half works as described.  Of the navigation half, entry
+is used.
+
+**Tension.**  The exit is not used, authored edges cross container boundaries
+directly, and nothing records that a story has ended.  The navigation half is
+partly a hypothesis: that a graph can be given one source and one sink does
+not show that passing through them has the right effect for direct links,
+nested scenes and hubs that are re-entered.
+
+A scope boundary is not automatically a traversal boundary, and several open
+questions meet where the two are confused.  They are one question asked from
+different sides: *what does it mean for a destination to be admissible,
+provisioned and entered across a scope boundary?*
+
+- **Reasons to jump.**  One mechanism serves a shared introduction or ending,
+  a nested conversation, an interjection, an excursion from a hub, a redirect
+  between scenes and a scene that is re-entered.  Each wants something
+  different on arrival and on return: continue after the edge that was taken,
+  plan the caller afresh, or do not come back.  Whether jump, resume and
+  re-enter are enough to say all of these is untested.
+- **Readiness.**  A jump can land outside the current scope and beyond what
+  has been provisioned.  What must already exist there, and who assembles it,
+  is not stated.
+- **Donation.**  A concept can offer an action.  How a concept offers a whole
+  contained episode, one that may not be materialized yet, is not stated
+  either.
+- **Leaving.**  What passing through the sink guarantees about completion and
+  cleanup, to the caller and to the level above.
+
+It may be that source and sink are a way of *viewing* a container as one node
+and not a requirement that every edge physically pass through them.  A check
+that reports where edges cross a boundary directly is then a way to look, not
+a finding that a world is wrong.
+
+**Evidence.**  Two worlds in which setup and cleanup placed at a source and a
+sink replace wiring at every entrance and exit.  A table of the reasons to
+jump against the behaviour wanted on return, each row expressed with the
+existing operations or shown to need another.
+
+### Hypotheses
+
+#### 7. Story is shape; the rest is appearance
+
+**Thesis.**  Story is what affects the shape of, and the path through, a story
+space.  Prose and media refine appearance and presentation; voice and point of
+view belong to them.  Mechanics are different in kind: a mechanic can change
+story state, what is available next and which paths can be reached.  Story
+owns the common model of cause and traversal, and a mechanic is an optional,
+domain-specific operation that takes part in it.  What a mechanic adds beyond
+that, its dressing and its interaction, is appearance.
+
+The same test applies to a single state.  Two states belong to the same
+**equivalence class** when nothing downstream can tell them apart: leaving a
+room and returning with nothing changed is no move at all, and picking
+something up now or later is the same if nothing depends on when.  (The term
+follows Andrew Plotkin's [PlotEx](https://eblong.com/zarf/plotex/).)
+
+Games here are storytelling affordances.  They may be fair, and a fair game is
+a good first step, but an author must be able to put a thumb on the scale to
+any degree.  Chance should dress an outcome more often than decide it.
+
+**Today.**  The package boundaries roughly follow the line.  Merging outcomes
+that nothing can tell apart has been built once, in a world's own compiler.
+
+**Tension.**  The engine has no way to compare two story states.  At what
+scale "tell apart" is judged is open.  Presentation hints have accumulated
+mechanism that is neither shape nor portable appearance.
+
+Media and prose are both appearance, and media has the fuller arrangement: a
+need is stated, candidates are authored or generated, one is selected, and it
+is identified by what it was derived from.  Prose could be arranged the same
+way, which would make two tellings of one event directly comparable.  The
+symmetry is named here and the machinery is not adopted: prose has no request
+object or selection step, and should not gain one only because media has
+them.
+
+**Evidence.**  Replacing the prose, the media, or the dressing of a mechanic
+leaves the reachable equivalence classes unchanged.
+
+#### 8. A walk is reproducible up to an equivalence
+
+**Thesis.**  There are two kinds of similarity.
+
+- **Self-similarity.**  Given one starting configuration, the same walk
+  reproduces.
+- **Outcome similarity.**  A different starting configuration and the same
+  choices land on essentially the same story state, though identities differ
+  and the telling may differ entirely: the journal might be in French.
+
+A seed is an option for testing, not a requirement.  Outcome similarity holds
+only where chance has little influence on provisioning and on which paths are
+open.  Reproducibility is to a given equivalence, when the engine is used in a
+particular way, and becomes fuzzier the lighter the author's thumb.
+
+**Today.**  Self-similarity holds within one saved story.  "Determinism and
+Replay" below says what supports it.
+
+**Tension.**  Two stories from one world share no identities and nothing
+compares their states, so outcome similarity cannot yet be checked.  Chance
+inside some mechanics is not drawn from the story's own generator.
+
+"The same" has several meanings, and the thesis cannot be checked until one
+is chosen.  They are distinct relations, not steps on one scale: two things
+can share an identity and differ in state, or share bytes and differ in role.
+
+| Relation | The question |
+| --- | --- |
+| Nominal | same declared kind and label? |
+| Provenance | same originating declaration or template? |
+| Construction | same template and the same effective parameters? |
+| Identity | the same continuing thing? |
+| Value | the same relevant data now? |
+| Content | the same wrapped content, by digest? |
+| Observational | can a stated set of readers tell them apart? |
+| Behavioural | can any continuation tell them apart? |
+
+Each matters somewhere: reattaching a rebuilt edge wants construction, a media
+file wants content, merging outcomes wants the last two.  The engine's general
+equality is value, computed by serializing.  An identity derived from the
+declaration would supply construction and no more, and must be a fingerprint
+of how a thing was made, not of what it has since become.  The observational
+relation needs its readers named: what one walk did not read, another branch
+may.
+
+**Evidence.**  The same choices from two starts pass through the same sequence
+of equivalence classes.  A comparison of two states or walks that states which
+relation it used and, where they differ, names the reader or the next step
+that tells them apart.
+
+### How these change
+
+These propositions guide work on the engine.  Authors and plugins may do
+unsupported things; the engine does not guard against that.
+
+When an implementation collides with a proposition, decide whether the problem
+lies in the implementation, in the proposition, or in its scope.  Prefer the
+smallest coherent revision, and keep neither the abstraction nor the code
+merely because it came first.  Sometimes that is a narrow exception; sometimes
+several exceptions together show that the generalization was wrong.
+[CANON_AND_REALIZATION.md](../CANON_AND_REALIZATION.md) describes the method.
+
+A tension entry names a question so that it is not lost.  It approves no
+mechanism and schedules no work; whether and when anything is built is decided
+in the issue that owns the area.
+
+---
 
 ## Concepts As Continuity Anchors
 
@@ -437,31 +787,45 @@ Presenter → typed journal fragments + an application/client presentation adapt
 
 ## Determinism and Replay
 
-Every mutation in the engine is **event-sourced**: state changes are captured
-as patches in the ledger, and the complete history of a story instance is
-reproducible from a snapshot plus the patch log.
+Working thesis 8 states the intent: a walk reproduces from its starting
+configuration, and the same choices from a different start land on essentially
+the same story state.  This section says why that matters and what the engine
+currently does about it.
 
-This is not just an implementation convenience — it's a **narratological
-commitment**.  The syuzhet is a *particular* collapse of the fabula.  To
-study narrative structure, you need to be able to replay that collapse,
-branch from any point, and compare alternative collapses.  Without
-deterministic replay, the engine would be a storytelling tool.  With it,
-the engine is a **narratological instrument**.
+It is a **narratological commitment** as much as an implementation choice.  The
+syuzhet is a *particular* collapse of the fabula.  To study narrative
+structure, you need to be able to reproduce that collapse, branch from a point,
+and compare alternative collapses.  Without that, the engine would be a
+storytelling tool.  With it, the engine is a **narratological instrument**.
 
-Determinism requires discipline:
+What supports it today:
 
-- **Seeded RNG** — random choices during provisioning use a seed derived
-  from `(story_id, step, choice_hash)`, so the same choice at the same
-  point always produces the same outcome
-- **Ordered dispatch** — handler execution follows deterministic priority
-  ordering within each phase; receipts record exactly what ran
-- **External IO logging** — any non-deterministic input (LLM responses,
-  media generation) is recorded in the patch so replay doesn't need to
-  re-invoke external services
+- **A record per step.**  The ledger keeps a step record and a state delta for
+  every traversal hop, and a full checkpoint at the start and periodically
+  thereafter.  Rollback restores a checkpoint and applies the deltas after it;
+  each delta carries the state hash before and after, so a mismatch is
+  detected.
+- **Seeded chance.**  Random draws during a step come from a generator seeded
+  from the current story state, the cursor and the step, so re-planning the
+  same step gives the same result.
+- **Ordered dispatch.**  Handlers run in a defined priority order within each
+  phase, and receipts record what ran.
+- **Recorded realizations.**  The journal stores what was told, so reproducing
+  a telling does not depend on re-running whatever produced it.  Generated
+  media keeps the request it was made from and the hash of its content.
 
-**Implementation:** `Ledger` (event-sourced patch log); `DiffReplay`
-(snapshot + patches → reconstructed state); seeded RNG in resolver;
-`JobReceipt` audit trail on every dispatch.
+What it does not yet do:
+
+- Two stories created from the same world do not share identities, so a list
+  of choices from one cannot be applied to another by identifier.
+- The step record names the edge that was chosen but not any payload that came
+  with the choice.
+- Nothing re-executes a list of choices and compares the result with the
+  recorded one.
+
+**Implementation:** `Ledger` (step records, replay deltas, checkpoints);
+`DiffReplayEngine`; the seeded generator on `Frame`; `CallReceipt` on every
+dispatch.
 
 ---
 
