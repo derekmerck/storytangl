@@ -88,12 +88,13 @@ autodoc_typehints_description_target = "documented"
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "furo"
+# The sidebar title is the only link back to the front page on wide screens.
+html_title = "StoryTangl"
 # html_logo = "_static/logo-light.svg"
 # html_favicon = "_static/favicon.png"
 html_theme_options = {
     # "light_logo": "logo-light.svg",
     # "dark_logo": "logo-dark.svg",
-    "sidebar_hide_name": True,
     "navigation_with_keys": True,
     "top_of_page_button": "edit",  # or "back-to-top"
 }
