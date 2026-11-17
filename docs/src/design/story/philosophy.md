@@ -290,11 +290,13 @@ none, and a look or a voice that has no variant for it uses its ordinary
 form.  An attitude noted beside a line of dialog is then a change to the
 speaker, not a second place the attitude lives, and it persists past its own
 line until something changes it again.  Today the attitude is read only from
-the note and the actor is never asked.  A line cannot be delivered against the
-speaker's attitude: a cheerful line from an angry speaker makes them cheerful,
-and the next line can make them angry again.  An actor with a deeper model, an
-attitude that depends on whom they are addressing for instance, is a richer
-actor class, not a second carrier in the text.
+the note and the actor is never asked.  An actor's attitude and how a line is
+performed are different things, but the base actor does not model them
+separately: in this representation a cheerful line from an angry speaker makes
+them cheerful, and the next line can make them angry again.  That is a
+limitation of the representation, not a rule about narrative.  An actor with a
+deeper model, an attitude that depends on whom they are addressing for
+instance, is a richer actor class, not a second carrier in the text.
 
 **Evidence.**  Reading a journal that has already been committed changes
 nothing.  A case where the telling genuinely has to change shape would count
@@ -365,8 +367,12 @@ existing operations or shown to need another.
 #### 7. Story is shape; the rest is appearance
 
 **Thesis.**  Story is what affects the shape of, and the path through, a story
-space.  Prose, media and mechanics refine appearance, presentation and
-interactivity.  Voice and point of view belong to prose or media.
+space.  Prose and media refine appearance and presentation; voice and point of
+view belong to them.  Mechanics are different in kind: a mechanic can change
+story state, what is available next and which paths can be reached.  Story
+owns the common model of cause and traversal, and a mechanic is an optional,
+domain-specific operation that takes part in it.  What a mechanic adds beyond
+that, its dressing and its interaction, is appearance.
 
 The same test applies to a single state.  Two states belong to the same
 **equivalence class** when nothing downstream can tell them apart: leaving a
