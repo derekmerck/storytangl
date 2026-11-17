@@ -1,8 +1,9 @@
 Notes
 =====
 
-Migration records, audits, and reference material that explain the current
-state of the codebase without defining the canonical architecture.
+Migration records, audits, reference material, and design notes that have not
+been promoted. They explain the current state of the codebase without
+defining the canonical architecture.
 
 .. toctree::
    :maxdepth: 2

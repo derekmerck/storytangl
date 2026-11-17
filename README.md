@@ -118,8 +118,8 @@ implementation for narrative systems.
 **It implements narrative theory as executable code.** The architecture maps to
 established narratological concepts: Bal's fabula/story/text trinity becomes
 graph/navigation/journal; Chatman's kernels and satellites become required and
-optional dependency edges; Genette's discourse operations become phase-bus
-transformations.
+optional dependency edges; Genette's discourse operations map onto phase-bus
+transformations, a discourse layer that is planned and not yet built.
 
 **It makes structural analysis and validation possible.** The current
 preflight and diagnostic surfaces report loader, compiler, and runtime findings.
@@ -138,7 +138,8 @@ and presentation profiles without changing the underlying graph.
 
 Use StoryTangl when you want to explore computational narratology, experiment
 with graph-based story structures, build interactive narrative research tools,
-or work with a formally specified narrative engine with deterministic replay.
+or work with a formally specified narrative engine whose walks can be
+reproduced.
 
 Use something else when you want to ship a game quickly, need mature authoring
 tooling and a large community, or want a WYSIWYG writing environment.
@@ -166,8 +167,9 @@ Syuzhet         The realized narrative: a linear journal of prose,
 ```
 
 An author writes scripts, commonly YAML or another loader-supported format.
-The compiler normalizes those scripts into StoryTangl's story graph. A
-materializer instantiates that graph for a specific playthrough.
+The compiler normalizes those scripts into a world: the templates and rules
+of a story space. A materializer grounds that world into a story graph for a
+specific playthrough.
 
 As the reader makes choices, the VM walks the graph through an ordered phase
 pipeline:
@@ -295,13 +297,16 @@ storytangl/
 │   │   ├── vm/                 # Temporal evolution: phases, traversal, replay
 │   │   ├── story/              # Narrative semantics: episodes, concepts
 │   │   ├── journal/            # Fragment and journal surfaces
+│   │   ├── presentation/       # What a client may render, arrange, or solicit
 │   │   ├── ir/                 # Intermediate representation models
 │   │   ├── loaders/            # World bundles and source codecs
 │   │   ├── mechanics/          # Optional domain vocabularies
 │   │   ├── media/              # Media specs, creators, and dereference boundary
 │   │   ├── prose/              # Text-facing parsing and voice helpers
+│   │   ├── lang/               # Names, pronouns, nominals, conjugation
 │   │   ├── service/            # Manager-first lifecycle, auth, typed responses
-│   │   └── persistence/        # Storage abstraction across backends
+│   │   ├── persistence/        # Storage abstraction across backends
+│   │   └── devref/             # Index over design notes, code, and issues
 │   └── tests/                  # Engine test suite
 ├── apps/
 │   ├── cli/                    # cmd2 command-line interface
@@ -334,6 +339,8 @@ Major package design notes:
 | story | [STORY_DESIGN.md](engine/src/tangl/story/STORY_DESIGN.md) | Fabula compilation, concepts, journal |
 | service | [SERVICE_DESIGN.md](engine/src/tangl/service/SERVICE_DESIGN.md) | Manager lifecycle, persistence, transport, typed responses |
 | media | [MEDIA_DESIGN.md](engine/src/tangl/media/MEDIA_DESIGN.md) | Media inventory, creators, dereference boundary |
+| presentation | [PRESENTATION_DESIGN.md](engine/src/tangl/presentation/PRESENTATION_DESIGN.md) | Interaction intent, hints, projected state |
+| prose | [PROSE_DESIGN.md](engine/src/tangl/prose/PROSE_DESIGN.md) | Text rendering, dialog, concept-linked naming |
 | sandbox | [SANDBOX_DESIGN.md](engine/src/tangl/mechanics/sandbox/SANDBOX_DESIGN.md) | Location-centered dynamic choice projection |
 
 ---
@@ -344,7 +351,7 @@ Major package design notes:
 
 - Python >= 3.12
 - [Poetry](https://python-poetry.org/) for dependency management
-- Node.js 18+ and Yarn for the web client
+- Node.js 20+ and Yarn for the web client
 
 ### Install
 
