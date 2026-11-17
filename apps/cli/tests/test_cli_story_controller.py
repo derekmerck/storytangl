@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from collections.abc import Callable
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import cmd2
@@ -7,7 +10,7 @@ import pytest
 
 from tangl.cli.controllers.story_controller import StoryController
 from tangl.cli.rendering import PlainTerminalRenderer
-from tangl.journal.fragments import ChoiceFragment, ContentFragment, PieceFragment
+from tangl.journal.fragments import ChoiceFragment, ContentFragment, PieceFragment, fragment_from_dto
 from tangl.presentation.intent import Blocker, CostPreview, UIHints
 from tangl.presentation.events import UxEvent
 from tangl.presentation.projection import (
@@ -417,6 +420,136 @@ def test_do_command_accepts_explicit_compose_payload(
 
     _, params = [call for call in cli.calls if call[0] == "resolve_choice"][-1]
     assert params["request"].payload == {"parts": {"amount": {"quantity": 2}}}
+
+
+@pytest.fixture
+def portable_cli(monkeypatch: pytest.MonkeyPatch) -> Callable[[str], RecordingCLI]:
+    """Return a real controller with a recording Service boundary for fixture envelopes."""
+    def load(name: str) -> RecordingCLI:
+        directory = Path(__file__).resolve().parents[3] / "engine/contrib/conformance/fixtures"
+        wire = json.loads((directory / f"{name}.json").read_text(encoding="utf-8"))
+        cli = RecordingCLI()
+        envelope = RuntimeEnvelope(
+            cursor_id=UUID(wire["cursor_id"]), step=wire["step"],
+            fragments=[fragment_from_dto(fragment) for fragment in wire["fragments"]],
+            ux_events=wire.get("ux_events", []), metadata=wire.get("metadata", {}),
+        )
+        original = cli.call_service
+
+        def call_service(method_name: str, /, **params: object) -> object:
+            if method_name == "get_story_update":
+                cli.calls.append((method_name, params))
+                return envelope
+            return original(method_name, **params)
+
+        monkeypatch.setattr(cli, "call_service", call_service)
+        cli.story_controller.do_story()
+        return cli
+    return load
+
+
+def test_portable_crossroads_visible_and_refused_pick(portable_cli: Callable[[str], RecordingCLI]) -> None:
+    cli = portable_cli("crossroads_inn")
+    output = "\n".join(cli.outputs)
+    prose = "Rain drums on the thatch. Inside the Crossroads Inn the air is smoke and peat."
+    spoken = "STRANGER (low, confidential): They say you're headed north."
+    assert output.count(prose) == output.count(spoken) == 1
+    assert output.index(prose) < output.index(spoken) < output.index("Choices:")
+    assert all(text in output for text in ("time: late evening", "coin: 63 s", "weather: rain"))
+    assert "1. Pay the forty silver." in output
+    assert "x) Lift the map while he drinks." in output
+    assert "Sleight of Hand 1, need 2." in output
+    assert [(c.edge_id, c.available) for c in cli.story_controller._current_choices] == [
+        (UUID("00000000-0000-4000-8000-000000001108"), True),
+        (UUID("00000000-0000-4000-8000-000000001109"), False),
+    ]
+    cli.story_controller.do_story()
+    assert not [call for call in cli.calls if call[0] == "resolve_choice"]
+    cli.story_controller.do_do("2")
+    assert "Sleight of Hand 1, need 2." in cli.outputs[-1]
+    assert not [call for call in cli.calls if call[0] == "resolve_choice"]
+    cli.story_controller.do_do("1")
+    request = [params["request"] for name, params in cli.calls if name == "resolve_choice"]
+    assert request == [DirectEdgeRequest(
+        edge_id=UUID("00000000-0000-4000-8000-000000001108"), payload={},
+    )]
+
+
+def test_pick_submits_override_for_frame_to_merge(story_controller: StoryController) -> None:
+    cli = story_controller._cmd
+    fragment = fragment_from_dto({
+        "fragment_type": "choice", "edge_id": str(cli.edge_id), "text": "Choose",
+        "accepts": {"kind": "pick"}, "payload": {"verdict": "pass"},
+    })
+    story_controller._apply_runtime_envelope(RuntimeEnvelope(fragments=[fragment]))
+    story_controller.do_do("1")
+    request = [params["request"] for name, params in cli.calls if name == "resolve_choice"]
+    assert request == [DirectEdgeRequest(edge_id=cli.edge_id, payload={})]
+
+
+def test_portable_credentials_document_selection(portable_cli: Callable[[str], RecordingCLI]) -> None:
+    cli = portable_cli("credentials_shift")
+    output = "\n".join(cli.outputs)
+    prose = "You unfold the work permit. The seal is sound, but the date stamp shows expiry months past."
+    assert output.count(prose) == 1
+    assert (output.index("[Credentials packet]") < output.index("[0:passport]")
+            < output.index("[0:work permit]"))
+    assert "[candidate-0] Bek Tarsus" in output
+    assert "The permit's issue stamp has expired." in output
+    assert "An expired permit does not satisfy the work rule." in output
+    labels = ["Inspect a document.", "Choose pass.", "Choose deny.",
+              "Request reissue of work permit.", "Verify identity.", "Request search."]
+    assert [c.label for c in cli.story_controller._current_choices] == labels
+    assert [str(c.edge_id) for c in cli.story_controller._current_choices] == [
+        f"00000000-0000-4000-8000-0000000006e{i}" for i in range(6)
+    ]
+    assert "Inspect a document. <piece ids: 1>" in output
+    assert "0:work permit" in output
+    cli.story_controller.do_do('1 "0:work permit"')
+    request = [params["request"] for name, params in cli.calls if name == "resolve_choice"]
+    assert request == [DirectEdgeRequest(
+        edge_id=UUID("00000000-0000-4000-8000-0000000006e0"),
+        payload={"piece_ids": ["0:work permit"]},
+    )]
+
+
+def test_portable_quantity_validation_and_submission(portable_cli: Callable[[str], RecordingCLI]) -> None:
+    cli = portable_cli("quantity_payload")
+    output = "\n".join(cli.outputs)
+    assert "The quartermaster taps the crate." in output
+    assert "wallet: 7 coin" in output and "rations: 0" in output
+    assert "Buy rations. <quantity 1-3 ration>" in output
+    for command, message in (("1 4", "Quantity must be at most 3."),
+                             ("1 nope", "Quantity must be an integer.")):
+        cli.story_controller.do_do(command)
+        assert cli.outputs[-1] == message
+        assert not [call for call in cli.calls if call[0] == "resolve_choice"]
+    cli.story_controller.do_do("1 2")
+    request = [params["request"] for name, params in cli.calls if name == "resolve_choice"]
+    assert request == [DirectEdgeRequest(
+        edge_id=UUID("00000000-0000-4000-8000-000000001404"), payload={"quantity": 2},
+    )]
+
+
+def test_portable_compose_requires_and_forwards_explicit_payload(
+    portable_cli: Callable[[str], RecordingCLI],
+) -> None:
+    cli = portable_cli("compose_payload")
+    output = "\n".join(cli.outputs)
+    assert "The guard waits by the gate, palm open." in output
+    assert "[People nearby]" in output and "[guard] gate guard" in output
+    assert "Give coins. <compose: --payload JSON>" in output
+    cli.story_controller.do_do("1")
+    assert "compose input requires an explicit JSON object via --payload." in cli.outputs[-1]
+    assert not [call for call in cli.calls if call[0] == "resolve_choice"]
+    cli.story_controller.do_do(
+        '''1 --payload '{"parts":{"amount":{"quantity":2},"target":{"piece_ids":["guard"]}}}' '''
+    )
+    request = [params["request"] for name, params in cli.calls if name == "resolve_choice"]
+    assert request == [DirectEdgeRequest(
+        edge_id=UUID("00000000-0000-4000-8000-000000001805"),
+        payload={"parts": {"amount": {"quantity": 2}, "target": {"piece_ids": ["guard"]}}},
+    )]
 
 
 def test_drop_story_invokes_service_and_clears_context(story_controller: StoryController) -> None:

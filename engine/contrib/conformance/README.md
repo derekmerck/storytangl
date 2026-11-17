@@ -15,6 +15,13 @@ target in `STORYTANGL_WIDGET_VOCAB.md`. In particular:
 Every future port should be able to load these JSON files and assert observable
 output in its own medium.
 
+The shipped CLI's controller and plain terminal renderer are exercised against
+`crossroads_inn`, `credentials_shift`, `quantity_payload`, and `compose_payload`,
+including their supported submissions and refusals. This is adapter, terminal,
+and Service-request evidence, not a real REST server or complete fixture-directory
+coverage. Optional media playback, Rich styling, info channels, UX feedback, and
+multi-envelope control lifecycle remain separate.
+
 `proposals/` contains non-gating fixtures for target surfaces such as
 record-shaped `KvRow`, `piece.realized`, `place` accepts, `roll` fragments,
 wireframe-derived v1.5 examples, and the compact CarWars garage turn. Proposal
