@@ -290,9 +290,11 @@ none, and a look or a voice that has no variant for it uses its ordinary
 form.  An attitude noted beside a line of dialog is then a change to the
 speaker, not a second place the attitude lives, and it persists past its own
 line until something changes it again.  Today the attitude is read only from
-the note and the actor is never asked.  Open: whether a line can be delivered
-against the speaker's attitude, an angry character speaking cheerfully,
-without changing it.
+the note and the actor is never asked.  A line cannot be delivered against the
+speaker's attitude: a cheerful line from an angry speaker makes them cheerful,
+and the next line can make them angry again.  An actor with a deeper model, an
+attitude that depends on whom they are addressing for instance, is a richer
+actor class, not a second carrier in the text.
 
 **Evidence.**  Reading a journal that has already been committed changes
 nothing.  A case where the telling genuinely has to change shape would count
