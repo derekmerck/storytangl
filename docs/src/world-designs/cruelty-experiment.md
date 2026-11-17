@@ -72,7 +72,7 @@ works.
 
 | Profile | Treatment of the same consumable action |
 | --- | --- |
-| **Cruel** | The player may spend the item irreversibly. No forewarning or immediate disclosure of the resulting soft lock. |
+| **Cruel** | The player may trigger the fatal action, but its *irreversibility itself* is not apparent from the observations; the resulting soft lock is likewise undisclosed. |
 | **Polite** | The player may spend it; the post-action response clearly explains that the declared goal has become unreachable. |
 | **Merciful** | The player cannot enter the foreclosed state, e.g., because the waste action is blocked with a legible reason. A forward recovery path is a valid later alternative. |
 
@@ -128,14 +128,18 @@ journal receipts in a text/Service client first; replay on another client
 only after the semantic baseline agrees. Keep the playable puzzle and
 its analysis report reproducible from one declared world source.
 
-The proof should show:
+The **central proof is a derived counterfactual foreclosure boundary**,
+not three differently worded failure messages. From one authored world and
+declared goal, the analysis should show:
 
-- one successful path; one action that forecloses the same goal;
-- a source-attributed diagnostic identifying the foreclosure boundary,
-  with an honest horizon/completeness label;
-- Cruel permitting that transition without an immediate warning;
-  Polite allowing it but reporting the lock immediately; Merciful
-  preventing or repairing that lock; and
+- a successful witness from the pre-action state, followed by a candidate
+  action whose committed successor no longer admits that goal;
+- one source-attributed foreclosure finding derived from the modeled
+  transitions, with an honest horizon/completeness label, **not** an
+  independently authored list of dangerous choices;
+- Cruel permitting that transition without making its irreversibility
+  apparent; Polite allowing it but reporting goal loss immediately;
+  Merciful preventing or repairing it, all consuming the same finding; and
 - identical unaffected story facts across profiles, and coherent
   journal/history under each profile.
 
@@ -152,6 +156,82 @@ exhaustive strategy synthesis, or graphical flowchart as prerequisites.
 Later work can test whether the same semantic history supports a
 derived visited/known/rumored graph view (matrix A20) or an analog
 gamebook projection (A14).
+
+## Review addenda: observation, counterfactuals, and recovery
+
+These points sharpen the **future implementation acceptance tests**; they
+do not select implementation work or expand the first slice into a rewind
+framework. They follow review of the original three-profile proposal.
+
+### Distinguish Cruel from Nasty by what is observable
+
+A player who visibly destroys a **known unique** scroll can recognize an
+irreversible loss, even if they cannot yet know that the missing scroll makes
+the final puzzle unsolvable. That may illustrate **Nasty**, not **Cruel**.
+Merely hiding the soft-lock warning does not establish a Cruel realization.
+
+For the one fatal action, document the intended observable information at
+three moments, separately from the underlying state:
+
+| Observation point | Question for the player-facing contract |
+| --- | --- |
+| **Before commitment** | Can the reader tell that this act is irreversible or threatens a future option? |
+| **Immediately after** | Does the visible result establish permanent loss, or could the reader reasonably expect replacement/recovery? |
+| **At the blocked goal** | Does the later failure reveal what happened and which prior act caused it, or is the permanent cause still opaque? |
+
+Choose the puzzle's item and presentation so the *irreversibility itself*
+is not clearly disclosed in Cruel. Preserve the same objective state
+transition across Cruel and Polite; vary what is disclosed. Record the
+observation contract explicitly rather than relying on prose tone.
+The five Plotkin labels above remain historical categories, not a promise
+to implement five profiles in this first experiment.
+
+### One source-derived foreclosure result, several policy consumers
+
+Let `R_base(s, g)` mean that goal `g` is reachable from `s` under the
+declared **underlying** world transitions, within the analysis scope.
+For a candidate action `a` with successor `s' = T_base(s, a)`,
+the central counterfactual is:
+
+```text
+forecloses_base(s, a, g) := R_base(s, g) and not R_base(s', g)
+```
+
+Evaluate that property **before** applying a Merciful action filter or
+recovery rule; otherwise the policy may eliminate the very transition
+we are trying to characterize. A pre-action witness, a successor-state
+negative reachability result, and the source action/goal references
+constitute the author-facing finding. Bounded non-reachability remains
+bounded evidence, not an unqualified impossibility proof.
+
+The same finding should drive the intended Cruel, Polite, and Merciful
+treatments. An offline analysis artifact is acceptable for the bounded
+proof if its scope/provenance are explicit and it is checked against
+ordinary `Ledger` transitions. The **runtime policy** must still enforce
+what a player can actually do; neither a hand-maintained fatal-action
+table nor an unchecked solver assertion is authoritative.
+
+### Retain a one-step rollback as a follow-up experiment
+
+The initial three profiles exercise prevention and disclosure; they do
+**not** by themselves demonstrate the matrix's stronger traversal-budget
+or rewind claims. Keep a narrowly specified follow-up:
+
+1. In a **cloned Ledger** at the pre-action state, verify a goal-reaching
+   continuation; commit the fatal action in another trace and establish
+   that the goal is no longer reachable under the baseline transitions.
+2. Compare that result with a model allowing **one rollback** to the
+   previous state. This tests recoverability under a historical operation,
+   rather than ordinary forward reachability.
+3. Only if worth implementing, expose that rollback to a player and
+   verify its journal, state restoration, and replay semantics. This is
+   not a prerequisite or a claim that StoryTangl already has a general
+   undo/redo facility.
+
+A snapshot-based counterfactual is an analysis witness, **not** evidence
+that an actual client-facing rewind works. Guaranteed success for a
+player who does not know the right action remains a separate, harder
+information-constrained strategy problem.
 
 ## Connections to other opportunities
 
