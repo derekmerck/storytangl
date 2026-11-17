@@ -13,6 +13,15 @@ The #538 first slice replaces speaker-associated expression portraits in place;
 The #587 first slice adds optional compact local paging with ordered visuals;
 beat-synchronized audio remains deferred.
 
+The headless adapter tests also decode the portable `crossroads_inn`,
+`credentials_shift`, `quantity_payload`, and `compose_payload` JSON fixtures.
+They cover narration, speaker names, choice identity and refusals, key/value
+rows, pieces and zones, and supported pick/piece payloads. Quantity and compose
+remain visible but explicitly refuse input. These witnesses do not establish
+other clients' behavior, text-input fixture coverage, info channels, UX events,
+controls or multi-envelope lifecycle, optional media, or visual/audio playback.
+Fixtures under `proposals/` remain non-gating.
+
 ## What Is Included
 
 - `src/tangl/pygame_client/models.py` — `Turn`, `Line`, `Choice`, `StageImage`.
