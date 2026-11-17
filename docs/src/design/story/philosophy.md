@@ -288,11 +288,11 @@ arrangement has one authority: the actor holds its attitude, and whatever
 tells or shows a line asks the actor for it.  An actor with no attitude offers
 none, and a look or a voice that has no variant for it uses its ordinary
 form.  An attitude noted beside a line of dialog is then a change to the
-speaker, not a second place the attitude lives.  Today the attitude is read
-only from the note and the actor is never asked.  Open: whether a note changes
-the speaker past its own line, and whether a line can be delivered against the
-speaker's attitude, an angry character speaking cheerfully, without changing
-it.
+speaker, not a second place the attitude lives, and it persists past its own
+line until something changes it again.  Today the attitude is read only from
+the note and the actor is never asked.  Open: whether a line can be delivered
+against the speaker's attitude, an angry character speaking cheerfully,
+without changing it.
 
 **Evidence.**  Reading a journal that has already been committed changes
 nothing.  A case where the telling genuinely has to change shape would count
