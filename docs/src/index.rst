@@ -30,3 +30,4 @@ around them.
    world-designs/index
    notes/index
    contrib/index
+   bibliography/index
