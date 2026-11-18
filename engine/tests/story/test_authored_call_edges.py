@@ -100,6 +100,44 @@ def test_a_call_returns_the_reader_to_the_caller() -> None:
     ]
 
 
+def test_two_authored_receivers_share_one_once_call_across_json_restore() -> None:
+    from tangl.persistence.serializers import JsonSerializationHandler as Json
+
+    script = {
+        "label": "shared_call_world",
+        "metadata": {"start_at": "s.first"},
+        "scenes": {"s": {"blocks": {
+            "first": {"content": "First", "actions": [
+                {"text": "Talk", "successor": "chat", "return": True, "once": True},
+                {"text": "Next", "successor": "second"},
+            ]},
+            "second": {"content": "Second", "actions": [
+                {"text": "Talk again", "successor": "chat", "return": True, "once": True},
+            ]},
+            "chat": {"content": "Shared conversation."},
+        }}},
+    }
+    world = World.from_script_data(script_data=script)
+    graph = world.create_story("shared_call", init_mode=InitMode.EAGER).graph
+    first_call = _edge(graph, "first", "Talk")
+    second_call = _edge(graph, "second", "Talk again")
+    assert first_call.successor_id == second_call.successor_id
+    ledger = Ledger.from_graph(graph=graph, entry_id=_node(graph, "first").uid)
+    ledger.resolve_choice(first_call.uid)
+    assert [ledger.graph.get(uid).get_label() for uid in ledger.cursor_history] == [
+        "first", "chat", "first",
+    ]
+    restored = Ledger.structure(Json.deserialize(Json.serialize(ledger.unstructure())))
+    restored.resolve_choice(_edge(restored.graph, "first", "Next").uid)
+    assert restored.cursor.get_label() == "second"
+    choices = {fragment.text: fragment.available for fragment in restored.get_journal()
+               if isinstance(fragment, ChoiceFragment)
+               and fragment.step >= restored.current_update_start_step}
+    assert choices["Talk again"] is False
+    with pytest.raises(ValueError, match="Edge validation failed"):
+        restored.resolve_choice(second_call.uid)
+
+
 def test_the_destination_still_runs_its_effects() -> None:
     # Effects run in the destination's own namespace, as they do anywhere else.
     graph = _graph(
