@@ -1,6 +1,7 @@
 # Scoped episode donation: characterization and ownership checkpoint
 
-**Status:** design checkpoint for #702 slice 1; no new runtime API is implemented.
+**Status:** #702 slice 2 implements referential owned-episode lowering for EAGER
+stories. Scoped matching and Action projection are not implemented.
 The broader offer/request convergence remains in
 [Open Links](../../design/planning/AFFORDANCE_MODEL.md) and
 [#255](https://github.com/derekmerck/storytangl/issues/255).
@@ -30,23 +31,29 @@ their UUID retention is not established by these tests.
 
 ## Ownership and lowering recommendation
 
-Prefer exploring a **graph-owned episode with an explicit owner reference**, while
-preserving literal nested authoring as an ownership declaration. This is a
-recommendation for the next checkpoint, not an approved new persistence shape.
+An actor's `episodes` mapping lowers through normal scene/block templates to
+graph-owned scenes; an explicit scene `owner_ref` uses the same representation.
+EAGER materialization resolves the exact owner to `owner_id`; `Scene.owner` reads
+the live graph object. This preserves literal nested authoring as an ownership
+declaration without treating the owner as a namespace ancestor.
 `StoryCompiler.compile` currently compiles actor declarations separately from
 scene/block children; `Actor` is a plain `Node`, `Role` a `Dependency`, and
 `GraphItem.parent` recognizes `HierarchicalNode` membership. Thus putting an
-episode under an actor in source today does not establish a runtime child episode
-or make the actor its namespace ancestor. Making Actor hierarchical would alter a
+episode under an actor in source does not make the actor its namespace ancestor.
+Making Actor hierarchical would alter a
 Core ownership/ancestry contract; a reference alone also must not silently claim
 that ancestry. The next design must specify which owner context is intentionally
 available while keeping the receiving episode as the active cursor.
 
-The minimal missing shape is an `actors.aria` declaration containing its own
-`episodes.chat` alongside an ordinary `scenes.inn` receiver. The current compiler
-visits the top-level actors and the scene's blocks through separate paths; it has
-no demonstrated lowering of that nested episode into a graph-owned destination.
-This is a design gap, not a permanent expected-failure test.
+An `actors.aria.episodes.chat` declaration becomes the ordinary qualified
+`aria.chat` scene and its block templates. It does not add a receiver Action,
+become the default entry, or imply the owner participates in the scene. Explicit
+Actions can traverse it using existing EAGER traversal and JSON restoration.
+Frozen EAGER construction binds the reference; no general frozen donation
+readiness is claimed. LAZY remains unsupported for this shape: in the tested
+actor-qualified destination, initial setup left the episode unmaterialized and
+selecting its unresolved Action failed validation. It is not eagerly expanded to
+hide that gap.
 
 Candidate lowering chokepoints are the existing compiler/template grouping and
 `EntityTemplate.materialize`/factory attachment, graph-owned reference restoration,
@@ -59,9 +66,8 @@ is not evidence that reverse discovery is already wired. Do not add a global gra
 donor scan, Actor-only projector, second dispatcher, mandatory contributor methods,
 or a generic persistent match record by default.
 
-The next bounded implementation should first settle and witness nested declaration
-lowering and scoped binding for one ordinary receiver before replacing sandbox's
-specialized path. Entry wording and once lowering, invocation context, namespace
+The next bounded implementation should settle scoped binding for one ordinary
+receiver before replacing sandbox's specialized path. Entry wording and once lowering, invocation context, namespace
 refresh after binding, and supported eager/lazy materialization modes remain open.
 Keep normal one-step-ahead planning and the existing justified JIT path: descending
 eligible contributions is not expansion of future game trees. Scheduling,

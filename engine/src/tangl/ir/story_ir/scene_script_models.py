@@ -351,6 +351,7 @@ class SceneScript(BaseScriptItem):
         return Scene
 
     text: Optional[str] = Field(None, alias="title", description="The scene title.")
+    owner_ref: str | None = None
 
     # Mechanic-specific authored block kinds remain a compiler-extension concern.
     blocks: list[BlockScript] | dict[UniqueLabel, BlockScript] = Field(..., description="Block objects in label-keyed map or list form.", json_schema_extra={"visit_field": True})
