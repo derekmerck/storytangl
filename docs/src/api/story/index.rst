@@ -14,6 +14,7 @@ and planning pages under *Design* to the reference that follows.
    :caption: Package design notes
 
    OBSERVATION_DESIGN
+   SCOPED_DONATION_DESIGN
    STORY_DESIGN
    concepts/asset/ASSET_DESIGN
 
