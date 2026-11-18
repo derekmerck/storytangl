@@ -2,7 +2,7 @@
 
 **Status:** design checkpoint for #702 slice 1; no new runtime API is implemented.
 The broader offer/request convergence remains in
-[Open Links](../../../../docs/src/design/planning/AFFORDANCE_MODEL.md) and
+[Open Links](../../design/planning/AFFORDANCE_MODEL.md) and
 [#255](https://github.com/derekmerck/storytangl/issues/255).
 
 ## From authoring to an ordinary action
@@ -67,3 +67,20 @@ Keep normal one-step-ahead planning and the existing justified JIT path: descend
 eligible contributions is not expansion of future game trees. Scheduling,
 preemption, per-cause instances, general capacity/arbitration, alternative casting,
 BoP rules and full recasting remain separate follow-ups.
+
+Follow-on consumers also distinguish the grant beneficiary from owner, provider
+and receiver. Deliberately exposed wallet membership or a declared relationship
+chain may supply scope; neither implies unrestricted graph traversal or namespace
+flattening. `HasAssets` and [asset ownership](concepts/asset/ASSET_DESIGN.md)
+are existing custody precedents, not an implemented donation path. Once a source
+qualifies, a live willingness refusal may retain an unavailable ordinary Action
+with its existing Blocker and disclosure, rather than erasing the binding.
+
+Live bindings and committed historical evidence have different lifetimes: later
+consumers may need selection-time cast and cause after recasting, without recording
+tentative matches. Match inputs such as accused plus episode are not a universal
+instance key; repeated causes may differ. Viability preview may consider
+template-creatable providers without creating or sampling them during a read.
+Eligibility may use computed current namespace/world values at semantic evaluation
+boundaries, not GUI ticks. Custody traversal, proxy entitlements, historical
+registries, generation and claims remain outside this slice.

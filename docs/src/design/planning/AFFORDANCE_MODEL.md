@@ -26,7 +26,7 @@ immediate refactor** — do not build it yet.
 ```
 
 See also:
-[Scoped episode donation checkpoint](../../../../engine/src/tangl/story/SCOPED_DONATION_DESIGN.md)
+[Scoped episode donation checkpoint](../../api/story/SCOPED_DONATION_DESIGN.md)
 for the #702 characterization and open ownership decision,
 [glossary.md](../glossary.md) ("Open Links and Projection") for the shared
 vocabulary table these terms anchor,
