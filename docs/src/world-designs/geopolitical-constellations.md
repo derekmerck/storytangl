@@ -243,6 +243,51 @@ This world already layers the structures: a Nation is an assembly (governing and
 
 Two cautions keep the analogy honest. The structures are not one class: a wallet's fungible quantities are not individually identified participants (its discrete members are, but they carry no slot or relationship to each other), and an assembly is mostly static while an incident has temporal identity, progression, and resolution. What may generalize is the shared machinery (role-constrained membership, scoped contribution, binding changes, affordance projection), not a superclass. So when GeopoliticalIncident needs slot or binding behavior, look at assembly first as the example to copy, and record where it fits and where it doesn't. Since [#662](https://github.com/derekmerck/storytangl/issues/662), assembly slots are themselves graph-owned discrete wallets whose membership neither reparents members nor implies exclusive custody ([ASSET_DESIGN](../api/story/concepts/asset/ASSET_DESIGN.md)), which is what role binding needs: one actor can fill roles in several open episodes at once. A role slot can probably *be* that primitive (eligibility via `can_assign`, cardinality via capacity, escrow or attention via slot budget). Build on the graph-backed `ComponentManager` path, not the standalone `SlottedContainer` backing that is slated to retire ([COMPONENT_DESIGN](../api/mechanics/assembly/COMPONENT_DESIGN.md)). *Slotted episode* (the working name, by analogy to slotted components; earlier drafts said ConceptConstellation) may turn out to name a capability that emerges from composing existing primitives rather than a new mechanic family.
 
+## Declarative scenario authoring (relation to #702)
+
+[#702](https://github.com/derekmerck/storytangl/issues/702) promotes sandbox's scoped sponsor → receiver contribution path into ordinary Story/VM provisioning. That is the mechanism a declarative crisis catalog would lower through. The target shape: declare **scenarios** with activation conditions; within each, its **participants** (roles) and **responses** shaped by attitude; then the **escalation episodes** with descriptive content and state updates. #702 already anticipates the attitude layer: a mechanic selects an active owned concept such as an Attitude, which then hands its contained offers back to ordinary provisioning.
+
+| Authored layer | #702 / brief vocabulary | BoP meaning |
+| --- | --- | --- |
+| Scenario + activation | Sponsor-owned offer with receiving requirements; the world hub is the receiver | A policy instance sponsors a possible crisis |
+| Participants | Roles keep the relationship reference separate from the bound provider | Challenger, respondent, contested Nation; a coup recasts the government while Nation and incident persist |
+| Responses by attitude | Attitude concept selected by a mechanic, delegating its offers | Pugnacity and Adventurousness choose a stance |
+| Escalation episodes | Destination episodes with ordinary UPDATE/JOURNAL | Ladder rungs |
+
+The catalog is the rules axis as data, the nation roster the world axis, attitude handlers the behavior axis.
+
+Four conditions keep the declarative form expressing the model rather than hiding it:
+
+1. **A scenario is a generator, not a shared episode.** #702's first witness is one graph-owned conversation, consumed once across receivers. A crisis scenario instead materializes a new incident per matching cause. It is the fanout/generator form of an affordance, and its retained match witness (policy, challenger, contested nation) is the incident identity key. "Once" means once per cause.
+2. **For BoP, attitude ranks; it rarely filters.** Crawford offers two responses at every rung (escalate or back down), and the computer's pick is a numeric judgment (Outrage Excess plus bluff). Attitudes contribute weights to the computer's side and only occasional hard gates. The human principal always sees every legal response; filtering their options removes BoP's central choice and folds desire into possibility. Eligibility sifting pays off for richer response sets: third parties (an ally joining a protest, a minor Finlandizing after a crisis) and Prom Week.
+3. **Rungs are shared; scenarios add overlays.** The ladder owns generic rung episodes, and each scenario donates optional prose overlays to them. Per-scenario rung lists repeat content across policies × rungs, the per-host copying #702 exists to remove. Deltas such as prestige and adventurousness losses come from the rules, not authored constants.
+4. **One response offer serves both kinds of actor.** The human's response is a choice; the computer's is an automatic redirect. That needs an offer that carries its trigger (a choice by default), one projector parameterized by who acts. It also answers the `receive_move()` question above for computer-initiated and readerless crises.
+
+Two hazards. The reaction check (every principal judging every new policy) is a genuine cross-product, but it belongs to the world-process step: a mechanic computes Hurt at UPDATE, and activation conditions read the stored result, keeping PLANNING pure. It is not a disguised receiver dispatcher. And scenarios should belong to the rule set and name their sponsor policy by reference; a crisis catalog must not wait on, or force, making Nations hierarchical episode owners.
+
+**Sequencing.** BoP needs the generator form and trigger-carrying offers, both beyond #702's first slice, so it is a later consumer, not #702's first witness. Pass 1 constructs an incident explicitly anyway. Pass 2 ("discover a new incident from state") is where the mechanism lands: use #702's path if it exists by then, otherwise a small provision handler labelled as its migration test, never a bespoke incident dispatcher.
+
+Illustrative lowering, not a new DSL (scenario → Scene, participants → Roles, rungs → Blocks, attitude → a concept the mechanic selects):
+
+~~~yaml
+scenarios:
+  insurgent_arms_challenge:
+    sponsor: policy                      # one incident per policy instance
+    when: hurt(challenger, contested) > challenge_threshold
+    roles:
+      respondent: policy.sponsor
+      contested: policy.target           # the Nation, not its government
+      challenger: {requires: is_superpower, not: respondent}
+      ally?: {treaty_with: challenger}   # optional third party
+    action_name: "Protest arms to {{contested}}'s rebels"
+    overlays: {diplomatic_protest: ..., military_alert: ...}
+ladder:                                  # rule-set owned, shared by all scenarios
+  rungs: [diplomatic_protest, ..., nuclear_war]
+  responses: [escalate, back_down]       # computer: auto-triggered; human: choice
+attitudes:
+  hawkish: {when: pugnacity > 0.6, weights: {escalate: +bluff}}
+~~~
+
 ## Follow-on consumer: Prom Week social situations
 
 The second-domain experiment is tracked separately in [#665](https://github.com/derekmerck/storytangl/issues/665) (deferred, not part of #654's first playable proof); it is also a concrete candidate for the still-parked [Project Deikto #643](https://github.com/derekmerck/storytangl/issues/643).
