@@ -7,5 +7,6 @@ future design without defining current StoryTangl contracts.
 .. toctree::
    :maxdepth: 1
 
+   reading_list
    interactive_narrative_capability_matrix
    formal_solver_poc/index
