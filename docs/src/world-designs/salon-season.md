@@ -441,6 +441,126 @@ beside the social loop rather than through it.
    consumer: *which* ending unlocks *which* content. Build it after #448 lands,
    and after the slice.
 
+### Declarative play authoring (relation to #702 and #703)
+
+[#702](https://github.com/derekmerck/storytangl/issues/702) promotes sandbox's
+scoped sponsor → receiver contribution path into ordinary provisioning.
+[#703](https://github.com/derekmerck/storytangl/issues/703) adds casting over
+several role slots and a claim pass over provider capacity. The geopolitical
+brief maps its crises onto the same path
+([#704](https://github.com/derekmerck/storytangl/pull/704)). Salon Season is a
+third consumer, and the most character-driven: most of its play is people
+bringing their own episodes to places.
+
+**Most of this world is sponsor-owned.** The brief already rejects a terminal
+branch table for Thermidor. The receiver-owned alternative anywhere else would be
+the same table.
+
+| Authored layer | Owner | Receiver | Shape |
+| --- | --- | --- | --- |
+| Rendezvous, fittings, the rumor mill | A suitor, Madeleine, Victoire | An afternoon hub | Person-owned; casts a setting and a time |
+| Salons | An invitation letter in the wallet (A.3) | The evening hub | Token-owned; one instance per letter |
+| Gossip dilemmas | The salon | Its own blocks | Ordinary episode; who is present is a soft cast |
+| A known character's case | That character | A committee session | Person-owned slotted episode: accused, prosecution, proxy |
+| The docket's strangers | The rule set's case bank | A committee session | Casts every slot, minting the accused |
+| "Ask her for the invoice" | Whoever holds a relevant piece | The case's assembly | Holder-owned; availability is the holder's willingness |
+| Thermidor testimony | Each surviving acquaintance | Your hearing | Person-owned, from their own holdings and history |
+| Endings | The rule set | The finale | Gated by record-shape readouts |
+
+The locality payoff is the slice's own question turned around. Adding a third
+case should be one new character declaration, with no edit to the committee
+session. Adding a salon should edit no suitor.
+
+**Already covered** by the shared vocabulary BoP and the calendar world proposed:
+
+- **Cast, then keep.** A case is the kept casting, keyed by accused and episode.
+- **Specificity arbitration.** Madeleine's own case beats a bank "modiste
+  accused" case for the same cause.
+- **Capacity as a budget.** Influence is a quantity, not a count.
+- **Donations carry their trigger.** Strangers' cases run without a choice; the
+  world goes on.
+- **Fillability without binding.** A salon offer can say who will be there.
+
+**Where the model must stay flexible for this world:**
+
+1. **Scope through custody.** A letter or a piece of evidence donates because
+   someone holds it, not because it fills a role or a setting. Wallet membership
+   should be a qualifying scope path. Spending or surrendering the token removes
+   the attachment, which is #702's ordinary detach.
+2. **Scope through a declared relationship, one hop further.** The player acts
+   on the committee through a proxy: player → proxy → seat. The committee's
+   powers are the seat's grant to whoever fills it. The player reaches them
+   through the proxy binding and pays in her own influence. So scope must follow a
+   declared relationship without widening to the whole graph, and a grant's
+   beneficiary need not be its provider. If the proxy falls, recasting removes the
+   player's access with no edit to the offers: the Role-owned slice's owner versus
+   provider, with a beneficiary added.
+3. **Refusals filter, and they show.** BoP's attitudes mostly rank. Here a
+   proxy's conviction is a hard gate, because learning what each person will
+   refuse to do is the Season's lesson. The refusal must be disclosed with its
+   reason ("Lucien will not alter a dossier"), not hidden. Keep availability and
+   disclosure separate, as #702 does, and let the reason reach the client.
+4. **Match records outlive bindings.** Who was present when you answered a
+   gossip dilemma is a soft cast in 1789 and a witness in 1793. The binding ends
+   with the salon. The record must stay addressable by later episodes and
+   availability policies. Binding lifetime (#255) is not record lifetime.
+5. **Casting may mint a provider.** A stranger on the docket does not exist until
+   cast. Previewing fillability must count "creatable through the existing
+   template path" as fillable, and materialize the provider only on keep.
+   Demographics completes names on pre-materialized slots; runtime creation is its
+   named gap.
+6. **Availability reads computed readouts.** Hostesses, holders and the committee
+   judge by current standing, and a regime change only swaps readout weights
+   (A.1). Availability policies must be able to read world readouts evaluated per
+   draw. Then every donation re-evaluates at the boundary, which writes nothing.
+7. **One owner, many receiver kinds.** Madeleine donates a fitting to a Season
+   hub, a case to a committee session and testimony to a hearing. Receiving
+   requirements are data on each donation, not one receiver kind per owner.
+
+**Hazards.**
+
+- Covering an accusation with an answer is the credentials kernel's rule
+  (`derive_disposition`), not requirement matching. Provisioning offers ways to
+  *obtain* pieces. It does not decide what they prove.
+- Committed influence never releases, unlike BoP's attention held while an
+  incident is open. It stays a wallet counter (A.2), not a claim.
+- Like the other consumers, character lines need not make Actors hierarchical
+  owners. A character's declarations naming its episodes by reference are enough,
+  although this is the world where nested authoring would read most naturally.
+
+**Sequencing.** The first slice (#669) stays world-local and hand-wires its two
+cases. That is the receiver-owned baseline. Once #702's first pair lands, moving
+Madeleine's and Hélène's cases to character-owned donations, then adding a third
+case without touching the committee session, is this world's extension
+experiment. Thermidor waits for points 1–4. It is the natural sponsor-owned
+consumer, and the reason not to build it as a table.
+
+Illustrative lowering, not a new DSL:
+
+~~~yaml
+actors:
+  madeleine:
+    donates:
+      fitting:                          # Season: casts a time; she brings the shop
+        receiver: afternoon_hub
+      case:                             # Terror: kept casting = the case
+        receiver: committee_session
+        roles: {accused: self, proxy: player.proxy}
+      testimony:                        # Thermidor: from her own holdings
+        receiver: player_hearing
+        when: alive and remembers(the_invoice)
+tokens:
+  invitation_letter:                    # donates while held in the wallet
+    donates: {salon: {receiver: evening_hub, template: locals.salon}}
+rule_set:
+  docket_case:                          # strangers, minted when kept
+    receiver: committee_session
+    trigger: automatic
+    roles: {accused: {create: unmemorable_npc}}
+  committee_seat:                       # granted to whoever fills the seat;
+    grants: [present, sandbag, embellish, challenge]   # the player reaches it via her proxy
+~~~
+
 ## 6. First slice: does the flip land?
 
 | Act | Contents |
