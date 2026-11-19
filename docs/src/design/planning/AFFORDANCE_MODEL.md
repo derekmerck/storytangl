@@ -183,6 +183,17 @@ successor=provider` linkage and the existing provisioner semantics — the matri
 below is about classifying ownership, direction, and provider state, not about
 rewiring topology.
 
+An `Affordance` can also record ordered `source_ids` and a separate
+`source_requirement`. These UUIDs identify sites that have attached to a shared
+offer; they do not add graph endpoints or make the affordance executable from
+those sites. Rechecking an unchanged site preserves its position; an explicit
+reattachment moves it to the end. Source matching takes the site or context
+being evaluated, never an implicitly selected most-recent site. The record is
+not live eligibility: a consumer must recheck scope and structural matching at
+the actual receiver, then apply ordinary availability and lock policy there.
+Local traversal remains a binary edge, such as a receiver-to-destination Action.
+Scoped discovery, projection and stale-selection validation are follow-on work.
+
 ---
 
 ## The planning matrix

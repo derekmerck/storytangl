@@ -367,7 +367,31 @@ class Affordance(Edge, HasRequirement[PT], Generic[PT]):
         >>> r.successor
         <RegistryAware:foo>
     """
-    # another layer of delegators
+    # Historical source sites are references, not additional edge endpoints.
+    source_ids: list[UUID] = Field(default_factory=list, json_schema_extra={"include": True})
+    source_requirement: Requirement[Node] | None = None
+
+    _restore_source_requirement_kind = field_validator("source_requirement", mode="before")(
+        lambda value: _restore_requirement_kind(value) if value is not None else None,
+    )
+
+    def record_source(self, source: Node, *, reattach: bool = False) -> None:
+        """Record a source site without changing executable graph adjacency.
+
+        Repeated planning leaves its position unchanged.  A caller that has
+        established a genuine reattachment may explicitly move it to the end.
+        Recording does not establish current structural eligibility.
+        """
+        self.registry._validate_linkable(source)
+        if source.uid in self.source_ids:
+            if not reattach:
+                return
+            self.source_ids.remove(source.uid)
+        self.source_ids.append(source.uid)
+
+    def matches_source(self, source: Node) -> bool:
+        """Check the supplied site or context, independent of recorded recency."""
+        return self.source_requirement is None or self.source_requirement.satisfied_by(source)
 
     def set_provider(self, value: Optional[PT], _ctx=None) -> None:
         """Bind provider and synchronize to ``successor`` (push resource)."""

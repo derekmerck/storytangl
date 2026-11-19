@@ -1,12 +1,25 @@
 # Scoped episode donation: characterization and ownership checkpoint
 
 **Status:** #702 slice 2 implements referential owned-episode lowering for EAGER
-stories. Scoped matching and Action projection are not implemented.
+stories. Affordances can record ordered source-site references and a separate
+structural source requirement; scoped matching and Action projection are not
+implemented.
 The broader offer/request convergence remains in
 [Open Links](../../design/planning/AFFORDANCE_MODEL.md) and
 [#255](https://github.com/derekmerck/storytangl/issues/255).
 
 ## From authoring to an ordinary action
+
+An affordance's `source_ids` is an ordered record of attachment sites, not
+executable adjacency or proof of current eligibility. Its existing binary
+predecessor and successor retain their graph-index semantics. A caller checks
+`source_requirement` against the actual site or ancestor in that receiver's
+context; the latest recorded source does not select another receiver's context.
+Unchanged planning must not reorder the record. Structural scope loss removes a
+local projection, while a matching but unavailable offer retains its projection
+and uses ordinary availability and disclosure. The future Story projection must
+revalidate these conditions on selection. Recording sites itself performs none of
+that projection or live policy evaluation.
 
 The intended shape is: a nested authored episode belongs to a concept or
 relationship; compilation records that declaration and its owner; normal template

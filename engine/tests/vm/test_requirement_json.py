@@ -4,13 +4,55 @@ from __future__ import annotations
 
 import pytest
 
-from tangl.core import Graph, Selector
+from tangl.core import Graph, Node, Selector
 from tangl.persistence.serializers import JsonSerializationHandler as Json
 from tangl.story import Action, InitMode, World
 from tangl.vm import Ledger, TraversableNode
 from tangl.vm.provision import Affordance, Dependency, Fanout, HasRequirement, Requirement
 from tangl.vm.dispatch import on_gather_ns, on_update
 from tangl.vm.system_handlers import apply_selected_edge_effects, contribute_runtime_baseline
+
+
+def test_affordance_source_sites_are_ordered_references_not_adjacency() -> None:
+    graph = Graph()
+    first = Node(label="first", tags={"eligible"}, registry=graph)
+    second = Node(label="second", registry=graph)
+    destination = Node(label="destination", registry=graph)
+    offer = Affordance(
+        registry=graph,
+        requirement=Requirement(has_kind=Node),
+        source_requirement=Requirement(has_kind=Node, has_tags={"eligible"}),
+    )
+    offer.set_predecessor(first)
+    offer.set_provider(destination)
+    offer.record_source(first)
+    offer.record_source(second)
+    offer.record_source(first)
+    assert offer.source_ids == [first.uid, second.uid]
+    assert offer.matches_source(first) and not offer.matches_source(second)
+    assert list(first.edges_out(Selector(has_kind=Affordance))) == [offer]
+    assert list(second.edges_out(Selector(has_kind=Affordance))) == []
+
+    restored = Graph.structure(Json.deserialize(Json.serialize(graph.unstructure())))
+    restored_offer = restored.get(offer.uid)
+    restored_first = restored.get(first.uid)
+    restored_second = restored.get(second.uid)
+    assert restored_offer.source_ids == [first.uid, second.uid]
+    assert restored_offer.provider is restored.get(destination.uid)
+    assert restored_offer.source_requirement.has_kind is Node
+    assert restored_offer.matches_source(restored_first)
+    assert not restored_offer.matches_source(restored_second)
+    restored_offer.record_source(restored_first, reattach=True)
+    assert restored_offer.source_ids == [second.uid, first.uid]
+    restored_first.tags.remove("eligible")
+    assert not restored_offer.matches_source(restored_first)
+    assert restored_offer.source_ids == [second.uid, first.uid]
+    assert list(restored_first.edges_out(Selector(has_kind=Affordance))) == [restored_offer]
+    assert list(restored_second.edges_out(Selector(has_kind=Affordance))) == []
+    with pytest.raises(ValueError, match="same registry"):
+        restored_offer.record_source(Node(label="foreign", registry=Graph()))
+    again = Graph.structure(Json.deserialize(Json.serialize(restored.unstructure())))
+    assert again.get(offer.uid).source_ids == [second.uid, first.uid]
 
 
 @pytest.mark.parametrize("carrier_kind", [HasRequirement, Dependency, Affordance, Fanout])
