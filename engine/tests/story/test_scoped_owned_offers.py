@@ -2,15 +2,15 @@
 from tangl.core import Selector
 from tangl.core.runtime_op import Predicate
 from tangl.persistence.serializers import JsonSerializationHandler as Json
-from tangl.journal.fragments import ContentFragment
+from tangl.journal.fragments import ChoiceFragment, ContentFragment
 import pytest
 
-from tangl.story import Action, InitMode, Scene, World
+from tangl.story import Action, Actor, InitMode, Scene, World
 from tangl.story.concepts import Role
-from tangl.story.system_handlers import render_choice_text
-from tangl.vm import Affordance, Ledger, ResolutionPhase
-from tangl.vm.dispatch import do_provision
-from tangl.vm.traversable import TraversableEffect
+from tangl.story.system_handlers import is_action_selectable, render_choice_text
+from tangl.vm import Affordance, Ledger, ResolutionPhase, Resolver
+from tangl.vm.dispatch import do_journal, do_provision
+from tangl.vm.traversable import HasAvailability, TraversableEffect
 
 
 def _world():
@@ -115,7 +115,8 @@ def test_structural_mismatch_removes_only_projection_and_can_reattach():
     assert offer.source_ids == [other.uid, start.uid]
 
 
-def test_availability_uses_each_receivers_namespace():
+@pytest.mark.parametrize("gate", ["offer", "sponsor"])
+def test_availability_uses_each_receivers_namespace(gate):
     graph = _world().create_story("gates", init_mode=InitMode.EAGER).graph
     ledger = Ledger.from_graph(graph, entry_id=graph.initial_cursor_id)
     frame = ledger.get_frame()
@@ -124,9 +125,20 @@ def test_availability_uses_each_receivers_namespace():
     other = graph.find_one(Selector(label="other"))
     first, second = _actions(start)[0], _actions(other)[0]
     offer = graph.get(first.offer_id)
+    if gate == "sponsor":
+        class AvailableActor(HasAvailability, Actor):
+            pass
+
+        sponsor = AvailableActor(label="available_bard", name="Aria", registry=graph)
+        for role in graph.find_all(Selector(has_kind=Role)):
+            role.set_provider(sponsor)
+        offer.set_predecessor(sponsor)
+        first.successor.owner_id = sponsor.uid
+    else:
+        sponsor = offer
     start.locals["allow_offer"] = True
     other.locals["allow_offer"] = False
-    offer.availability = [Predicate(expr="allow_offer")]
+    sponsor.availability = [Predicate(expr="allow_offer")]
     ctx = ledger.get_frame()._make_ctx()
     assert first.available(ctx=ctx)
     assert not second.available(ctx=ctx)
@@ -136,6 +148,56 @@ def test_availability_uses_each_receivers_namespace():
         ledger.resolve_choice(first.uid)
     do_provision(start, ctx=ledger.get_frame()._make_ctx())
     assert _actions(start)[0].uid == first.uid
+
+
+@pytest.mark.parametrize(
+    ("receiver_ready", "scene_ready", "entry_ready", "gate", "expected"),
+    [
+        (False, False, True, "entry", True),
+        (True, True, False, "entry", False),
+        (False, True, False, "scene", True),
+        (True, False, True, "scene", False),
+    ],
+)
+def test_destination_gates_use_destination_context(
+    receiver_ready, scene_ready, entry_ready, gate, expected,
+):
+    graph = _world().create_story("destination_scopes", init_mode=InitMode.EAGER).graph
+    ledger = Ledger.from_graph(graph, entry_id=graph.initial_cursor_id)
+    frame = ledger.get_frame()
+    frame._run_planning_phase(ctx=frame._make_ctx(), entry_phase=ResolutionPhase.PLANNING)
+    receiver = ledger.cursor
+    (action,) = _actions(receiver)
+    scene = action.successor
+    entry = graph.get(scene.source_id)
+    receiver.locals["ready"] = receiver_ready
+    receiver.locals["source_open"] = True
+    scene.locals["ready"] = scene_ready
+    entry.locals["ready"] = entry_ready
+    graph.get(action.offer_id).availability = [Predicate(expr="source_open")]
+    action.availability = [Predicate(expr="source_open")]
+    target = scene if gate == "scene" else entry
+    target.availability = [Predicate(expr="ready")]
+    entry.effects = [TraversableEffect(expr="graph.locals['entered'] = True")]
+    ctx = ledger.get_frame()._make_ctx()
+    assert action.available(ctx=ctx) is expected
+    assert Resolver.from_ctx(ctx).preview_frontier_node(scene, _ctx=ctx).viable is expected
+    assert is_action_selectable(edge=action, ctx=ctx) is expected
+    choice = next(f for f in do_journal(receiver, ctx=ctx)
+                  if isinstance(f, ChoiceFragment) and f.edge_id == action.uid)
+    assert choice.available is expected
+    history = list(ledger.cursor_history)
+    if expected:
+        ledger.resolve_choice(action.uid)
+        assert ledger.cursor_id == receiver.uid
+        assert scene.uid in ledger.cursor_history
+        assert graph.locals["entered"] is True
+    else:
+        with pytest.raises(ValueError):
+            ledger.resolve_choice(action.uid)
+        assert ledger.cursor_id == receiver.uid
+        assert ledger.cursor_history == history
+        assert "entered" not in graph.locals
 
 
 def test_location_owner_uses_setting_scope():

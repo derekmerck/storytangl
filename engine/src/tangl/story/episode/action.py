@@ -53,7 +53,7 @@ class Action(TraversableEdge):
         receiver = self.predecessor
         if receiver is None or ctx is None or not offer_is_eligible(self, receiver, ctx=ctx):
             return False
-        return super().available(ctx=ctx, ns=ctx.get_ns(receiver))
+        return super().available(ctx=ctx, ns=ns)
 
     def validate_payload(self, payload: Any) -> bool:
         """Enforce explicit text declarations on the effective payload before movement.

@@ -1,8 +1,9 @@
 # Scoped episode donation: characterization and ownership checkpoint
 
-**Status:** EAGER, mutable stories lower owned episodes and project scoped
-offers into retained ordinary call Actions. LAZY/JIT and frozen projection,
-invocation-context enrichment, and sandbox migration remain follow-ups.
+**Status:** #706, #707 and #709 are merged characterization, reference-ownership
+and source-bookkeeping foundations. Pending #710 adds retained ordinary call
+Actions for scoped owned scenes in EAGER, mutable stories. LAZY/JIT and frozen
+projection, invocation-context enrichment, and sandbox migration remain follow-ups.
 The broader offer/request convergence remains in
 [Open Links](../../design/planning/AFFORDANCE_MODEL.md) and
 [#255](https://github.com/derekmerck/storytangl/issues/255).
@@ -24,8 +25,13 @@ An owned scene can declare `offer: {source_requirement: {has_tags: [tavern]},
 once: true}`. EAGER materialization binds one affordance from its owner to the
 scene. Provisioning discovers owners from the receiving namespace and bound
 roles/settings, matches the receiver or one actual ancestor, and reconciles
-ordinary Actions without cloning the scene. The offer and destination gates use
-the receiving namespace. A scene's owner does not become its ancestor.
+ordinary Actions without cloning the scene. Offer and availability-capable sponsor
+predicates and Action-local guards use the actual receiver's namespace; author
+receiver-relative call conditions in `SceneOffer.availability`. Scene admission
+and entry-Block readiness use their ordinary destination namespaces. In the
+regression witness, opposing `ready` values at receiver, Scene and entry do not
+shadow the destination's own gates; disclosure, preview and selection agree.
+A scene's owner does not become its ancestor.
 The shared affordance uses the existing predicate availability mixin; it does
 not add a separate lock mechanism or recursively inherit parent availability.
 
@@ -33,7 +39,7 @@ The intended shape is: a nested authored episode belongs to a concept or
 relationship; compilation records that declaration and its owner; normal template
 materialization creates graph-owned episode state; provisioning considers the
 declaration only where its owner/provider is legitimately in the receiver's scope;
-the receiver's requirement binds the actual witnesses; Story projects an ordinary
+the receiver requirement matches an actual site or ancestor; Story projects an ordinary
 Action to the shared destination. Owner, declaration, receiver, requirement/Role,
 bound provider and destination are distinct references, even when some coincide.
 Trigger data should pass through the same projection; choice is the default.
@@ -63,8 +69,7 @@ scene/block children; `Actor` is a plain `Node`, `Role` a `Dependency`, and
 episode under an actor in source does not make the actor its namespace ancestor.
 Making Actor hierarchical would alter a
 Core ownership/ancestry contract; a reference alone also must not silently claim
-that ancestry. The next design must specify which owner context is intentionally
-available while keeping the receiving episode as the active cursor.
+that ancestry. Richer explicit invocation-context enrichment remains deferred.
 
 An `actors.aria.episodes.chat` declaration becomes the ordinary qualified
 `aria.chat` scene and its block templates. It does not add a receiver Action,
