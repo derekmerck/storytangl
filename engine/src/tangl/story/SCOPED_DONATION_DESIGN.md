@@ -1,9 +1,8 @@
 # Scoped episode donation: characterization and ownership checkpoint
 
-**Status:** #702 slice 2 implements referential owned-episode lowering for EAGER
-stories. Affordances can record ordered source-site references and a separate
-structural source requirement; scoped matching and Action projection are not
-implemented.
+**Status:** EAGER, mutable stories lower owned episodes and project scoped
+offers into retained ordinary call Actions. LAZY/JIT and frozen projection,
+invocation-context enrichment, and sandbox migration remain follow-ups.
 The broader offer/request convergence remains in
 [Open Links](../../design/planning/AFFORDANCE_MODEL.md) and
 [#255](https://github.com/derekmerck/storytangl/issues/255).
@@ -17,9 +16,18 @@ predecessor and successor retain their graph-index semantics. A caller checks
 context; the latest recorded source does not select another receiver's context.
 Unchanged planning must not reorder the record. Structural scope loss removes a
 local projection, while a matching but unavailable offer retains its projection
-and uses ordinary availability and disclosure. The future Story projection must
-revalidate these conditions on selection. Recording sites itself performs none of
-that projection or live policy evaluation.
+and uses ordinary availability and disclosure. Story revalidates these conditions
+on selection. Recording sites itself performs none of that projection or live
+policy evaluation.
+
+An owned scene can declare `offer: {source_requirement: {has_tags: [tavern]},
+once: true}`. EAGER materialization binds one affordance from its owner to the
+scene. Provisioning discovers owners from the receiving namespace and bound
+roles/settings, matches the receiver or one actual ancestor, and reconciles
+ordinary Actions without cloning the scene. The offer and destination gates use
+the receiving namespace. A scene's owner does not become its ancestor.
+The shared affordance uses the existing predicate availability mixin; it does
+not add a separate lock mechanism or recursively inherit parent availability.
 
 The intended shape is: a nested authored episode belongs to a concept or
 relationship; compilation records that declaration and its owner; normal template
@@ -30,7 +38,7 @@ Action to the shared destination. Owner, declaration, receiver, requirement/Role
 bound provider and destination are distinct references, even when some coincide.
 Trigger data should pass through the same projection; choice is the default.
 
-The tests in this slice prove a narrower existing path: sandbox gathers a Role's
+Earlier characterization tests prove the sandbox path: sandbox gathers a Role's
 provider from the receiver namespace, deduplicates aliases, and projects a normal
 scheduled-event Action. A sibling outside that scope gets no donation; removing
 the roles removes the offer without deleting the provider. JSON restoration and
@@ -79,9 +87,9 @@ is not evidence that reverse discovery is already wired. Do not add a global gra
 donor scan, Actor-only projector, second dispatcher, mandatory contributor methods,
 or a generic persistent match record by default.
 
-The next bounded implementation should settle scoped binding for one ordinary
-receiver before replacing sandbox's specialized path. Entry wording and once lowering, invocation context, namespace
-refresh after binding, and supported eager/lazy materialization modes remain open.
+The ordinary receiver path uses Scene action wording and explicitly authored
+destination-history once. Invocation context enrichment and lazy materialization
+remain open; sandbox's specialized path has not yet been replaced.
 Keep normal one-step-ahead planning and the existing justified JIT path: descending
 eligible contributions is not expansion of future game trees. Scheduling,
 preemption, per-cause instances, general capacity/arbitration, alternative casting,

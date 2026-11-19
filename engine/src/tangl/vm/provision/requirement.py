@@ -12,6 +12,7 @@ from pydantic import Field, field_validator
 
 from tangl.core import Entity, Registry, RegistryAware, Selector, Edge, Node, EntityTemplate
 from ..ctx import VmPhaseCtx
+from ..traversable import HasAvailability
 from .provisioner import ProvisionPolicy
 
 PT = TypeVar('PT', bound=RegistryAware)  # 'ProviderType'
@@ -330,7 +331,7 @@ class Dependency(Edge, HasRequirement[PT], Generic[PT]):
         self.set_provider(value, _ctx=_ctx)
 
 
-class Affordance(Edge, HasRequirement[PT], Generic[PT]):
+class Affordance(HasAvailability, Edge, HasRequirement[PT], Generic[PT]):
     """Affordance(predecessor_id: UUID | None = None, requirement: Requirement[PT])
 
     Push-resource edge whose predecessor offers a provider to nearby consumers.

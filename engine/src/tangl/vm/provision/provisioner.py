@@ -145,6 +145,21 @@ class FindProvisioner:
                 callback = lambda *_, _c=c, **__: _c  # need to freeze ref to _this_ c
             )
 
+    def get_scoped_affordance_offers(self, contexts: Iterable[Node]) -> Iterator[ProvisionOffer]:
+        """Match source requirements against explicitly supplied receiving contexts."""
+        from .requirement import Affordance
+
+        contexts = tuple(contexts)
+        for candidate in Selector(has_kind=Affordance).filter(self.values):
+            if candidate.source_requirement is not None and any(
+                candidate.matches_source(context) for context in contexts
+            ):
+                yield ProvisionOffer(
+                    origin_id="FindProvisioner", policy=ProvisionPolicy.EXISTING,
+                    priority=Priority.NORMAL, distance_from_caller=self.distance,
+                    candidate=candidate, callback=lambda *_, _c=candidate, **__: _c,
+                )
+
 @dataclass
 class TemplateProvisioner:
     """Offer CREATE candidates from template registries using scope matching."""

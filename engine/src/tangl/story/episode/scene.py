@@ -3,10 +3,25 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from tangl.core import GraphItem
-from tangl.vm import TraversableNode
+from tangl.core.bases import BaseModelPlus
+from tangl.core.runtime_op import Predicate
+from tangl.vm import Requirement, TraversableNode
+from tangl.vm.provision.requirement import _restore_requirement_kind
+
+
+class SceneOffer(BaseModelPlus):
+    """Authored structural source requirement and call policy for an owned scene."""
+
+    source_requirement: Requirement
+    once: bool = False
+    availability: list[Predicate] = Field(default_factory=list)
+
+    _restore_source_kind = field_validator("source_requirement", mode="before")(
+        _restore_requirement_kind,
+    )
 
 
 class Scene(TraversableNode):
@@ -41,6 +56,7 @@ class Scene(TraversableNode):
     settings: list[dict[str, Any]] = Field(default_factory=list)
     owner_ref: str | None = None
     owner_id: UUID | None = None
+    offer: SceneOffer | None = None
 
     @property
     def owner(self) -> GraphItem | None:

@@ -192,7 +192,9 @@ being evaluated, never an implicitly selected most-recent site. The record is
 not live eligibility: a consumer must recheck scope and structural matching at
 the actual receiver, then apply ordinary availability and lock policy there.
 Local traversal remains a binary edge, such as a receiver-to-destination Action.
-Scoped discovery, projection and stale-selection validation are follow-on work.
+Story's EAGER mutable owned-scene path discovers scoped owners, matches explicit
+receiver contexts, and revalidates its local Action projections. LAZY/JIT and
+frozen projection and broader consumer convergence remain follow-on work.
 
 ---
 
