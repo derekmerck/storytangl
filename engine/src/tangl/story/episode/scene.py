@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from pydantic import Field
 
+from tangl.core import GraphItem
 from tangl.vm import TraversableNode
 
 
@@ -37,6 +39,13 @@ class Scene(TraversableNode):
     action_name: str = ""
     roles: list[dict[str, Any]] = Field(default_factory=list)
     settings: list[dict[str, Any]] = Field(default_factory=list)
+    owner_ref: str | None = None
+    owner_id: UUID | None = None
+
+    @property
+    def owner(self) -> GraphItem | None:
+        """Resolve the episode's declared owner through its graph."""
+        return self.graph.get(self.owner_id) if self.owner_id is not None else None
 
     def finalize_container_contract(self) -> None:
         """Populate source/sink ids from current child order when absent."""

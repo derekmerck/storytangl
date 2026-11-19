@@ -12,6 +12,9 @@ from .asset_script_models import AssetsScript
 
 MediaItemScript = BaseScriptItem
 
+if TYPE_CHECKING:
+    from .scene_script_models import SceneScript
+
 class ActorScript(BaseScriptItem):
 
     @classmethod
@@ -30,6 +33,9 @@ class ActorScript(BaseScriptItem):
     assets: list[AssetsScript] = None     # assets associated with the actor
 
     media: list[MediaItemScript] = None
+    episodes: list[SceneScript] | dict[UniqueLabel, SceneScript] | None = Field(
+        None, json_schema_extra={"visit_field": True},
+    )
 
 
 class RoleScript(BaseScriptItem):

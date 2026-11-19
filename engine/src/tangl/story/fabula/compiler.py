@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from tangl.core import Entity, EntityTemplate, Selector, TemplateRegistry
+from tangl.core import Entity, EntityTemplate, GraphItem, Selector, TemplateRegistry
 from tangl.core.template import TemplateGroup
 from tangl.ir.story_ir import StoryScript
 from tangl.ir.story_ir.scene_script_models import (
@@ -803,9 +803,19 @@ class StoryCompiler:
             collector=collector,
             authored_path_prefix="templates",
         )
+        actor_items = self._normalize_mapping(data.get("actors"))
+        actor_payloads = [
+            {key: value for key, value in actor.items() if key != "episodes"}
+            for _, _, actor in actor_items
+        ]
+        actor_section = (
+            {label: payload for (_, label, _), payload in zip(actor_items, actor_payloads)}
+            if isinstance(data.get("actors"), dict)
+            else actor_payloads
+        )
         self._compile_section(
             parent=root,
-            items=data.get("actors"),
+            items=actor_section,
             fallback_kind=Actor,
             collector=collector,
             authored_path_prefix="actors",
@@ -818,10 +828,30 @@ class StoryCompiler:
             authored_path_prefix="locations",
         )
 
-        scenes = self._normalize_mapping(data.get("scenes"))
-        root_scene_labels = {scene_label for _scene_index, scene_label, _scene_data in scenes}
-        for scene_index, scene_label, scene_data in scenes:
-            scene_authored_path = _authored_item_path("scenes", scene_index, scene_label)
+        scenes = [
+            (scene_label, scene_data, _authored_item_path("scenes", scene_index, scene_label))
+            for scene_index, scene_label, scene_data in self._normalize_mapping(data.get("scenes"))
+        ]
+        for actor_index, actor_label, actor_data in actor_items:
+            prefix = f"{_authored_item_path('actors', actor_index, actor_label)}.episodes"
+            episodes = actor_data.get("episodes")
+            if episodes is not None and not isinstance(episodes, (dict, list)):
+                raise ValueError(f"{prefix} must be a mapping or list of scenes")
+            for index, episode_label, episode_data in self._normalize_mapping(episodes):
+                qualified = f"{actor_label}.{episode_label}"
+                if episode_data.get("owner_ref") not in (None, actor_label):
+                    path = _authored_item_path(prefix, index, episode_label)
+                    raise ValueError(f"{path} has conflicting owner_ref")
+                scenes.append((
+                    qualified,
+                    {**episode_data, "label": qualified, "owner_ref": actor_label},
+                    _authored_item_path(prefix, index, episode_label),
+                ))
+        root_scene_labels = {scene_label for scene_label, _, _ in scenes}
+        for scene_label, scene_data, scene_authored_path in scenes:
+            owner_ref = scene_data.get("owner_ref")
+            if owner_ref is not None and (not isinstance(owner_ref, str) or not owner_ref):
+                raise ValueError(f"{scene_authored_path}.owner_ref must be a nonempty string")
             scene_kind = self._resolve_kind(
                 scene_data.get("kind"),
                 fallback=Scene,
@@ -1007,6 +1037,22 @@ class StoryCompiler:
                     fallback_kind=TraversableNode,
                     collector=collector,
                     authored_path_prefix=f"{block_authored_path}.templates",
+                )
+
+        for scene_label, scene_data, scene_path in scenes:
+            reference = scene_data.get("owner_ref")
+            if reference is None:
+                continue
+            candidates = list(registry.find_all(Selector(
+                has_payload_kind=GraphItem, has_identifier=reference,
+            )))
+            if len(candidates) != 1:
+                collector.add_settled(
+                    code="compile:invalid_episode_owner", severity=CompileSeverity.ERROR,
+                    message=(
+                        f"Owner reference {reference!r} resolves to {len(candidates)} graph items."
+                    ),
+                    subject_label=scene_label, authored_path=f"{scene_path}.owner_ref",
                 )
 
         entry_template_ids, resolution_strategy = self._resolve_entry_template_ids(
@@ -1416,6 +1462,11 @@ class StoryCompiler:
             template
             for template in registry.values()
             if hasattr(template, "has_payload_kind") and template.has_payload_kind(Block)
+            and not (
+                isinstance(template.parent, TemplateGroup)
+                and isinstance(template.parent.payload, Scene)
+                and template.parent.payload.owner_ref is not None
+            )
         ]
 
         for tag_name in ("start", "entry"):
@@ -1439,7 +1490,7 @@ class StoryCompiler:
             if short_label.lower() == "start":
                 return [label], "label:start"
 
-        first_block = registry.find_one(Selector(has_payload_kind=Block))
+        first_block = block_templates[0] if block_templates else None
         if first_block is not None:
             return [first_block.get_label()], "first_block"
 
