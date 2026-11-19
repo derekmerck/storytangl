@@ -50,6 +50,7 @@ from .dispatch import (
 )
 from .episode import Action, Block, MenuBlock
 from .presentation import choice_text_source, render_text_as
+from . import scoped_offers  # noqa: F401 -- register scoped offer provisioning
 
 logger = logging.getLogger(__name__)
 

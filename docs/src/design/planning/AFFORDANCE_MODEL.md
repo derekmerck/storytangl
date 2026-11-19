@@ -27,7 +27,7 @@ immediate refactor** — do not build it yet.
 
 See also:
 [Scoped episode donation checkpoint](../../api/story/SCOPED_DONATION_DESIGN.md)
-for the #702 characterization and open ownership decision,
+for #702's reference ownership, source bookkeeping and scoped projection,
 [glossary.md](../glossary.md) ("Open Links and Projection") for the shared
 vocabulary table these terms anchor,
 [PROVISIONING.md](PROVISIONING.md) for how open endpoints are bound,
@@ -192,7 +192,10 @@ being evaluated, never an implicitly selected most-recent site. The record is
 not live eligibility: a consumer must recheck scope and structural matching at
 the actual receiver, then apply ordinary availability and lock policy there.
 Local traversal remains a binary edge, such as a receiver-to-destination Action.
-Scoped discovery, projection and stale-selection validation are follow-on work.
+Merged #706, #707 and #709 establish characterization, reference ownership and
+source-site bookkeeping. Pending #710 connects EAGER mutable owned scenes to
+scoped discovery and revalidated local Action projections. LAZY/JIT and frozen
+projection and broader consumer convergence remain follow-on work.
 
 ---
 
@@ -343,7 +346,8 @@ representation. The reason to provision first-class concepts is identity,
 witnesses, binding provenance, interrogation, and rebinding—not compulsory
 conversion of every scalar into a graph entity. Sandbox `WorldTime` and
 `ScheduleEntry` remain valid domain facilities; no universal Story clock or
-host-clock default is implied. See #255 (concept convergence) and #556
+host-clock default is implied. See [#255](https://github.com/derekmerck/storytangl/issues/255)
+(concept convergence) and [#556](https://github.com/derekmerck/storytangl/issues/556)
 (temporal/contextual consumer).
 
 ---
@@ -375,8 +379,17 @@ The existing #527 location/scope scheduled-event implementation is a
 it retains static receiver Actions regardless of schedule/presence matches
 and gates them live. Mobile/fixture/asset/game projections presently use
 their own ephemeral refresh paths. Do not silently migrate either family or
-claim the proposed donation model has landed; characterize provenance,
-lifecycle, and restore before any change in behavior.
+claim every donation consumer has converged; characterize provenance, lifecycle,
+and restore before any change in behavior.
+
+[#703](https://github.com/derekmerck/storytangl/issues/703) tracks an optional
+allocation policy among admitted and available offers. Structural non-admission,
+live availability refusal and capacity loss remain distinct; resolver provider
+ranking does not define claim order. A read-only claim preview observes durable
+commitments through provider availability and capacity, then allocates residual
+capacity. Rendering or preview does not rewrite bindings, reserve resources or
+spend; ordinary provisioning may still establish bindings during its supported
+PLANNING boundary. A selected interaction revalidates before committing.
 
 ---
 
@@ -453,9 +466,19 @@ may need a different policy. #560 should characterize caller admission on
 re-entry **without changing legacy sandbox returns by fiat**.
 A **resume** of an interrupted phase is different: it continues the
 established context rather than silently recasting and re-provisioning it.
-#255 owns convergence of source binding and explicit owner-directed
-mutation; #556 is a contextual consumer; #560 owns VM return/disposition
-and any validation/admission seam.
+[#255](https://github.com/derekmerck/storytangl/issues/255) owns convergence of
+source binding and explicit owner-directed mutation; #556 is a contextual
+consumer; [#560](https://github.com/derekmerck/storytangl/issues/560) owns VM
+return/disposition and any validation/admission seam.
+
+A shared once episode uses destination history; incident-per-cause identity is
+consumer policy, not a universal cast key. Follow-on consumers include
+[#654](https://github.com/derekmerck/storytangl/issues/654) /
+[#704](https://github.com/derekmerck/storytangl/issues/704) and
+[#669](https://github.com/derekmerck/storytangl/issues/669) /
+[#705](https://github.com/derekmerck/storytangl/issues/705). The future
+“Fire Aria” mutation witness should first use existing effects and explicit
+graph/binding APIs, rather than presume a new mutation API.
 
 ---
 

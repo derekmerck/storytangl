@@ -255,8 +255,10 @@ class StoryMaterializer:
     def _run_topology_passes(self, *, state: _MaterializationState) -> None:
         nodes = self._unwired_traversable_nodes(state=state)
         if state.report.mode is InitMode.EAGER:
-            for scene in state.graph.find_all(Selector(has_kind=Scene)):
+            for scene in list(state.graph.find_all(Selector(has_kind=Scene))):
                 if scene.owner_ref is None:
+                    if scene.offer is not None:
+                        raise ValueError(f"Scene {scene.get_label()!r} offer requires an owner")
                     continue
                 templates = list(state.template_registry.find_all(Selector(
                     has_payload_kind=GraphItem, has_identifier=scene.owner_ref,
@@ -270,6 +272,18 @@ class StoryMaterializer:
                         f"resolved to {len(owners)} graph items"
                     )
                 scene.owner_id = owners[0].uid
+                if scene.offer is not None:
+                    offers = owners[0].edges_out(Selector(has_kind=Affordance, successor=scene))
+                    if not any("owned_scene_offer" in offer.tags for offer in offers):
+                        Affordance(
+                            registry=state.graph,
+                            predecessor_id=owners[0].uid,
+                            successor_id=scene.uid,
+                            requirement=Requirement(provider_id=scene.uid),
+                            source_requirement=scene.offer.source_requirement.model_copy(deep=True),
+                            availability=scene.offer.availability,
+                            tags={"owned_scene_offer"},
+                        )
         self._finalize_scene_contracts(state=state)
         self._wire_role_and_setting_dependencies(nodes=nodes, state=state)
         self._wire_menu_fanouts(nodes=nodes, state=state)
