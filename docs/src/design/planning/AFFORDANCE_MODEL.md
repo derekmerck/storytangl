@@ -193,7 +193,7 @@ not live eligibility: a consumer must recheck scope and structural matching at
 the actual receiver, then apply ordinary availability and lock policy there.
 Local traversal remains a binary edge, such as a receiver-to-destination Action.
 Merged #706, #707 and #709 establish characterization, reference ownership and
-source-site bookkeeping. Pending #710 connects EAGER mutable owned scenes to
+source-site bookkeeping. #710 connects EAGER mutable owned scenes to
 scoped discovery and revalidated local Action projections. LAZY/JIT and frozen
 projection and broader consumer convergence remain follow-on work.
 

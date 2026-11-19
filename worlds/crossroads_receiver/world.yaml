@@ -1,0 +1,7 @@
+label: crossroads_receiver
+scripts: script.yaml
+metadata:
+  title: "Crossroads Inn: Receiver First"
+  description: "A shared conversation linked explicitly from receiving places."
+  start_at: inn.hearth
+  proof_class: finite

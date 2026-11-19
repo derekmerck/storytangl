@@ -1,0 +1,4 @@
+create_story crossroads_sponsor
+do 4
+do 1
+do 3

@@ -1,0 +1,7 @@
+label: crossroads_sponsor
+scripts: script.yaml
+metadata:
+  title: "Crossroads Inn: Sponsor First"
+  description: "A shared conversation offered by its scoped owner."
+  start_at: inn.hearth
+  proof_class: finite
