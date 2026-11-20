@@ -196,6 +196,10 @@ Merged #706, #707 and #709 establish characterization, reference ownership and
 source-site bookkeeping. #710 connects EAGER mutable owned scenes to
 scoped discovery and revalidated local Action projections. LAZY/JIT and frozen
 projection and broader consumer convergence remain follow-on work.
+Story may also address an ordinary Scene Role as `scene.roles.role`: the
+Role edge remains the owner, while its currently bound Actor is a distinct
+provider. This relationship-local scope does not follow the Actor into another
+Role and does not make ownership a namespace or containment hierarchy.
 
 ---
 
