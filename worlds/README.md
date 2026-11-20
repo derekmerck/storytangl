@@ -35,6 +35,12 @@ offer choices, one actor is templated, and media is optional. Nothing in this
 world is meant to be clever. Copy it when you want to see the smallest
 recognizable StoryTangl story bundle before adding a mechanic.
 
+**[Crossroads Inn: Receiver First](crossroads_receiver/)** and
+**[Crossroads Inn: Sponsor First](crossroads_sponsor/)** tell the same small
+encounter with explicit calls or one scoped owned-scene offer. Their shared
+comparison shows the actual Role, navigation and extension edits, with local
+Service, JSON and CLI witnesses.
+
 ## Small Pieces: One Mechanic at a Time
 
 These worlds keep the surrounding fiction thin so the reusable interaction

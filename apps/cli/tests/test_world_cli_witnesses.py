@@ -120,6 +120,17 @@ def test_destination_choice_cli_witness_renders_live_cast_and_source_scope() -> 
     assert transcript.count("Rest on the bench") == 2
 
 
+@pytest.mark.parametrize("world_id", ["crossroads_receiver", "crossroads_sponsor"])
+def test_crossroads_authoring_cli_witness(world_id: str) -> None:
+    transcript = _run_world_script(world_id)
+    assert _proof_class(world_id) == "finite"
+    assert 'Aria says, "The northern road is open again."' in transcript
+    assert "A map lies open on the table." in transcript
+    assert "Ask Aria about the northern road [locked:" in transcript
+    assert "You carry the news of the northern road into the rain." in transcript
+    assert transcript.rstrip().endswith("No available choices.")
+
+
 def test_casting_desk_cli_witness_completes_inspects_and_revisits() -> None:
     transcript = _run_world_script("casting_desk")
     unwrapped = " ".join(transcript.split())

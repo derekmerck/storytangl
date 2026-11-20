@@ -1,0 +1,4 @@
+create_story crossroads_receiver
+do 4
+do 1
+do 3

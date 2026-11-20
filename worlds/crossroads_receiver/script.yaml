@@ -1,0 +1,57 @@
+label: crossroads_receiver
+globals:
+  roles: {}
+  rumors_heard: 0
+actors:
+  aria:
+    name: Aria
+    episodes:
+      conversation:
+        action_name: Ask Aria about the northern road
+        blocks:
+          message:
+            content: 'Aria says, "The northern road is open again."'
+            effects:
+              - "graph.locals['rumors_heard'] = graph.locals.get('rumors_heard', 0) + 1"
+scenes:
+  inn:
+    tags: [crossroads_inn]
+    roles:
+      bard: {actor_ref: aria}
+    blocks:
+      hearth:
+        content: Rain drums on the inn roof beside the warm hearth.
+        actions:
+          - {text: Walk to the table, successor: table}
+          - {text: Step outside, successor: outside.yard}
+          - text: Leave with the news
+            successor: outside.done
+            conditions: ["graph.locals.get('rumors_heard', 0) > 0"]
+          - successor: aria.conversation
+            return: true
+            once: true
+            conditions: ["'bard' in roles"]
+      table:
+        content: A map lies open on the table.
+        actions:
+          - {text: Return to the hearth, successor: hearth}
+          - {text: Step outside, successor: outside.yard}
+          - text: Leave with the news
+            successor: outside.done
+            conditions: ["graph.locals.get('rumors_heard', 0) > 0"]
+          - successor: aria.conversation
+            return: true
+            once: true
+            conditions: ["'bard' in roles"]
+  outside:
+    blocks:
+      yard:
+        content: Outside, rain blurs the crossroads sign.
+        actions:
+          - {text: Return to the hearth, successor: inn.hearth}
+          - successor: aria.conversation
+            return: true
+            once: true
+            conditions: ["'bard' in roles"]
+      done:
+        content: You carry the news of the northern road into the rain.

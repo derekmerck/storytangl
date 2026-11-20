@@ -1,9 +1,13 @@
 # Scoped episode donation: characterization and ownership checkpoint
 
 **Status:** #706, #707 and #709 are merged characterization, reference-ownership
-and source-bookkeeping foundations. Pending #710 adds retained ordinary call
-Actions for scoped owned scenes in EAGER, mutable stories. LAZY/JIT and frozen
+and source-bookkeeping foundations. #710 adds retained ordinary call Actions
+for scoped owned scenes in EAGER, mutable stories. LAZY/JIT and frozen
 projection, invocation-context enrichment, and sandbox migration remain follow-ups.
+The paired Crossroads examples in `worlds/crossroads_receiver` and
+`worlds/crossroads_sponsor` exercise this path and explicit receiver calls
+through local Service, JSON and the CLI; they do not establish REST, visual
+parity or general client conformance.
 The broader offer/request convergence remains in
 [Open Links](../../design/planning/AFFORDANCE_MODEL.md) and
 [#255](https://github.com/derekmerck/storytangl/issues/255).
@@ -72,8 +76,9 @@ Core ownership/ancestry contract; a reference alone also must not silently claim
 that ancestry. Richer explicit invocation-context enrichment remains deferred.
 
 An `actors.aria.episodes.chat` declaration becomes the ordinary qualified
-`aria.chat` scene and its block templates. It does not add a receiver Action,
-become the default entry, or imply the owner participates in the scene. Explicit
+`aria.chat` scene and its block templates. Ownership alone does not add a
+receiver Action, make it the default entry, or imply the owner participates in
+the scene. An explicit offer supplies the additional projection policy. Explicit
 Actions can traverse it using existing EAGER traversal and JSON restoration.
 Frozen EAGER construction binds the reference; no general frozen donation
 readiness is claimed. LAZY remains unsupported for this shape: in the tested
