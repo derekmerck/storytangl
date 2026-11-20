@@ -43,7 +43,7 @@ Crawford's core processes are insurgency, coups, Finlandization/coerced alignmen
 
 ## Proposed concept vocabulary
 
-**Nation** is a persistent geopolitical actor-like concept: identity, population, economy, territorial/proximity facts, alignment and treaty relationships, and perhaps a small number of scoped affordance providers. It can satisfy different Participant role requirements by capabilities, not solely by a nominal major/minor class.
+**Nation** is a persistent geopolitical actor-like concept: identity, population, economy, territorial/proximity facts, alignment and treaty relationships, and perhaps a small number of scoped affordance providers. It can satisfy different Participant role requirements by capabilities, not solely by a nominal major/minor class. A small world-local pair is enough to separate how countries participate: `BoPCountry(Actor, HasAssets)` for every nation, and `BoPPrincipal(BoPCountry)` for a superpower, which is to this world what the `Player` node is to a single-protagonist story (a published, high-scope provider). Roles still gate on requirements (`has_kind: BoPPrincipal` for challenger and respondent); the classes say what a country *can* do, not which slot it is in.
 
 **PoliticalPower** is a durable actor-like concept or token representing a governing regime or organized opposition, with its own resources, policy disposition, and history. A Nation can have **governing_power** and **opposition_power** assembly/role slots. A coup or revolution changes the slot occupancy, not the Nation's identity. The distinction between a regime and its individual leader is *possible* but unnecessary for this proof.
 
@@ -53,7 +53,7 @@ Crawford's core processes are insurgency, coups, Finlandization/coerced alignmen
 
 *Later refinement, not part of the simple framework:* each nation can hold three resource pools: **national** (stays with the Nation through any change of regime: the police are still the police), **incumbent-bound**, and **opposition-bound**. When the balance of power shifts, some fraction of the incumbent and opposition pools trade places, so a coup captures specific resources rather than the whole country. The first slices may treat national resources as a single state block; nothing in them should assume that a regime change moves every resource.
 
-A **principal** can sponsor great-power policies and diplomatic challenges; a **minor** is usually the affected party and may have its own responses, political updates, and limited actions. Start with USA and USSR as two configured principals and a few minors. Avoid encoding 'exactly two superpowers' as an engine invariant.
+A **principal** (`BoPPrincipal`) can sponsor great-power policies, challenge, and escalate or back down in a crisis. A **minor** (a plain `BoPCountry`) is the contested party and participates through world processes (insurgency, coups, Finlandization, its government and opposition), not as a crisis decision-maker; it may later have limited actions of its own. Start with USA and USSR as two configured principals and a few minors. Avoid encoding 'exactly two superpowers' as an engine invariant.
 
 Illustrative authoring shape (not current schema):
 
@@ -101,7 +101,7 @@ Keep three semantics distinct:
 
 An incident needs **stable instance identity, causal provenance, and a lifecycle**. A repeated visit to the world hub must not duplicate an incident; a later, genuinely new challenge involving the same nations is allowed. Identity must include a causal subject/occurrence or equivalent stable instance key, not merely type + participants.
 
-**Policies are data, not incident subclasses.** In Crawford, all eight policy types (economic aid, weapons to the government or insurgents, intervention for either side, destabilization, treaties, diplomatic pressure) share one crisis procedure. Keep three things distinct for each policy:
+**A policy is a concept, not an incident subclass.** It lives on the graph as a stateful asset-like token: a singleton policy *type* (one of Crawford's eight) supplies shared defaults, and each `Token` instance for a sponsor–target pair holds its own state. It is held in the sponsor's discrete wallet and can fill a role such as an incident's *driving policy*. Like a complicated stage prop, it accumulates state: its current level, when it was exercised, how closely it has been followed, the penalty for violating it, and its brittleness (how easily it is damaged). Crawford's policies are standing per-pair levels, so the tokens can be materialized at setup and *changed* at UPDATE rather than created there. Its event history should come from journal entries tagged with the policy (#191) rather than a second log on the token; the token keeps derived state such as adherence and damage. In Crawford, all eight policy types (economic aid, weapons to the government or insurgents, intervention for either side, destabilization, treaties, diplomatic pressure) share one crisis procedure. Keep three things distinct for each policy:
 
 1. **Policy definition:** eligible sponsor, target, magnitude, cost, and its *direct world effects* (arms reach the insurgents, aid changes the economy, a treaty creates an obligation, troops change military strength). These are what make the world move; without them the simulation degenerates into prestige optimization with cosmetic policy labels.
 2. **Reaction model:** how another principal judges the policy: *Hurt* (signed harm or help to the contested nation, scaled by magnitude and the nation's vulnerability), interests, obligations, the intervention weighting, and so the likelihood of a challenge.
@@ -266,7 +266,7 @@ Two cautions keep the analogy honest. The structures are not one class: a wallet
 
 Four conditions keep the declarative form expressing the model rather than hiding it:
 
-1. **Per-cause identity is consumer policy.** A shared offer's `once` reads destination history, which is right for one conversation and wrong for crises: a new challenge to a new policy is a new crisis. Neither `once` nor a claim preview supplies an instance key. The world keys each incident record by its cause (the challenged policy) and decides whether repeated causes may recur.
+1. **Per-cause identity is consumer policy.** A shared offer's `once` reads destination history, which is right for one conversation and wrong for crises: a new challenge to a new policy is a new crisis. Neither `once` nor a claim preview supplies an instance key. The world keys each incident record by its cause and decides whether repeated causes may recur. Because policy tokens are standing, the cause is a policy *change* (the token plus the turn it was raised), not the token itself: the same aid policy can be challenged again at a new level.
 2. **For BoP, attitude ranks; it rarely filters.** Crawford offers two responses at every rung (escalate or back down), and the computer's pick is a numeric judgment (Outrage Excess plus bluff). Attitudes weight the computer's side and only occasionally gate it. The human principal always sees every legal response.
 3. **Rungs are shared; scenarios add overlays.** The ladder owns generic rung episodes; scenarios contribute prose to them. Deltas such as prestige and adventurousness losses come from the rules, not authored constants.
 4. **How a response is taken is separate from whether it shuts out others.** A donation will carry its trigger, a choice by default (#702; not yet a `SceneOffer` field). The computer's reply needs no trigger at all while it is computed inside the human's round (see the plan below).
@@ -283,24 +283,24 @@ One policy, one cause, one incident, its legal responses, the opponent's policy,
 
 | Participant | Type | Contract |
 | --- | --- | --- |
-| USA, USSR (principals) | `Actor` | Bound to hub Roles (`Role` is `Dependency[Actor]`, hard). A fixed cast, so authored roles suffice. |
-| Nicaragua (contested) | `Actor` | Bound to a hub Role. Government and opposition are local state in slice 1; Pass 4 rebinds them while the Nation persists. |
-| Aid policy (cause) | A record in the sponsoring principal's state, written by the nominate Action's UPDATE | Data, not a graph node: UPDATE changes state, not shape. It carries an id, target, magnitude and status (provisional, settled, countermanded); the incident record refers to it by id. Standing doctrines that later own offers are authored nodes. |
+| USA, USSR (principals) | `BoPPrincipal(BoPCountry)` | Bound to hub Roles (`Role` is `Dependency[Actor]`, hard). A fixed cast, so authored roles suffice. Sponsor, challenge, escalate, back down. |
+| Nicaragua (contested) | `BoPCountry(Actor, HasAssets)` | Bound to a hub Role. Contested only; no crisis decisions. Government and opposition are local state in slice 1; Pass 4 rebinds them while the Nation persists. |
+| US aid to Nicaragua (driving policy) | `Token` of an aid policy type, held in the USA's discrete wallet | Materialized at setup at level 0. The nominate Action's UPDATE raises its level and marks it provisional; the tick settles or countermands it. Fills the incident's driving-policy role; carries exercise turns, adherence, violation penalty and brittleness. |
 | Crisis | One authored `Scene` called from the hub | The procedure, not the instance. Which cause it is resolving is read from the consumer's incident record. |
-| Resources | `AssetWallet` amounts on principals and nation | Counted quantities; prestige stays a projection over relations. |
+| Resources | Fungible amounts through `HasAssets` on each country | Counted quantities; prestige stays a projection over relations. |
 
 **Available engine APIs**
 
 - Story roles, Actions with `conditions`, `effects`, `return` and `once`; Scene `action_name`; `HasAvailability` predicates with blockers and disclosure.
 - `on_update` handlers for the advance Action's world tick; `on_journal` for news; `on_gather_ns` for world readouts.
-- `AssetWallet` counts and `DiscreteAssetWallet` membership.
+- `HasAssets` (fungible counts plus `DiscreteAssetWallet` membership); `Token` over a `Singleton` type for policies; `Player` as the precedent for a published, high-scope provider node. The progression mechanic's `HasWallet` is a thinner currency dict; the story-layer `HasAssets` is the fit here because policies are discrete members.
 - `Game` / `HasGame` / `GameHandler.receive_move()`: one round is a player move plus a preselected opponent move. That fits a human-versus-computer crisis: the human escalates or backs down, and the computer's reply is computed in the same round.
 - Constructor-form JSON restore and CLI/Service witnesses, as Crossroads uses.
 
 **Required domain logic**
 
-- *Policy:* the nominate Action creates a provisional policy; only settled policies apply direct effects, in the world tick.
-- *Reaction model:* at the tick, the USSR computes Hurt for each provisional US policy and challenges above a threshold, opening an incident record keyed by that policy.
+- *Policy:* the nominate Action raises a standing policy token's level and marks it provisional; only settled policies apply direct effects, in the world tick, which also records the exercise and updates adherence. A countermanded or backed-down policy takes damage scaled by its brittleness, and violating a settled one costs its penalty.
+- *Reaction model:* at the tick, the USSR computes Hurt for each provisional US policy and challenges above a threshold, opening an incident record keyed by that policy change.
 - *Ladder:* CrisisLevel, who holds the ball, and the two legal responses as Actions gated by level. Level 1 ends automatically; war is a defined terminal outcome, never an inescapable hub.
 - *Opponent policy:* a deterministic reply rule (Outrage Excess plus a bluff term shrinking with CrisisLevel), applied inside the human's round.
 - *Consequences:* backing down countermands or concedes; prestige and adventurousness move through relations; the record closes.
