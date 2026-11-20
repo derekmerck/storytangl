@@ -4,6 +4,8 @@
 and source-bookkeeping foundations. #710 adds retained ordinary call Actions
 for scoped owned scenes in EAGER, mutable stories. LAZY/JIT and frozen
 projection, invocation-context enrichment, and sandbox migration remain follow-ups.
+The Role-owned witness supports a bound scene Role as a distinct offer owner;
+it does not add automatic recasting or a general unbound-Role offer policy.
 The paired Crossroads examples in `worlds/crossroads_receiver` and
 `worlds/crossroads_sponsor` exercise this path and explicit receiver calls
 through local Service, JSON and the CLI; they do not establish REST, visual
@@ -38,6 +40,33 @@ shadow the destination's own gates; disclosure, preview and selection agree.
 A scene's owner does not become its ancestor.
 The shared affordance uses the existing predicate availability mixin; it does
 not add a separate lock mechanism or recursively inherit parent availability.
+
+An explicit owned Scene may name an ordinary scene Role declaration:
+
+```yaml
+scenes:
+  inn:
+    tags: [tavern]
+    roles:
+      bard: {actor_ref: aria}
+    blocks:
+      hearth: {content: By the hearth.}
+  conversation:
+    owner_ref: inn.roles.bard
+    offer: {source_requirement: {has_tags: [tavern]}, once: true}
+    blocks:
+      message: {content: The road is open.}
+```
+
+The declaring Role is normally wired first; `Scene.owner_id` then references
+that existing Role edge. Its provider is a separate Actor reference. Discovery
+uses the receiver's scoped Role symbols, so the same Actor in an unrelated
+Role does not carry the relationship's offer there. A controlled compatible
+provider replacement keeps the owner, offer and retained Actions while ordinary
+Role grants and aliases follow the new binding. A removed owning Role cannot
+authorize an Action from its historical site record. Actor and Location owners
+continue to use their existing exact template references. No caller cast is
+implicitly added to the detached conversation's namespace.
 
 The intended shape is: a nested authored episode belongs to a concept or
 relationship; compilation records that declaration and its owner; normal template

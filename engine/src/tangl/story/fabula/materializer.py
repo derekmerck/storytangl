@@ -254,6 +254,8 @@ class StoryMaterializer:
 
     def _run_topology_passes(self, *, state: _MaterializationState) -> None:
         nodes = self._unwired_traversable_nodes(state=state)
+        self._finalize_scene_contracts(state=state)
+        self._wire_role_and_setting_dependencies(nodes=nodes, state=state)
         if state.report.mode is InitMode.EAGER:
             for scene in list(state.graph.find_all(Selector(has_kind=Scene))):
                 if scene.owner_ref is None:
@@ -266,6 +268,18 @@ class StoryMaterializer:
                 owners = [owner for template in templates for owner in state.graph.find_all(Selector(
                     has_kind=GraphItem, templ_hash=template.content_hash(),
                 ))]
+                if ".roles." in scene.owner_ref:
+                    scene_label, role_label = scene.owner_ref.rsplit(".roles.", 1)
+                    declaring_templates = state.template_registry.find_all(Selector(
+                        label=scene_label, has_payload_kind=Scene,
+                    ))
+                    for template in declaring_templates:
+                        for declaring_scene in state.graph.find_all(Selector(
+                            has_kind=Scene, templ_hash=template.content_hash(),
+                        )):
+                            owners.extend(declaring_scene.edges_out(Selector(
+                                has_kind=Role, label=role_label,
+                            )))
                 if len(owners) != 1:
                     raise ValueError(
                         f"Scene {scene.get_label()!r} owner {scene.owner_ref!r} "
@@ -273,7 +287,9 @@ class StoryMaterializer:
                     )
                 scene.owner_id = owners[0].uid
                 if scene.offer is not None:
-                    offers = owners[0].edges_out(Selector(has_kind=Affordance, successor=scene))
+                    offers = state.graph.find_edges(Selector(
+                        has_kind=Affordance, predecessor_id=owners[0].uid, successor=scene,
+                    ))
                     if not any("owned_scene_offer" in offer.tags for offer in offers):
                         Affordance(
                             registry=state.graph,
@@ -284,8 +300,6 @@ class StoryMaterializer:
                             availability=scene.offer.availability,
                             tags={"owned_scene_offer"},
                         )
-        self._finalize_scene_contracts(state=state)
-        self._wire_role_and_setting_dependencies(nodes=nodes, state=state)
         self._wire_menu_fanouts(nodes=nodes, state=state)
         self._wire_block_actions(nodes=nodes, state=state)
         self._wire_media_dependencies(nodes=nodes, state=state)

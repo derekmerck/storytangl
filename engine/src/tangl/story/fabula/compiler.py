@@ -1039,6 +1039,14 @@ class StoryCompiler:
                     authored_path_prefix=f"{block_authored_path}.templates",
                 )
 
+        role_addresses: dict[str, int] = {}
+        for declaring_scene, declaring_data, _ in scenes:
+            for role in self._normalize_list(declaring_data.get("roles")):
+                role_label = role.get("label")
+                if role_label:
+                    address = f"{declaring_scene}.roles.{role_label}"
+                    role_addresses[address] = role_addresses.get(address, 0) + 1
+
         for scene_label, scene_data, scene_path in scenes:
             reference = scene_data.get("owner_ref")
             if reference is None:
@@ -1046,11 +1054,12 @@ class StoryCompiler:
             candidates = list(registry.find_all(Selector(
                 has_payload_kind=GraphItem, has_identifier=reference,
             )))
-            if len(candidates) != 1:
+            owner_count = len(candidates) + role_addresses.get(reference, 0)
+            if owner_count != 1:
                 collector.add_settled(
                     code="compile:invalid_episode_owner", severity=CompileSeverity.ERROR,
                     message=(
-                        f"Owner reference {reference!r} resolves to {len(candidates)} graph items."
+                        f"Owner reference {reference!r} resolves to {owner_count} graph items."
                     ),
                     subject_label=scene_label, authored_path=f"{scene_path}.owner_ref",
                 )

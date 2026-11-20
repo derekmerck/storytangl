@@ -10,21 +10,29 @@ from tangl.vm.ctx import VmPhaseCtx
 from tangl.vm.traversable import HasAvailability
 
 from .episode import Action, Block, Scene
+from .concepts import Role
 from .story_graph import StoryGraph
 
 
 def _scoped_offers(receiver: Block, *, ctx: VmPhaseCtx) -> dict[UUID, Affordance]:
     ns = ctx.get_ns(receiver)
     values = list(ns.values())
-    for name in ("roles", "settings"):
+    for name in ("roles", "settings", "role_edges"):
         bindings = ns.get(name)
         if isinstance(bindings, Mapping):
             values.extend(bindings.values())
     owners = {value.uid: value for value in values
-              if isinstance(value, Node) and value.registry is receiver.graph}
-    candidates = [offer for owner in owners.values()
-                  for offer in owner.edges_out(Selector(has_kind=Affordance))
-                  if "owned_scene_offer" in offer.tags]
+              if (isinstance(value, Node) or isinstance(value, Role) and value.provider is not None)
+              and receiver.graph.get(value.uid) is value}
+    candidates = []
+    for owner in owners.values():
+        if isinstance(owner, Node):
+            edges = owner.edges_out(Selector(has_kind=Affordance))
+        else:
+            edges = receiver.graph.find_edges(Selector(
+                has_kind=Affordance, predecessor_id=owner.uid,
+            ))
+        candidates.extend(edge for edge in edges if "owned_scene_offer" in edge.tags)
     contexts = list(receiver.ancestors)
     offers = FindProvisioner(values=candidates).get_scoped_affordance_offers(contexts)
     return {offer.candidate.uid: offer.candidate for offer in offers}
