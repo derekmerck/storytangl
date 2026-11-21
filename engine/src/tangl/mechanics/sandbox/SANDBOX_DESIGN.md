@@ -1141,6 +1141,12 @@ the `ui:plate:<plate>:<region>` tags that generated travel choices inherit from
 the location they point at. Neither side references the other, so a location can
 claim regions on several plates at different scales.
 
+A claim creates a possible map route even when the destination is currently
+unavailable. Destination predicates stay on the destination and use its normal
+admission namespace; authored route guards remain on the Action and use the
+source namespace. Ordinary choice disclosure decides whether a gated route is
+shown disabled or hidden, and selection revalidates the live destination gate.
+
 The region *names* are world truth and survive any reskin. The *rectangles* are
 currently world-owned too, which assumes every art pack's plate shares one
 composition — so an independently composed pack cannot yet be dropped in without
