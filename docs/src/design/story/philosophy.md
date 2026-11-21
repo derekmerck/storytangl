@@ -47,6 +47,42 @@ combinatorial space.
 
 ---
 
+## The Basic Ideas
+
+Each basic idea should fit in a sentence; one that cannot is too complicated.
+These are the designer's, stated in November 2026, and the wording is
+provisional.
+
+1. **A latent space.**  A world is a latent space of possible stories.
+2. **A path under constraints.**  Telling a story is picking a path through
+   that space that satisfies constraints which evolve as the path goes.
+3. **Searched or offered.**  A possibility can be searched for, or it can
+   offer itself.
+4. **Recipes and rules.**  A recipe says how to make something; a rule says
+   when something holds; they are different things.
+5. **Concepts, episodes, output.**  A story is made of concepts, the episodes
+   that walk through them, and the output the walk leaves behind.
+6. **The graph is a metaphor.**  A graph discretizes the process, suggests
+   landmarks that correspond from one story to another, and can hold at once
+   the progression through concepts, the progression still projected, and the
+   relationships between concepts.
+7. **The virtual machine is a metaphor.**  It stands for the evolutionary
+   process: shape changes, state updates, output and trace, bookkeeping.
+8. **Story adds vocabulary.**  The story layer names these things in narrative
+   terms and adds little machinery of its own.
+
+Two things are left vague on purpose.  How people prime the space or follow a
+path, through scripting and client presentation, is specified only at the input
+and output interfaces.  Mechanics, media and similar subsystems are grafted on
+where stories need them; they are practical rather than timeless.
+
+Two parts are mechanically unsettled: materialization (what exists, and when)
+and jump and return (where a walk goes and how it comes back).  Both rest on a
+third question, identity: what counts as the same thing.  The
+[working theses](#working-theses) below are these sentences worked out.
+
+---
+
 ## Three Models, Three Layers
 
 StoryTangl separates *what could happen* from *what does happen* from *what the
