@@ -357,7 +357,7 @@ Current scope donations:
 - wait defaults
 - selectable scheduled events
 - scheduled presence
-- concept-provider events
+- shared Actor-owned Scene offers through bound Roles
 
 ### Sandbox Location
 
@@ -455,7 +455,7 @@ functions from the predecessor scope are future work if we find real repeated
 need for them.
 
 The first package spike implements linked-location movement, wait, selectable
-scheduled events, concept-provider events, local lockable unlock choices, and a
+scheduled events, local lockable unlock choices, and a
 minimal asset-presence projection. It also introduces `SandboxScope` for
 scope-level wait/event/presence donation, a lightweight `player_assets` holder,
 and stable `SandboxMob` nodes for simple present actors.
@@ -800,12 +800,9 @@ events are available while the fixture is reachable. All of these may still
 carry ordinary availability predicates such as "only if raining", "only if safe
 to talk", or "only if the sword is in player assets".
 
-Concepts can originate events too. The sandbox projector discovers providers
-from the gathered namespace and calls `get_sandbox_events(caller, ctx, ns)` on
-providers that opt in. This keeps the relationship simple: actors, locations,
-settings, roles, and token assets remain normal concept providers, but can
-donate normal sandbox `ScheduledEvent`s when their local type or instance state
-notices the right surrounding namespace.
+Actor-owned Scenes can offer conversations through bound Roles to a
+`SandboxLocation` using the same shared Story offer path as ordinary Blocks.
+This does not replace the sandbox scheduled-event families.
 
 An event target resolves as a stable graph path before identifier and local
 scope fallbacks. An unresolved target remains inert, but the projector warns so

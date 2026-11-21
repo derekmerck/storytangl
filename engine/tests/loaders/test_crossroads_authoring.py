@@ -146,6 +146,43 @@ def test_shipped_variants_have_the_same_service_journey(tmp_path, monkeypatch):
     assert journeys[0] == journeys[1]
 
 
+def test_aria_busy_extension_keeps_offer_identity_and_once(tmp_path, monkeypatch):
+    bundle = tmp_path / "worlds" / "crossroads_sponsor"
+    shutil.copytree(WORLDS / "crossroads_sponsor", bundle)
+    script_path = bundle / "script.yaml"
+    script = yaml.safe_load(script_path.read_text())
+    script["globals"]["aria_ready"] = False
+    script["actors"]["aria"]["episodes"]["conversation"]["offer"]["availability"] = [
+        {"expr": "aria_ready"},
+    ]
+    script["scenes"]["inn"]["blocks"]["hearth"]["actions"].append({
+        "text": "Wait for Aria", "successor": "hearth",
+        "effects": ["graph.locals['aria_ready'] = True"],
+    })
+    script_path.write_text(yaml.safe_dump(script, sort_keys=False))
+    monkeypatch.setattr(world_registry, "get_world_dirs", lambda: [bundle.parent])
+    world_registry.clear_discovered_world_registries()
+    World.clear_instances()
+    service = ServiceManager(PersistenceManagerFactory.json_file(base_path=tmp_path / "store"))
+    user = UUID(service.create_user(secret="aria-busy").details["user_id"])
+    envelope = service.create_story(user_id=user, world_id="crossroads_sponsor")
+    initial = _choices(envelope)[TALK]
+    assert not initial.available
+    envelope = service.resolve_choice(
+        user_id=user, request=DirectEdgeRequest(edge_id=_choices(envelope)["Wait for Aria"].edge_id),
+    )
+    ready = _choices(envelope)[TALK]
+    assert ready.available and ready.edge_id == initial.edge_id
+    envelope = service.resolve_choice(user_id=user, request=DirectEdgeRequest(edge_id=ready.edge_id))
+    assert any("northern road is open again" in f.content for f in envelope.fragments
+               if isinstance(f, ContentFragment))
+    assert not _choices(envelope)[TALK].available
+    assert _choices(envelope)[TALK].edge_id == initial.edge_id
+    with service.open_session(user_id=user) as session:
+        assert session.ledger.cursor.label == "hearth"
+        assert session.ledger.graph.locals["aria_ready"] is True
+
+
 def _call(owner):
     return {"successor": f"{owner}.conversation", "return": True, "once": True,
             "conditions": [f"'{owner}' in roles"]}
