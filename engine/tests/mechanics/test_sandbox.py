@@ -3812,6 +3812,90 @@ def test_map_travel_is_offered_on_the_destinations_own_terms() -> None:
     assert travel.available(ctx=ctx)
 
 
+@pytest.mark.parametrize("source_open,destination_open", [(False, True), (True, False)])
+def test_map_travel_uses_destination_scope_through_choice_and_ledger(
+    source_open: bool, destination_open: bool,
+) -> None:
+    graph, hub, mill = _plate_graph()
+    hub.locals.update({"mill_is_open": source_open, "unavailable_choice_disclosure": "disclose"})
+    mill.locals["mill_is_open"] = destination_open
+    mill.availability = [Predicate(expr="mill_is_open")]
+    ledger = Ledger.from_graph(graph, entry_id=hub.uid)
+    ctx = ledger.get_frame()._make_ctx()
+    do_provision(hub, ctx=ctx)
+    (travel,) = _dynamic_sandbox_actions_with_tag(hub, "map_travel")
+    choice = next(f for f in render_block_choices(caller=hub, ctx=ctx)
+                  if isinstance(f, ChoiceFragment) and f.edge_id == travel.uid)
+    assert choice.available is destination_open
+    assert travel.available(ctx=ctx) is destination_open
+    assert choice.tags == {"ui:plate:quay:mill", "ui:plate:world:quayside"}
+    if destination_open:
+        ledger.resolve_choice(travel.uid)
+        assert ledger.cursor_id == mill.uid
+    else:
+        assert choice.unavailable_reason == "guard_failed_or_unavailable"
+        assert choice.blockers
+        history = list(ledger.cursor_history)
+        with pytest.raises(ValueError):
+            ledger.resolve_choice(travel.uid)
+        assert ledger.cursor_id == hub.uid and ledger.cursor_history == history
+
+
+def test_map_travel_revalidates_changed_destination_without_reprojection() -> None:
+    graph, hub, mill = _plate_graph()
+    hub.locals.update({"mill_is_open": True, "unavailable_choice_disclosure": "disclose"})
+    mill.locals["mill_is_open"] = True
+    mill.availability = [Predicate(expr="mill_is_open")]
+    ledger = Ledger.from_graph(graph, entry_id=hub.uid)
+    do_provision(hub, ctx=ledger.get_frame()._make_ctx())
+    (travel,) = _dynamic_sandbox_actions_with_tag(hub, "map_travel")
+    assert travel.available(ctx=ledger.get_frame()._make_ctx())
+    mill.locals["mill_is_open"] = False
+    ctx = ledger.get_frame()._make_ctx()
+    choice = next(f for f in render_block_choices(caller=hub, ctx=ctx)
+                  if isinstance(f, ChoiceFragment) and f.edge_id == travel.uid)
+    assert not choice.available and choice.blockers
+    assert graph.get(travel.uid) is travel
+    with pytest.raises(ValueError):
+        ledger.resolve_choice(travel.uid)
+    assert ledger.cursor_id == hub.uid
+    mill.locals["mill_is_open"] = True
+    assert travel.available(ctx=ledger.get_frame()._make_ctx())
+    ledger.resolve_choice(travel.uid)
+    assert ledger.cursor_id == mill.uid
+
+
+def test_authored_map_route_keeps_source_guard_and_destination_gate() -> None:
+    graph, hub, mill = _plate_graph()
+    hub.locals.update({"route_open": True, "destination_open": False,
+                       "unavailable_choice_disclosure": "disclose"})
+    mill.locals.update({"route_open": False, "destination_open": True})
+    mill.availability = [Predicate(expr="destination_open")]
+    authored = Action(
+        registry=graph, label="authored_walk", predecessor_id=hub.uid,
+        successor_id=mill.uid, text="Walk to the mill",
+        availability=[Predicate(expr="route_open")],
+    )
+    ledger = Ledger.from_graph(graph, entry_id=hub.uid)
+    do_provision(hub, ctx=ledger.get_frame()._make_ctx())
+    assert not _dynamic_sandbox_actions_with_tag(hub, "map_travel")
+    assert "ui:plate:quay:mill" in authored.tags
+    assert authored.available(ctx=ledger.get_frame()._make_ctx())
+    hub.locals["route_open"] = False
+    assert not authored.available(ctx=ledger.get_frame()._make_ctx())
+    hub.locals["route_open"] = True
+    mill.locals["destination_open"] = False
+    ctx = ledger.get_frame()._make_ctx()
+    choice = next(f for f in render_block_choices(caller=hub, ctx=ctx)
+                  if isinstance(f, ChoiceFragment) and f.edge_id == authored.uid)
+    assert not choice.available and choice.blockers
+    with pytest.raises(ValueError):
+        ledger.resolve_choice(authored.uid)
+    mill.locals["destination_open"] = True
+    ledger.resolve_choice(authored.uid)
+    assert ledger.cursor_id == mill.uid
+
+
 def test_unreachable_map_travel_renders_dimmed_rather_than_absent() -> None:
     graph, hub, mill = _plate_graph()
     scope = graph.find_one(Selector.from_identifier("quay_scope"))
