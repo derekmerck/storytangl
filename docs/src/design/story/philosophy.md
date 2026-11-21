@@ -28,7 +28,9 @@ ambiguity into commitment.  What was once "the villain *could* be anyone" become
 east, and now the west road is buried."
 
 The engine's job is to make this collapse **auditable** (every decision is logged),
-**deterministic** (the same choices reproduce the same story), and **extensible**
+**deterministic** (the same seed and the same choices reproduce the same story;
+weaker equivalences hold elsewhere, as far as the author's use of chance allows;
+see working thesis 8), and **extensible**
 (new kinds of narrative content and mechanics plug in without changing the core
 loop).
 
@@ -440,25 +442,29 @@ leaves the reachable equivalence classes unchanged.
 
 #### 8. A walk is reproducible up to an equivalence
 
-**Thesis.**  There are two kinds of similarity.
+**Thesis.**  Two walks can differ in seed, in choices, or in both.
 
-- **Self-similarity.**  Given one starting configuration, the same walk
-  reproduces.
-- **Outcome similarity.**  A different starting configuration and the same
-  choices land on essentially the same story state, though identities differ
-  and the telling may differ entirely: the journal might be in French.
+| | Same choices | Other choices |
+| --- | --- | --- |
+| **Same seed** | **Self-similarity.** The story is strictly the same. | State and concept names may be similar; nothing is guaranteed. |
+| **Other seed** | **Other-similarity.** Locally similar, up to a point. | Almost always different. |
 
-A seed is an option for testing, not a requirement.  Outcome similarity holds
-only where chance has little influence on provisioning and on which paths are
-open.  Reproducibility is to a given equivalence, when the engine is used in a
-particular way, and becomes fuzzier the lighter the author's thumb.
+How far other-similarity reaches is an authoring choice.  Chance only in state
+(names, looks, voices, who plays which role) keeps the shape the same.  Chance
+in shape, such as a random walk beside a cliff, keeps the stories the same only
+up to the point where they diverge.  A world with no chance at all makes the
+other seed irrelevant, and a world whose shape and state depend on neither
+chance nor the reader's choices is the same story in all four cells.  In every
+cell the telling can still differ: the journal might be in French.
 
 **Today.**  Self-similarity holds within one saved story.  "Determinism and
 Replay" below says what supports it.
 
 **Tension.**  Two stories from one world share no identities and nothing
-compares their states, so outcome similarity cannot yet be checked.  Chance
-inside some mechanics is not drawn from the story's own generator.
+compares their states, so other-similarity cannot yet be checked.  Chance
+inside some mechanics is not drawn from the story's own generator, which breaks
+even self-similarity there.  Nothing records whether a draw decided state or
+shape, so the engine cannot say how far a world's other-similarity reaches.
 
 "The same" has several meanings, and the thesis cannot be checked until one
 is chosen.  They are distinct relations, not steps on one scale: two things
@@ -483,8 +489,9 @@ of how a thing was made, not of what it has since become.  The observational
 relation needs its readers named: what one walk did not read, another branch
 may.
 
-**Evidence.**  The same choices from two starts pass through the same sequence
-of equivalence classes.  A comparison of two states or walks that states which
+**Evidence.**  With the same choices and another seed, a world whose chance is in
+state only passes through the same sequence of shape classes, and a world with
+chance in shape does so up to its first shape-deciding draw.  A comparison of two states or walks that states which
 relation it used and, where they differ, names the reader or the next step
 that tells them apart.
 
@@ -823,9 +830,10 @@ Presenter → typed journal fragments + an application/client presentation adapt
 
 ## Determinism and Replay
 
-Working thesis 8 states the intent: a walk reproduces from its starting
-configuration, and the same choices from a different start land on essentially
-the same story state.  This section says why that matters and what the engine
+Working thesis 8 states the intent: the same seed and the same choices
+reproduce the same story, and another seed with the same choices keeps the
+shape, or keeps it up to the point of divergence, depending on where the author
+admits chance.  This section says why that matters and what the engine
 currently does about it.
 
 It is a **narratological commitment** as much as an implementation choice.  The
