@@ -29,10 +29,10 @@ class SandboxMob(HasAssets, Actor):
     kind: str = ""
     traits: set[str] = Field(default_factory=set)
     location: str = ""
-    state: dict[str, Any] = Field(default_factory=dict)
+    state: dict[str, Any] = Field(default_factory=dict, json_schema_extra={"include": True})
     present_text: str | None = None
     nearby_text: str | None = None
-    schedule: Schedule = Field(default_factory=Schedule)
+    schedule: Schedule = Field(default_factory=Schedule, json_schema_extra={"include": True})
     affordances: list[SandboxMobAffordance] = Field(default_factory=list)
     interactions: list[SandboxInteraction] = Field(default_factory=list)
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list)

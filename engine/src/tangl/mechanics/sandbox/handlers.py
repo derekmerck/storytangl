@@ -676,7 +676,7 @@ def _actors_present(location: SandboxLocation) -> list[str]:
 def _sandbox_mobs(location: SandboxLocation) -> list[SandboxMob]:
     mobs: list[SandboxMob] = []
     for scope in reversed(_sandbox_scopes(location)):
-        mobs.extend(scope.mobs)
+        mobs.extend(scope.scoped_mobs())
     return mobs
 
 

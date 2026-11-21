@@ -442,7 +442,6 @@ def test_scheduled_mob_presence_follows_world_time() -> None:
     scope = SandboxScope(
         label="tiny_cave_scope",
         locals={"world_turn": 0},
-        mobs=[pirate],
     )
     road = SandboxLocation(label="road", location_name="Road")
     building = SandboxLocation(label="building", location_name="Building")
@@ -472,6 +471,78 @@ def test_scheduled_mob_presence_follows_world_time() -> None:
     ] == ["Greet the pirate"]
 
 
+def test_scoped_mob_identity_state_and_interaction_survive_json_restore() -> None:
+    from tangl.persistence.serializers import JsonSerializationHandler as Json
+
+    graph = StoryGraph(label="mob_restore")
+    scope = SandboxScope(label="scope", locals={"world_turn": 1}, wait_enabled=False)
+    road = SandboxLocation(label="road")
+    mob = SandboxMob(
+        label="pirate", name="Pirate", location="road",
+        affordances=[SandboxMobAffordance(
+            label="greet", text="Greet the pirate", state_effects={"greeted": True},
+        )],
+    )
+    for item in (scope, road, mob):
+        graph.add(item)
+    scope.add_child(road)
+    scope.add_child(mob)
+    mob.location = "building"
+    mob.schedule.entries.append(ScheduleEntry(location="road", period=2))
+    mob.set_state_value("trust", 2)
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    restored = Ledger.structure(Json.deserialize(Json.serialize(ledger.unstructure())))
+    restored_scope = restored.graph.get(scope.uid)
+    restored_mob = restored.graph.get(mob.uid)
+    assert list(restored_scope.scoped_mobs()) == [restored_mob]
+    assert next(restored_scope.scoped_mobs()) is restored_mob
+    assert restored_mob.parent is restored_scope
+    assert restored_mob.location == "building"
+    assert restored_mob.scheduled_location(current_world_time(restored.cursor)) == "road"
+    assert restored_mob.state == {"trust": 2}
+    ctx = restored.get_frame()._make_ctx()
+    assert ctx.get_ns(restored.cursor)["sandbox_mobs"]["pirate"] is restored_mob
+    do_provision(restored.cursor, ctx=ctx)
+    action = next(a for a in restored.cursor.edges_out(Selector(has_kind=Action))
+                  if a.text == "Greet the pirate")
+    restored.resolve_choice(action.uid)
+    assert restored.graph.get(mob.uid).state == {"trust": 2, "greeted": True}
+    assert restored.graph.get(mob.uid).parent is restored_scope
+    replayed = Ledger.structure(Json.deserialize(Json.serialize(restored.unstructure())))
+    assert replayed.graph.get(mob.uid).state == {"trust": 2, "greeted": True}
+    assert next(replayed.graph.get(scope.uid).scoped_mobs()) is replayed.graph.get(mob.uid)
+
+
+def test_scoped_mobs_follow_live_nested_membership_without_reparenting_for_presence() -> None:
+    graph = Graph(label="nested_mobs")
+    outer = SandboxScope(label="outer")
+    inner = SandboxScope(label="inner")
+    sibling = SandboxScope(label="sibling")
+    road = SandboxLocation(label="road")
+    outer_mob = SandboxMob(label="outer_mob", location="road")
+    inner_mob = SandboxMob(label="inner_mob", location="road")
+    other_mob = SandboxMob(label="other_mob", location="road")
+    for item in (outer, inner, sibling, road, outer_mob, inner_mob, other_mob):
+        graph.add(item)
+    outer.add_child(inner)
+    outer.add_child(sibling)
+    outer.add_child(outer_mob)
+    inner.add_child(road)
+    inner.add_child(inner_mob)
+    sibling.add_child(other_mob)
+    before = graph.value_hash()
+    assert sandbox_handlers.sandbox_present_mobs(road) == [outer_mob, inner_mob]
+    assert graph.value_hash() == before
+    inner.remove_child(inner_mob)
+    assert sandbox_handlers.sandbox_present_mobs(road) == [outer_mob]
+    inner.add_child(inner_mob)
+    inner_mob.location = "elsewhere"
+    assert sandbox_handlers.sandbox_present_mobs(road) == [outer_mob]
+    assert inner_mob.parent is inner
+    inner_mob.location = "road"
+    assert sandbox_handlers.sandbox_present_mobs(road) == [outer_mob, inner_mob]
+
+
 def test_scheduled_mob_presence_can_gate_scheduled_events() -> None:
     graph = Graph(label="tiny_cave")
     pirate = SandboxMob(
@@ -488,7 +559,6 @@ def test_scheduled_mob_presence_can_gate_scheduled_events() -> None:
     scope = SandboxScope(
         label="tiny_cave_scope",
         locals={"world_turn": 0},
-        mobs=[pirate],
         scheduled_events=[
             ScheduledEvent(
                 label="pirate_chat",
@@ -542,7 +612,7 @@ def test_present_mob_projects_traversable_interaction_with_return() -> None:
             )
         ],
     )
-    scope = SandboxScope(label="tiny_cave_scope", mobs=[pirate])
+    scope = SandboxScope(label="tiny_cave_scope")
     road = SandboxLocation(label="road", location_name="Road")
     pirate_chat = Block(
         label="pirate_chat",
@@ -580,7 +650,7 @@ def test_scheduled_absent_mob_does_not_project_interaction() -> None:
             )
         ],
     )
-    scope = SandboxScope(label="tiny_cave_scope", locals={"world_turn": 0}, mobs=[pirate])
+    scope = SandboxScope(label="tiny_cave_scope", locals={"world_turn": 0})
     road = SandboxLocation(label="road", location_name="Road")
     building = SandboxLocation(label="building", location_name="Building")
     pirate_chat = Block(
@@ -616,7 +686,7 @@ def test_once_mob_interaction_is_suppressed_after_target_visit() -> None:
             )
         ],
     )
-    scope = SandboxScope(label="tiny_cave_scope", mobs=[pirate])
+    scope = SandboxScope(label="tiny_cave_scope")
     road = SandboxLocation(label="road", location_name="Road")
     pirate_chat = Block(
         label="pirate_chat",
@@ -658,7 +728,7 @@ def test_a_once_interaction_still_shows_before_its_target_is_visited() -> None:
             )
         ],
     )
-    scope = SandboxScope(label="tiny_cave_scope", mobs=[pirate])
+    scope = SandboxScope(label="tiny_cave_scope")
     road = SandboxLocation(label="road", location_name="Road")
     pirate_chat = Block(label="pirate_chat", content="The pirate talks.")
     graph.add(scope)
@@ -863,7 +933,6 @@ def test_present_mob_projects_asset_transfer_actions() -> None:
     pirate.add_asset(coin)
     scope.add_child(road)
     scope.add_child(pirate)
-    scope.mobs.append(pirate)
     ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
 
     do_provision(road, ctx=ctx)
@@ -924,7 +993,6 @@ def test_absent_mob_does_not_project_asset_transfer_actions() -> None:
     scope.add_child(road)
     scope.add_child(building)
     scope.add_child(pirate)
-    scope.mobs.append(pirate)
 
     do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
 
@@ -962,7 +1030,6 @@ def test_stale_mob_transfer_actions_are_unavailable_after_mob_moves() -> None:
     scope.add_child(road)
     scope.add_child(building)
     scope.add_child(pirate)
-    scope.mobs.append(pirate)
     ctx = PhaseCtx(graph=graph, cursor_id=road.uid)
 
     do_provision(road, ctx=ctx)
@@ -2471,7 +2538,6 @@ def test_present_mob_scheduled_event_projects_when_time_matches() -> None:
     scope.add_child(road)
     scope.add_child(building)
     scope.add_child(pirate)
-    scope.mobs.append(pirate)
 
     do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
     do_provision(building, ctx=PhaseCtx(graph=graph, cursor_id=building.uid))
@@ -2517,7 +2583,6 @@ def test_hidden_mob_does_not_project_scheduled_events() -> None:
     graph.add(pirate)
     scope.add_child(cave)
     scope.add_child(pirate)
-    scope.mobs.append(pirate)
 
     do_provision(cave, ctx=PhaseCtx(graph=graph, cursor_id=cave.uid))
 

@@ -208,7 +208,6 @@ def test_sandbox_story_info_projects_disclosed_location_state() -> None:
     scope.add_child(road)
     scope.add_child(building)
     scope.add_child(pirate)
-    scope.mobs.append(pirate)
     ledger = Ledger.from_graph(graph, entry_id=road.uid)
 
     ctx = PhaseCtx(graph=graph, cursor_id=road.uid, step=ledger.step)
@@ -269,7 +268,6 @@ def test_sandbox_story_info_hides_suppressed_surroundings_but_keeps_inventory() 
     scope.add_child(cave)
     scope.add_child(deeper)
     scope.add_child(pirate)
-    scope.mobs.append(pirate)
     ledger = Ledger.from_graph(graph, entry_id=cave.uid)
 
     ctx = PhaseCtx(graph=graph, cursor_id=cave.uid, step=ledger.step)
@@ -330,7 +328,6 @@ def test_sandbox_dispatch_projects_requested_status_channels() -> None:
     scope.add_child(road)
     scope.add_child(building)
     scope.add_child(pirate)
-    scope.mobs.append(pirate)
     ledger = Ledger.from_graph(graph, entry_id=road.uid)
     ctx = PhaseCtx(graph=graph, cursor_id=road.uid, step=ledger.step)
 

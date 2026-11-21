@@ -222,8 +222,8 @@ projects their available moves as ordinary self-loop sandbox actions, and calls
 the handler's cycle operation when sandbox time ticks. The same game can still
 run manually in a modal `HasGame` block without sandbox.
 
-Mob projection is schedule/presence plus simple asset holding. `SandboxScope.mobs`
-holds stable `SandboxMob` nodes, each with a fallback sandbox location label,
+Mob projection is schedule/presence plus simple asset holding. A `SandboxScope`
+manages its graph-owned `SandboxMob` child nodes, each with a fallback location label,
 optional `Schedule`, and the story-level `HasAssets` facet. At projection time
 the mob's effective location is derived from `WorldTime`; when that location
 matches the current sandbox location, its present description, authored mob
