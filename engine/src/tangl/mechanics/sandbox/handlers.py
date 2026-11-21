@@ -1671,10 +1671,9 @@ def project_sandbox_map_travel(*, caller, ctx, **_kw):
     claiming a region on some other plate is not reached from here. Neither the
     map nor the location consults the other's geometry.
 
-    Travel is offered on the destination's own terms — the target's
-    ``availability`` is copied onto the generated edge — so the reason a place
-    cannot be reached lives with the place that is guarding itself, and renders
-    as an ordinary unavailable choice rather than a missing one.
+    A claim establishes a possible route. Ordinary successor admission evaluates
+    the destination's availability in its own namespace, so a closed destination
+    remains a disclosed or hidden unavailable choice according to Story policy.
     """
 
     if not isinstance(caller, SandboxLocation):
@@ -1735,7 +1734,6 @@ def project_sandbox_map_travel(*, caller, ctx, **_kw):
                 successor_id=target.uid,
                 text=f"Go to {target.location_name or target.get_label()}",
                 payload=_sandbox_action_payload("movement"),
-                availability=list(target.availability),
                 tags={
                     "dynamic",
                     "sandbox",
