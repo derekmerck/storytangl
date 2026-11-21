@@ -43,7 +43,7 @@ Crawford's core processes are insurgency, coups, Finlandization/coerced alignmen
 
 ## Proposed concept vocabulary
 
-**Nation** is a persistent geopolitical actor-like concept: identity, population, economy, territorial/proximity facts, alignment and treaty relationships, and perhaps a small number of scoped affordance providers. It can satisfy different Participant role requirements by capabilities, not solely by a nominal major/minor class.
+**Nation** is a persistent geopolitical actor-like concept: identity, population, economy, territorial/proximity facts, alignment and treaty relationships, and perhaps a small number of scoped affordance providers. It can satisfy different Participant role requirements by capabilities, not solely by a nominal major/minor class. A small world-local pair is enough to separate how countries participate: `BoPCountry(Actor, HasAssets)` for every nation, and `BoPPrincipal(BoPCountry)` for a superpower, which is to this world what the `Player` node is to a single-protagonist story (a published, high-scope provider). Roles still gate on requirements (`has_kind: BoPPrincipal` for challenger and respondent); the classes say what a country *can* do, not which slot it is in.
 
 **PoliticalPower** is a durable actor-like concept or token representing a governing regime or organized opposition, with its own resources, policy disposition, and history. A Nation can have **governing_power** and **opposition_power** assembly/role slots. A coup or revolution changes the slot occupancy, not the Nation's identity. The distinction between a regime and its individual leader is *possible* but unnecessary for this proof.
 
@@ -53,7 +53,7 @@ Crawford's core processes are insurgency, coups, Finlandization/coerced alignmen
 
 *Later refinement, not part of the simple framework:* each nation can hold three resource pools: **national** (stays with the Nation through any change of regime: the police are still the police), **incumbent-bound**, and **opposition-bound**. When the balance of power shifts, some fraction of the incumbent and opposition pools trade places, so a coup captures specific resources rather than the whole country. The first slices may treat national resources as a single state block; nothing in them should assume that a regime change moves every resource.
 
-A **principal** can sponsor great-power policies and diplomatic challenges; a **minor** is usually the affected party and may have its own responses, political updates, and limited actions. Start with USA and USSR as two configured principals and a few minors. Avoid encoding 'exactly two superpowers' as an engine invariant.
+A **principal** (`BoPPrincipal`) can sponsor great-power policies, challenge, and escalate or back down in a crisis. A **minor** (a plain `BoPCountry`) is the contested party and participates through world processes (insurgency, coups, Finlandization, its government and opposition), not as a crisis decision-maker; it may later have limited actions of its own. Start with USA and USSR as two configured principals and a few minors. Avoid encoding 'exactly two superpowers' as an engine invariant.
 
 Illustrative authoring shape (not current schema):
 
@@ -101,7 +101,23 @@ Keep three semantics distinct:
 
 An incident needs **stable instance identity, causal provenance, and a lifecycle**. A repeated visit to the world hub must not duplicate an incident; a later, genuinely new challenge involving the same nations is allowed. Identity must include a causal subject/occurrence or equivalent stable instance key, not merely type + participants.
 
-**Policies are data, not incident subclasses.** In Crawford, all eight policy types (economic aid, weapons to the government or insurgents, intervention for either side, destabilization, treaties, diplomatic pressure) share one crisis procedure. Keep three things distinct for each policy:
+**A policy is a concept, not an incident subclass.** It lives on the graph as a stateful asset-like token: a singleton policy *type* (one of Crawford's eight) supplies shared defaults, and each `Token` instance for a sponsor–target pair holds its own state. It is held in the sponsor's discrete wallet and can fill a role such as an incident's *driving policy*. Like a complicated stage prop, it accumulates state: its current level, when it was exercised, how closely it has been followed, the penalty for violating it, and its brittleness (how easily it is damaged). Crawford's policies are standing per-pair levels, so the tokens can be materialized at setup and *changed* at UPDATE rather than created there. Its event history should come from journal entries tagged with the policy (#191) rather than a second log on the token; the token keeps derived state such as adherence and damage.
+
+A policy also has **scope**, on two axes:
+
+- **Countries it applies to.** Aid to Nicaragua has a scope of one. A doctrine or treaty spans a set: the Monroe Doctrine covers the western hemisphere, an alliance covers its members. Express the scope as a requirement or Selector over `BoPCountry` (region tags, treaty membership), so a per-pair policy is just a scope of one and no separate doctrine type is needed.
+- **Crisis episodes it relates to**, in two directions:
+  - *Engenders:* the policy owns offers. The Monroe Doctrine offers a hemisphere challenge whenever the opponent engages a country inside its scope. This is the landed owner → offer path, with the policy's country scope feeding the offer's availability; it waits only on exposure of world-scoped owners (#702).
+  - *Applies to:* the policy is eligible to fill a role in, or donate options into, crises it did not start. A treaty lets its holder join a crisis over a member as ally, or grants an extra response there. This is ordinary role eligibility (the role's requirement checks that the contested country is in the policy's scope) or a relationship grant into the incident's scope, with RoleGrant as precedent.
+
+Both scopes are state on the token, so they can change: a treaty gains a member, a doctrine is narrowed after a defeat, and brittleness can shrink the scope rather than only the level. Scope can be a predicate over durable country facts (a definitional scope such as "the western hemisphere") or a membership group the policy owns (an enumerated scope such as treaty members); both sit behind one `applies_to` check, with the reverse lookup derived from it, so offer availability and role requirements never test scope separately.
+
+**Carved out versus costlier.** "The Monroe Doctrine no longer applies to Cuba once Soviet bases are built there" can mean two different things:
+
+- **Carved out:** the definitional scope still says hemisphere, but Cuba is now an enumerated exception. The doctrine's offers and eligibility are hidden for Cuba.
+- **Costlier:** Cuba stays in scope, but invoking the doctrine there costs more: higher stakes, a weaker bluff, a worse Outrage balance. That is a cost term reading current state, not a scope change.
+
+These are the hider and changer facet types of [COMPONENT_DESIGN](https://github.com/derekmerck/storytangl/blob/main/engine/src/tangl/mechanics/assembly/COMPONENT_DESIGN.md), matching this brief's split between possibility and desire, so no special "weakened" mode is needed. Which one applies is decided by the policy's history. Challenged and lost: carve-out. Never challenged: carve-out, plus a credibility cost wherever the doctrine still applies. Challenged and won: neither, and the doctrine strengthens. A doctrine also serves as *evidence* in a crisis: it feeds Hurt and Outrage by making a challenge legitimate, and a carved-out doctrine stops supplying that legitimacy for that country. In Crawford, all eight policy types (economic aid, weapons to the government or insurgents, intervention for either side, destabilization, treaties, diplomatic pressure) share one crisis procedure. Keep three things distinct for each policy:
 
 1. **Policy definition:** eligible sponsor, target, magnitude, cost, and its *direct world effects* (arms reach the insurgents, aid changes the economy, a treaty creates an obligation, troops change military strength). These are what make the world move; without them the simulation degenerates into prestige optimization with cosmetic policy labels.
 2. **Reaction model:** how another principal judges the policy: *Hurt* (signed harm or help to the contested nation, scaled by magnitude and the nation's vulnerability), interests, obligations, the intervention weighting, and so the likelihood of a challenge.
@@ -173,7 +189,7 @@ The trace, not authored dialogue or a polished map, is the initial acceptance wi
 
 **Pass 0 — audit and translation.** Inspect currently landed Episode, Role, dependency/provisioning, fanout, scoped namespace, asset-wallet, assembly, VM, journaling, and re-entrant game/sandbox contracts. Build a small Crawford-process-to-handler inventory, noting deliberate simplifications and any true missing capability; include the policy commitment/effect timing rule and how the alternating crisis maps onto the current game round contract. Don't mistake aspirational design notes for shipped APIs. Also record what actor-first discovery (#665, below) would need from the same binding path (enumerating candidate role fillers for an action rather than for a known situation) so the first consumer doesn't foreclose the second.
 
-**Pass 1 — static fixture and one interaction.** Seed principals/minors/powers and relationships; construct one incident explicitly; render choices through ordinary VM/Service; execute one challenge/concession and obtain a meaningful journal receipt. No automatic generation required yet.
+**Pass 1 — static fixture and one interaction** (scoped in *Bounded first plan* below). Seed principals/minors/powers and relationships; construct one incident explicitly; render choices through ordinary VM/Service; execute one challenge/concession and obtain a meaningful journal receipt. No automatic generation required yet.
 
 **Pass 2 — re-entrant hub and generative discovery.** Return from an incident to the same world scene; distinguish re-entry from world advancement; discover/provision one new incident from state; make duplicate-instance suppression and urgency ordering deterministic.
 
@@ -197,6 +213,8 @@ Start as a demo world (`worlds/balance_of_power/` with a `domain.py`, like `colo
 | **Kernel:** escalation ladder | Crisis-specific game logic at first; `mechanics/games` once extracted | Reusable with no Balance of Power knowledge |
 | **Rules:** Outrage/Hurt, world processes, opponent strategy, prestige projection | World-local rules module that reads state only through the bound concepts, never the fixture directly | *Same rules, different world* |
 | **World:** nations, powers, relations, prestige values | YAML fixture | *Different rules/events, same world* |
+
+**Vanilla BoP and BoP-plus.** Policy history, brittleness, carve-outs, scope damage, incident escrow and the attention budget all depart from Crawford, mostly by making his model more substantive. None belongs in the baseline. The baseline should be recognizably Crawford, and a *BoP-plus* variant should sideload extra domain code (additional handlers and rules on the same concepts) over the same world fixture. That makes the plus layer an instance of *different rules, same world*, and a good demo in its own right. The baseline must not foreclose it: policies are tokens with scope behind `applies_to`, their events are journaled with the policy's identity, and rules read state only through bound concepts. With that, BoP-plus adds handlers and state fields rather than reshaping the baseline. If a plus feature needs a baseline type or call site changed, record it as a design finding.
 
 The third follow-up, *different rules and events in a different world*, is the genuinely-different-domain test. Promote code out of the world (into `mechanics/` or a sibling example package) when there is demonstrated reuse or the world-local placement becomes awkward. A data-only world swap that needs no code move is itself evidence that the separation already works. Do not start in a separate repository: the point is to surface engine friction, not to hide it behind a consumer boundary.
 
@@ -245,82 +263,104 @@ Two cautions keep the analogy honest. The structures are not one class: a wallet
 
 ## Declarative scenario authoring (relation to #702 and #703)
 
-[#702](https://github.com/derekmerck/storytangl/issues/702) promotes sandbox's scoped sponsor → receiver contribution path into ordinary Story/VM provisioning; [#703](https://github.com/derekmerck/storytangl/issues/703) extends it to episodes with several role endpoints and a priority pass over provider capacity. Together they are the mechanism a declarative crisis catalog would lower through.
+*Synced 2026-11-20 with #706–#712 and the revised [#703](https://github.com/derekmerck/storytangl/issues/703). The earlier version used terms #703 has since retired.*
 
-**The principle: any concept in scope may donate shape.** A donated scenario is a slotted episode. Its owner fills its own slot, the scenario casts the rest, and state decides which donations are active. Which concept owns a scenario is an authoring choice, not a different mechanism. BoP has at least three natural donor kinds:
+[#702](https://github.com/derekmerck/storytangl/issues/702) promotes sandbox's scoped sponsor → receiver contribution path into ordinary Story/VM provisioning. #710–#712 landed its first slices: an owned Scene declares `offer: {source_requirement, once, availability}`, EAGER materialization binds one shared affordance from owner to scene, and provisioning projects an ordinary call Action at each receiver whose site or ancestor matches, discovering owners only from the receiver's namespace and bound roles/settings. An Actor, a Location, or (since #712) a bound scene Role can own an offer. #703 proposes the second pass: providers veto through their own availability policy, and an optional claim pass keeps each provider within its capacity.
 
-- **Nation-owned:** a Cuban missile crisis that *must* involve Cuba, with options specific to Cuban personalities. Cuba fills the contested slot; the scenario casts the superpowers.
-- **Policy-owned:** a Monroe Doctrine that offers a crisis whenever the opponent engages any western-hemisphere nation. The doctrine's holder fills the challenger slot; the scenario casts the respondent and contested nation.
-- **The rule-set bank:** general crises that bind wherever they can cast an appropriate challenger, respondent, contested nation, attitude and policy.
+**The principle: any concept in scope may donate shape; state decides what is active.** Which concept owns a scenario is an authoring choice, not a different mechanism. **An owner need not fill a slot:** it may fill one itself, through its holder, or not at all. BoP has three natural donor kinds:
 
-The calendar world in #703 shows the same freedom: episodes may be donated by a time and cast actors and settings, or owned by a setting and cast actors and times. When several donors fit the same cause (the Cuba-owned crisis and a bank crisis both match), ordinary specificity arbitration lets the more specific donation win, and the contested nation's capacity keeps it to one crisis.
+- **Nation-owned:** a Cuban missile crisis that *must* involve Cuba, with options specific to Cuban personalities. Cuba fills the contested role.
+- **Policy-owned:** a Monroe Doctrine that offers a crisis whenever the opponent engages a western-hemisphere nation. The doctrine's holder fills the challenger role.
+- **The rule-set bank:** general crises that fill every role from what is in scope.
 
-| Authored layer | #702 / #703 vocabulary | BoP meaning |
+| Authored layer | Landed path or missing contract | BoP meaning |
 | --- | --- | --- |
-| Scenario + activation | Donation by an owner in scope, gated by state | Nation-, policy- or bank-owned crisis |
-| Participants | Role slots; the owner fills its own, the rest are cast | Challenger, respondent, contested Nation, optional ally |
-| Responses by attitude | Attitude concept selected by a mechanic, delegating its offers | Pugnacity and Adventurousness choose a stance |
-| Escalation episodes | Destination episodes with ordinary UPDATE/JOURNAL | Ladder rungs |
+| Scenario + activation | Landed for fixed owners in scope (#710–#712). Missing: exposure of world-scoped and runtime-created owners | Nation-, policy- or bank-owned crisis |
+| Participants | Landed: authored scene Roles, optional via `hard_requirement=False`. Missing: roles filled at match time | Challenger, respondent, contested Nation, optional ally |
+| Responses by attitude | Domain logic over ordinary Actions and availability | Pugnacity and Adventurousness choose a stance |
+| Escalation episodes | Landed: ordinary Blocks with UPDATE/JOURNAL | Ladder rungs |
 
-The catalog is the rules axis as data, the nation roster the world axis, attitude handlers the behavior axis.
-
-**Shared vocabulary** (proposed with #703):
-
-| Term | Meaning | BoP |
-| --- | --- | --- |
-| Slotted episode | An episode with named role slots | An incident |
-| Owner | Fills its own slot; decides discovery, not precedence | A nation, a policy, or the rule set |
-| Cast | Tentative slot filling during planning; leaves nothing behind | Who would challenge whom, this draw |
-| Soft slot | An optional role | An ally |
-| Availability policy | A provider's own "can I serve now" | Attention left; a government in place |
-| Capacity | How many claims a provider can hold, by count or budget | Attention budget; one crisis per contested nation |
-| Claim pass | Ordered pass that takes provider capacity, in the existing arbitration order by default | Urgency ordering |
-| Match record | What matched; kept as the binding when selected | The incident's identity key |
-| Preempting claim | A claim on the time slot itself, shown as automatic | The computer's crisis reply |
+**Vocabulary** (revised #703): *owner* (where an offer is discovered), *receiver* (where it attaches), *provider* and *beneficiary* (who fills a role; who receives a grant), *availability policy* (a provider's own "can I serve now"), *capacity* (what a provider can hold during one planning pass, a count or a budget), *claim pass* (an optional, read-only ordered pass over capacity), *witness* (what matched, carried on a live binding). A "slotted episode" is an episode with roles and a "soft slot" an optional role; neither is a new type. A durable record of what was kept (which cause, who was present) belongs to the consumer and may outlive the binding (#255). The earlier terms "cast, then keep", "preempting claim" and "match record" are retired.
 
 Four conditions keep the declarative form expressing the model rather than hiding it:
 
-1. **Cast, then keep.** A scenario is not one shared episode consumed once (#702's first witness). Planning casts every active donation tentatively and leaves no bindings; choosing an offer, or the computer deciding to challenge, keeps that casting, and the kept casting is the incident. Its match record (cause, challenger, contested nation) is the identity key, so "once" means once per cause.
-2. **For BoP, attitude ranks; it rarely filters.** Crawford offers two responses at every rung (escalate or back down), and the computer's pick is a numeric judgment (Outrage Excess plus bluff). Attitudes contribute weights to the computer's side and only occasional hard gates. The human principal always sees every legal response; filtering their options removes BoP's central choice and folds desire into possibility. Eligibility sifting pays off for richer response sets: nation-owned crises with their own personalities, third parties (an ally joining a protest, a minor Finlandizing after a crisis), and Prom Week.
-3. **Rungs are shared; scenarios add overlays.** The ladder owns generic rung episodes, and each scenario donates optional prose overlays to them. Per-scenario rung lists repeat content across policies × rungs, the per-host copying #702 exists to remove. Deltas such as prestige and adventurousness losses come from the rules, not authored constants. A nation-owned crisis may add rung-specific options; that is still a donation to a shared rung.
-4. **Automatic responses are claims, not a second projector.** The human's response is a choice; the computer's is automatic. Either the donation carries its trigger (a choice by default) or, as #703 frames appointments, an offer that claims the whole time slot preempts the menu and is shown as an automatic redirect. These are probably one rule and should be settled once in #702/#703. Either way it answers the `receive_move()` question above for computer-initiated and readerless crises.
+1. **Per-cause identity is consumer policy.** A shared offer's `once` reads destination history, which is right for one conversation and wrong for crises: a new challenge to a new policy is a new crisis. Neither `once` nor a claim preview supplies an instance key. The world keys each incident record by its cause and decides whether repeated causes may recur. Because policy tokens are standing, the cause is a policy *change* (the token plus the turn it was raised), not the token itself: the same aid policy can be challenged again at a new level.
+2. **For BoP, attitude ranks; it rarely filters.** Crawford offers two responses at every rung (escalate or back down), and the computer's pick is a numeric judgment (Outrage Excess plus bluff). Attitudes weight the computer's side and only occasionally gate it. The human principal always sees every legal response.
+3. **Rungs are shared; scenarios add overlays.** The ladder owns generic rung episodes; scenarios contribute prose to them. Deltas such as prestige and adventurousness losses come from the rules, not authored constants.
+4. **How a response is taken is separate from whether it shuts out others.** A donation will carry its trigger, a choice by default (#702; not yet a `SceneOffer` field). The computer's reply needs no trigger at all while it is computed inside the human's round (see the plan below).
 
-**Urgency and attention fall out of the claim pass.** The brief leaves open where urgency is computed. #703's default policy (gather candidates from every owner, rank them in one global order, keep an offer only while its providers are still free) is deterministic urgency ordering with a cascade: if a superpower can attend one crisis per turn, a lower-ranked crisis still runs when the higher-ranked one lost its challenger elsewhere. The attention budget is provider capacity measured as a quantity. Unlike #703's per-draw claims, escrowed attention stays locked while an incident is open; that falls out if a principal's availability policy reads its kept bindings.
+**Attention is availability over kept state, not a claim.** Revised #703 separates three things: a claim holds capacity during one planning pass; spending is a state change; attention held while an incident is open is neither. It is an availability policy that reads the consumer's open incident records. Urgency ordering among concurrent crises is the claim pass, and only matters once crises compete for a principal's attention or a contested nation.
 
-Two hazards. The reaction check (every principal judging every new policy) is a genuine cross-product, but it belongs to the world-process step: a mechanic computes Hurt at UPDATE, and activation conditions read the stored result, keeping PLANNING pure. It is not a disguised receiver dispatcher. And donors name what they own by reference; a crisis catalog must not wait on, or force, making Nations or policies hierarchical episode owners.
+Two hazards. The reaction check (every principal judging every new policy) is a genuine cross-product, but it belongs to the world tick's UPDATE, which stores its judgments; planning reads them as plain predicates. And donors are named by reference; nothing here should force Nations or policies to become hierarchical episode owners.
 
-**Sequencing.** BoP needs multi-slot casting, keeping on selection and preempting claims, all beyond #702's first slice, so it is a later consumer. #703's cascade fixture is the nearest shared witness. Pass 1 constructs an incident explicitly anyway. Pass 2 ("discover a new incident from state") is where the mechanism lands: use the #702/#703 path if it exists by then, otherwise a small provision handler labelled as its migration test, never a bespoke incident dispatcher.
+### Bounded first plan
 
-Illustrative lowering, not a new DSL (scenario → Scene, slots → Roles, rungs → Blocks, attitude → a concept the mechanic selects):
+One policy, one cause, one incident, its legal responses, the opponent's policy, consequences and an explicit world tick. It deliberately uses receiver-authored calls from the hub, as Pass 1 and Crossroads Receiver First do, so it needs no donation slice beyond what has landed.
+
+**Participants and their dependency contracts**
+
+| Participant | Type | Contract |
+| --- | --- | --- |
+| USA, USSR (principals) | `BoPPrincipal(BoPCountry)` | Bound to hub Roles (`Role` is `Dependency[Actor]`, hard). A fixed cast, so authored roles suffice. Sponsor, challenge, escalate, back down. |
+| Nicaragua (contested) | `BoPCountry(Actor, HasAssets)` | Bound to a hub Role. Contested only; no crisis decisions. Government and opposition are local state in slice 1; Pass 4 rebinds them while the Nation persists. |
+| US aid to Nicaragua (driving policy) | `Token` of an aid policy type, held in the USA's discrete wallet | Country scope of one (Nicaragua). Materialized at setup at level 0. The nominate Action's UPDATE raises its level and marks it provisional; the tick settles or countermands it. Fills the incident's driving-policy role; carries exercise turns, adherence, violation penalty and brittleness. |
+| Crisis | One authored `Scene` called from the hub | The procedure, not the instance. Which cause it is resolving is read from the consumer's incident record. |
+| Resources | Fungible amounts through `HasAssets` on each country | Counted quantities; prestige stays a projection over relations. |
+
+**Available engine APIs**
+
+- Story roles, Actions with `conditions`, `effects`, `return` and `once`; Scene `action_name`; `HasAvailability` predicates with blockers and disclosure.
+- `on_update` handlers for the advance Action's world tick; `on_journal` for news; `on_gather_ns` for world readouts.
+- `HasAssets` (fungible counts plus `DiscreteAssetWallet` membership); `Token` over a `Singleton` type for policies; `Player` as the precedent for a published, high-scope provider node. The progression mechanic's `HasWallet` is a thinner currency dict; the story-layer `HasAssets` is the fit here because policies are discrete members.
+- `Game` / `HasGame` / `GameHandler.receive_move()`: one round is a player move plus a preselected opponent move. That fits a human-versus-computer crisis: the human escalates or backs down, and the computer's reply is computed in the same round.
+- Constructor-form JSON restore and CLI/Service witnesses, as Crossroads uses.
+
+**Required domain logic**
+
+- *Policy:* the nominate Action raises a standing policy token's level and marks it provisional; only settled policies apply direct effects, in the world tick, which also records the exercise and updates adherence. A countermanded or backed-down policy takes damage scaled by its brittleness, and violating a settled one costs its penalty.
+- *Reaction model:* at the tick, the USSR computes Hurt for each provisional US policy and challenges above a threshold, opening an incident record keyed by that policy change.
+- *Ladder:* CrisisLevel, who holds the ball, and the two legal responses as Actions gated by level. Level 1 ends automatically; war is a defined terminal outcome, never an inescapable hub.
+- *Opponent policy:* a deterministic reply rule (Outrage Excess plus a bluff term shrinking with CrisisLevel), applied inside the human's round.
+- *Consequences:* backing down countermands or concedes; prestige and adventurousness move through relations; the record closes.
+- *World tick:* objections → world processes (settled policies apply; one coarse stability update) → news. Only the advance Action's UPDATE ticks; re-entry never does. Advance is unavailable while an incident awaits the human.
+- *Consumer policies:* the incident record keyed by cause (condition 1), and, deferred until two crises can coexist, attention as availability over open records.
+
+**Specific missing engine contracts** (none blocks this plan)
+
+| Needed by | Contract | Tracking |
+| --- | --- | --- |
+| Donated incidents (Pass 2) | Invocation context: a donated scene can't see its caller's roles, so it can't name its challenger or cause | #702 |
+| Policy- and bank-owned donors | Exposure of world-scoped and runtime-created owners. A world `on_gather_ns` that contributes Nodes would be found by the current scan, but whether that is the sanctioned exposure is undecided; don't build on it silently | #702 |
+| Readerless or computer-initiated play (Pass 3) | A trigger carried on the offer; or a `GameHandler` round in which neither side is a player move | #702; Pass 0 decision |
+| Concurrent crises | The read-only claim pass with a consumer claim order (more specific donor first) | #703 |
+| Distinct graph identity per incident, if records prove insufficient | Per-cause instances | #702, deferred |
+
+**Done when:** a Service/CLI witness runs t0–t7 of the semantic trace above with the human as USA; a second challenge to a different policy opens a second incident record while the first stays closed; re-entering the hub without advancing changes nothing; JSON restore mid-crisis continues the same incident.
+
+Aspirational catalog shape once those contracts land (illustrative, not landed syntax):
 
 ~~~yaml
 nations:
   cuba:
     donates:
-      cuban_missile_crisis:             # Cuba fills contested; scenario casts the rest
+      cuban_missile_crisis:             # Cuba fills contested
         when: soviet_missiles_in(cuba)
-        roles: {challenger: usa, respondent: ussr}
-        overlays: {military_alert: ...} # Cuban personalities
 policies:
   monroe_doctrine:
     donates:
       hemisphere_challenge:             # the doctrine's holder fills challenger
         when: opponent_engaged(contested) and contested.in_western_hemisphere
-crises:                                 # the rule-set bank: casts every slot
+crises:                                 # the rule-set bank: fills no role itself
   insurgent_arms_challenge:
-    sponsor: policy                     # one incident per policy instance
     when: hurt(challenger, contested) > challenge_threshold
     roles:
       respondent: policy.sponsor
       contested: policy.target          # the Nation, not its government
       challenger: {requires: is_superpower, not: respondent}
-      ally?: {treaty_with: challenger}  # soft slot
-    action_name: "Protest arms to {{contested}}'s rebels"
+      ally: {treaty_with: challenger, hard_requirement: false}
 ladder:                                 # rule-set owned, shared by all crises
   rungs: [diplomatic_protest, ..., nuclear_war]
-  responses: [escalate, back_down]      # computer: preempting claim; human: choice
-attitudes:
-  hawkish: {when: pugnacity > 0.6, weights: {escalate: +bluff}}
+  responses: [escalate, back_down]
 ~~~
 
 ## Follow-on consumer: Prom Week social situations
