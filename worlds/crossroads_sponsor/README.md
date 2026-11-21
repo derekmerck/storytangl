@@ -94,6 +94,37 @@ according to whether Bram has already been added. These are counts for these
 actual patches, including the out-of-scope control, not a general complexity
 formula. Both construction orders are executed and compared semantically.
 
+## Optional extension: Aria is busy
+
+The maintained Service test also applies this recipe to the shipped data. Merge
+the following fields into the existing declarations and append the action to
+the hearth's existing actions:
+
+```yaml
+globals:
+  aria_ready: false
+actors:
+  aria:
+    episodes:
+      conversation:
+        offer:
+          availability:
+            - {expr: aria_ready}
+scenes:
+  inn:
+    blocks:
+      hearth:
+        actions:
+          - text: Wait for Aria
+            successor: hearth
+            effects:
+              - "graph.locals['aria_ready'] = True"
+```
+
+Her conversation remains attached but unavailable until the player waits.
+Waiting makes the same Action available; the conversation returns to the hearth
+and its normal once rule then makes the offer unavailable again.
+
 ## Maintained evidence and limits
 
 The shipped bundles are loaded by normal discovery and Service creation. The
@@ -105,7 +136,6 @@ These are local Service and CLI witnesses for [#438](https://github.com/derekmer
 not evidence of REST, media, visual parity or universal conformance.
 
 The supported projection is EAGER and mutable. LAZY/JIT and frozen projection,
-Role-owned episodes, richer invocation context, Fire Aria and return policy,
-and sandbox consumer convergence remain follow-ups under
+richer invocation context, Fire Aria and return policy remain follow-ups under
 [#702](https://github.com/derekmerck/storytangl/issues/702) and
 [#255](https://github.com/derekmerck/storytangl/issues/255).

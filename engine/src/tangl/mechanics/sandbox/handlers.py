@@ -59,21 +59,6 @@ from .visibility import SandboxProjectionState, SandboxVisibilityRule
 logger = logging.getLogger(__name__)
 
 
-@runtime_checkable
-class SandboxEventProvider(Protocol):
-    """Concept provider that can donate sandbox events."""
-
-    def get_sandbox_events(
-        self,
-        *,
-        caller: SandboxLocation,
-        ctx: VmPhaseCtx,
-        ns: Mapping[str, Any],
-    ) -> list[ScheduledEvent] | None:
-        """Return sandbox events available from this provider."""
-        ...
-
-
 class TaggedEntity(Protocol):
     """Entity surface for tag-based dynamic sandbox cleanup."""
 
@@ -551,15 +536,6 @@ def _scheduled_event_contributions(
                 )
                 for event in asset.scheduled_events
             )
-    contributions.extend(
-        ScheduledEventContribution(
-            event=event,
-            source="sandbox_schedule",
-            source_label=event.label or event.target,
-            source_kind="provider",
-        )
-        for event in _provider_scheduled_events(location, ctx=ctx)
-    )
     return contributions
 
 
@@ -1162,43 +1138,6 @@ def sandbox_projection_state(
 ) -> SandboxProjectionState:
     """Return the disclosed projection state for ``location`` in ``ctx``."""
     return _projection_state(location, ctx)
-
-
-def _concept_providers(location: SandboxLocation, ctx: VmPhaseCtx) -> list[Any]:
-    ns = ctx.get_ns(location)
-    providers = list(ns.values())
-    for key in ("roles", "settings"):
-        value = ns.get(key)
-        if isinstance(value, dict):
-            providers.extend(value.values())
-    return providers
-
-
-def _provider_scheduled_events(
-    location: SandboxLocation,
-    *,
-    ctx: VmPhaseCtx,
-) -> list[ScheduledEvent]:
-    events: list[ScheduledEvent] = []
-    seen_provider_ids: set[int] = set()
-    ns = ctx.get_ns(location)
-    for provider in _concept_providers(location, ctx):
-        provider_id = id(provider)
-        if provider_id in seen_provider_ids:
-            continue
-        seen_provider_ids.add(provider_id)
-
-        if not isinstance(provider, SandboxEventProvider):
-            continue
-
-        provided = provider.get_sandbox_events(caller=location, ctx=ctx, ns=ns)
-        if provided is None:
-            continue
-        for event in provided:
-            if not isinstance(event, ScheduledEvent):
-                raise TypeError("get_sandbox_events must yield ScheduledEvent instances")
-            events.append(event)
-    return events
 
 
 def _selected_payload(ctx: VmPhaseCtx) -> Any:

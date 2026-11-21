@@ -92,7 +92,7 @@ Current first-pass surface:
 - `project_sandbox_wait`: planning handler that projects wait as a normal
   self-loop choice.
 - `project_sandbox_scheduled_events`: planning handler that projects known
-  scope, location, mob, asset, fixture, and concept-provider scheduled-event
+  scope, location, mob, asset, and fixture scheduled-event
   candidates through the normal sponsored interaction path; their gates remain
   live action availability rather than projection filters.
 - `project_sandbox_unlocks`: planning handler that projects locked local objects
@@ -276,10 +276,9 @@ old IF maps often use one-way travel, weird loops, and conditional returns. A
 future `GridSandbox` specialization can add RPG-map-style symmetric adjacency
 defaults for tile or grid worlds without changing the base sandbox contract.
 
-Concept providers can opt in by exposing `get_sandbox_events(caller, ctx, ns)`.
-The sandbox projector discovers those providers from the gathered namespace, so
-roles, settings, locations, actors, and asset tokens can donate choices without
-becoming sandbox-specific base classes.
+A `SandboxLocation` also receives shared Story Scene offers like any other Block.
+An Actor-owned Scene exposed through a bound Role can offer a conversation here
+without a sandbox-specific callback; its source and availability gates remain live.
 
 Generated sandbox actions carry provenance in `ui_hints`: the projection
 `source`, contribution kind, source label/kind, and sandbox scope. This is still

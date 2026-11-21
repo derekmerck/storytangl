@@ -77,17 +77,13 @@ Action to the shared destination. Owner, declaration, receiver, requirement/Role
 bound provider and destination are distinct references, even when some coincide.
 Trigger data should pass through the same projection; choice is the default.
 
-Earlier characterization tests prove the sandbox path: sandbox gathers a Role's
-provider from the receiver namespace, deduplicates aliases, and projects a normal
-scheduled-event Action. A sibling outside that scope gets no donation; removing
-the roles removes the offer without deleting the provider. JSON restoration and
-continued traversal preserve those bindings. `Frame._run_planning_phase` derives
-the immediate successor's context, and the witness confirms that successor's
-provider does not leak to the current node. Separately, ordinary authored Actions
-call one shared destination from two receivers; destination-history `once`
-prevents the second call after the first returns, including after JSON restore.
-Provider-sponsored sandbox Actions are currently refreshed during reprovisioning;
-their UUID retention is not established by these tests.
+The shared offer path covers both ordinary Blocks and sandbox locations. Its
+witness deduplicates two Role bindings to one Actor, excludes a sibling outside
+scope, retains the Action across replanning and temporary availability changes,
+and removes it after structural exposure is lost. Constructor-form JSON restore
+preserves the bindings and continued call/return. Frame planning uses the
+immediate successor's own scope. Destination-history `once` is witnessed across
+ordinary receivers and JSON restore.
 
 ## Ownership and lowering recommendation
 
@@ -128,7 +124,8 @@ or a generic persistent match record by default.
 
 The ordinary receiver path uses Scene action wording and explicitly authored
 destination-history once. Invocation context enrichment and lazy materialization
-remain open; sandbox's specialized path has not yet been replaced.
+remain open. Sandbox locations also receive shared Actor-owned Scene offers;
+other sandbox scheduled-event families retain their own projection paths.
 Keep normal one-step-ahead planning and the existing justified JIT path: descending
 eligible contributions is not expansion of future game trees. Scheduling,
 preemption, per-cause instances, general capacity/arbitration, alternative casting,
