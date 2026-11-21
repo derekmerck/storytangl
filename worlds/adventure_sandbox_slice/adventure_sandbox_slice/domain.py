@@ -410,7 +410,6 @@ def _ensure_adventure_sandbox(graph: Graph) -> None:
     if _graph_frozen_shape(graph):
         pirate.prepare_discrete_wallet()
     scope.add_child(pirate)
-    scope.mobs.append(pirate)
 
 
 @adventure_dispatch.register(task="story_ready", wants_caller_kind=StoryGraph,

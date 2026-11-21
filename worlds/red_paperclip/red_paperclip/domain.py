@@ -221,7 +221,6 @@ def _ensure_district(graph: Graph) -> None:
         )
         graph.add(mob)
         scope.add_child(mob)
-        scope.mobs.append(mob)
 
 
 @on_provision(
@@ -398,7 +397,7 @@ def compose_spent_trader_lines(
     spent = set(_spent(caller))
     lines = {
         mob.uid: TRADES.traders[mob.get_label()].gone_text(TRADES.items)
-        for mob in scope.mobs
+        for mob in scope.scoped_mobs()
         if mob.get_label() in spent
     }
     if not lines:

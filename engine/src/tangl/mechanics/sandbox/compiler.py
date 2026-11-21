@@ -819,6 +819,5 @@ class SandboxSliceCompiler:
             )
             graph.add(mob)
             scope.add_child(mob)
-            scope.mobs.append(mob)
             mobs[label] = mob
         return mobs

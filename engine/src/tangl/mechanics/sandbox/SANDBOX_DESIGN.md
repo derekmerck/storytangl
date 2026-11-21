@@ -344,6 +344,13 @@ chapter-like ancestor that donates sandbox rules to child locations through the
 same ancestor namespace/hierarchy pattern that scenes already use for child
 blocks.
 
+Scoped mobs are graph-owned `SandboxMob` children of their managing scope.
+`scoped_mobs()` reads the live child membership; no second roster is stored.
+Nested scope discovery walks outer to inner scopes. A mob's current or scheduled
+physical location is separate state and does not reparent it. Constructor-form
+JSON restores the same graph member through the scope, including in-place mob
+state and schedule changes.
+
 Current scope donations:
 
 - shared `world_turn`

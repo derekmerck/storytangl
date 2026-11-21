@@ -34,7 +34,6 @@ class SandboxScope(TraversableNode):
 
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
     scheduled_presence: list[ScheduledPresence] = Field(default_factory=list)
-    mobs: list[SandboxMob] = Field(default_factory=list)
     visibility_rules: list[SandboxVisibilityRule] = Field(default_factory=list)
     player_assets: SandboxInventory = Field(
         default_factory=SandboxInventory,
@@ -49,6 +48,10 @@ class SandboxScope(TraversableNode):
         super().bind_registry(registry)
         self.player_assets.bind_asset_owner(self)
 
+    def scoped_mobs(self) -> Iterator[SandboxMob]:
+        """Yield graph-owned mobs managed directly by this scope."""
+        return self.children(Selector(has_kind=SandboxMob))
+
     @contribute_ns
     def provide_sandbox_scope_symbols(self) -> dict[str, Any]:
         """Publish scope metadata to descendant namespaces."""
@@ -56,7 +59,7 @@ class SandboxScope(TraversableNode):
             "sandbox_scope": self.get_label(),
             "sandbox_scope_node": self,
             "world_time": current_world_time(self),
-            "sandbox_mobs": {mob.get_label(): mob for mob in self.mobs},
+            "sandbox_mobs": {mob.get_label(): mob for mob in self.scoped_mobs()},
             "player_assets": self.player_assets,
             "player_inv": self.player_assets.assets,
         }
