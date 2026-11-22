@@ -3,13 +3,15 @@
 *(formerly "The Affordance Model" — affordance is one direction of the primitive
 defined here, not the whole of it; see the naming note at the end.)*
 
-**Document Version:** 2.3
+**Document Version:** 2.4
 **Status:** CANONICAL — defines the **open link** as StoryTangl's planning
 primitive and frames `Dependency`, `Affordance`, and `Fanout` against it via a
 feature matrix. v2.2 filled in the #255 audit table (issues #255/#268); v2.3
 records the concept-donation/source-binding distinction, the proposed `When` /
 `Time` Story vocabulary, and explicit owner-directed sub-story mutation. Those
 extensions are **design direction, not claims of implemented runtime behavior**.
+v2.4 adds the reconciled assembly/gating/walking contract for #236/#255; runtime
+convergence remains partial.
 Several domain layers (menu fanout, sandbox interactions,
 scheduled events) are *coordinates* in this matrix; some have drifted into
 bespoke vocabularies and are noted as convergence debt rather than separate
@@ -54,6 +56,144 @@ should be an affordance at all rather than prose or explicit structure.
 > availability and choice disclosure apply only after projection.**
 
 The rest of this document expands that paragraph.
+
+---
+
+## Assembly, gating and walking: convergence contract
+
+**Status:** reconciled design target for #236/#255; implementation is partial.
+This governs the next migrations, not a new `OpenLink` framework. Representation
+and call-completion checkpoints remain explicit below.
+
+### Three operations
+
+| Operation | Responsibility |
+| --- | --- |
+| Assemble | Reconcile the graph with declarations over a requested neighbourhood. |
+| Gate | Read whether an existing opportunity is still structurally justified and usable now. |
+| Walk | Follow an edge, maintain control flow, and request arrival readiness and phases. |
+
+Assembly matches scoped declarations and open requirements, materializes missing
+instances or links, retains continuing bindings, and retires obsolete projections.
+Dependency requests and scoped offers use the same matching/materialization
+machinery. This is one operation with domain policy, not necessarily one physical
+loop. Newly materialized providers may expose further requirements; incomplete
+discovery must not retire bindings it has simply not examined.
+
+A declaration describes a contribution. Its owner makes it discoverable; a
+provider supplies a required resource; a receiver is the attachment site; a
+destination is where an Action goes. These roles may coincide, but must not be
+made equal merely to fill an endpoint. Current resolver consumers interpret an
+Affordance's successor as a supplied resource; generalization must reconcile that
+reader without a fake owner self-link.
+
+Reusable Action declarations belong at the `EntityTemplate` boundary. Only
+receiver-local materializations are executable graph Actions. Scene calls, local
+verbs and automatic actions use ordinary Action vocabulary and one assembly path.
+A bound but unavailable Action is valid; a declaration-only Action masquerading
+as an inert runtime edge is not. Catalog references or explicitly owned embedded
+templates use constructor form, without another registry or serializer. Their
+precise storage/reference shape remains the slice-3 coding checkpoint.
+
+### Three invariants
+
+**Idempotence:** unchanged declarations, effective inputs and neighbourhood cause
+no further semantic graph changes. Continuing UIDs and attachment order survive
+repeat assembly; providers are not resampled. Rebuilding non-persistent indexes
+is not new binding. Restore under the same authorities and inputs satisfies the
+same rule. A callee that changes inputs can require real reconciliation on return.
+
+**Locality:** each condition uses the context prescribed by its declaration kind.
+Source requirements match the actual receiver or qualifying ancestor; offer gates
+and route guards use the receiver/source context; destination and entry readiness
+use destination contexts. Neither another cursor nor the last attachment supplies
+an implicit replacement. An offer's authoring owner need not own its namespace.
+
+**Separation:** assembly owns derived-opportunity reconciliation. Gating does not
+allocate, bind, prune, sample or repair the graph. Walking delegates required
+construction to assembly. Accepted UPDATE/FINALIZE effects may change inputs,
+including custody, scope membership and Role bindings, through ordinary APIs.
+Namespace reads and old opportunities' validity reflect those changes immediately;
+new derived links appear at the next assembly boundary. Creation as an accepted
+story consequence retains normal materialization/provenance requirements.
+
+Structural participation and live availability are declared separately. Temporary
+schedules, locks and willingness normally gate existing links; loss of legitimate
+donor scope can end an attachment. Relationship policy defines the relevant inputs,
+not a hardcoded list of special concept types. Mobile and custody-based donors
+need explicit witnesses before their policies are generalized.
+
+Selection rechecks structural justification and live gates without shape mutation,
+so a stale Action can be refused before assembly removes it. Accepted selection
+that needs a latent destination separately requests assembly/readiness before
+traversal. Read-only viability preview does not perform that creation.
+
+### Identity, freshness and retirement
+
+A retain key distinguishes declaration occurrence, receiving site, and effective
+construction parameters that define a different binding. Construction equivalence
+is not universal occurrence identity. Current mutable values and every gate input
+do not belong in the key. `source_ids` is deduplicated attachment history, not
+executable adjacency, an allocation key or a namespace selector.
+
+Changed effective payload, cost or target must not leave a stale Action. The
+declaration's contract says whether it refreshes a continuing binding or replaces
+it. The first slice may keep declarations fixed, but must say so and test declared
+replacement. Live values are not all predicates or "gate-only". Event-occurrence
+identity remains a separate consumer concern.
+
+Loss of justification immediately prevents further selection. Physical removal
+must preserve objects still required by active calls/bookmarks, including return
+information. Historical fragment IDs do not alone require every retired Action to
+stay in the live graph forever. The lifetime rule must name which live references
+pin an object and when removal is safe, using existing Ledger/persistence machinery.
+This remains a retirement checkpoint, not a general garbage-collector mandate.
+
+### Breadth, readiness and control flow
+
+The same operation accepts broad setup and narrow runtime neighbourhoods. EAGER
+setup establishes the admitted configuration for this playthrough; it need not
+reconcile the whole world on every move or create every possible catalog instance.
+Frame planning provisions the cursor and immediate successors in their own
+contexts. Startup and selected-destination readiness use existing on-demand seams.
+
+Frozen shape requires construction closure before further expansion is forbidden.
+An empty assembly request means no work, not proof of closure. Availability stays
+live. Newly required construction in a frozen story must be explicitly unsupported
+or refused, not silently treated as ready. Current setup requires EAGER for freezing;
+that does not prove every donation family supports frozen projection. Different
+breadths and expansion permission need one mechanism, not one indistinguishable promise.
+
+A traversable declaration separates activation, target binding, call completion
+and after-call disposition. PLANNING precedes PREREQS. A guard-closing automatic
+self-loop can run at POSTREQS (`last`); a PREREQS (`first`) self-loop cannot rely on its later UPDATE
+effect to stop redirecting. Phase-resume skips phases before its entry point;
+re-entry requests reconciliation and the chosen state phases.
+
+Current calls complete by exhaustion. A plain jump neither adds a bookmark nor
+abandons an existing one. Explicit return, escape/abandonment and run-ending
+completion remain the #560 checkpoint: later unrelated exhaustion must not be
+assumed to complete the intended callee, and explicit return alone does not dispose
+of abandoned calls. A dynamic return uses active call context, not a caller baked
+into a shared template or a retargeted shared graph edge. Do not infer stack
+unwinding from lexical scope or add it in #236.
+
+### Witnesses and migration
+
+Witness setup/first entry, ahead-planned movement, unresolved selected destination,
+automatic transition, call/re-entry or phase-resume, and restore/continued play.
+These test one contract rather than define scenario-specific mechanisms. Include
+two receivers, opposing namespaces, changed relationship inputs, an active call
+during detachment, and construction at a previously unprojected receiver after restore.
+
+First implement shared Action assembly and migrate the complete location-interaction
+family. Then migrate Wait and map travel, followed by fixture, asset, mob and
+scheduled contributions in bounded PRs. Each deletes superseded machinery, retains
+or explicitly revises useful capabilities, and checks idempotence and no-change cost.
+Invariants alone are insufficient: producing no opportunities satisfies them
+vacuously. Mobile scope and destinations beyond one radius remain named follow-ups.
+Calendar costs/capacity remain domain policies; #560 owns return execution, #456
+event occurrences, and #692 comparison vocabulary.
 
 ---
 

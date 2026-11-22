@@ -89,8 +89,9 @@ INIT → VALIDATE → PLANNING → PREREQS → UPDATE → JOURNAL → FINALIZE �
 ```
 
 **Phase ordering is causal, not arbitrary.** Each phase has a defined semantic role and
-fires in a fixed sequence with no skipping (except when an early phase produces a
-redirect, in which case `follow_edge` loops from the top on the new target):
+runs in order from the incoming edge's `entry_phase`. A phase-resume can skip earlier
+phases; a redirect follows its target with that edge's own entry policy. In particular,
+PLANNING runs before PREREQS:
 
 | Phase | Role | Aggregation |
 |-------|------|-------------|
@@ -121,9 +122,20 @@ they wrap core primitives (`Predicate`, `Effect`). See *Traversal Traits* below.
 **Atomic pipeline, no split around input.** FINALIZE and POSTREQS run immediately after
 JOURNAL — the player's next choice is recorded at the start of the *next*
 `resolve_choice` call, not at the end of the current pipeline. This keeps the pipeline
-atomic and simplifies replay: every step is a complete VALIDATE→POSTREQS sequence.
+atomic and simplifies replay: a step completes its applicable phases without waiting
+for another input midway. Redirects and declared entry phases still control which
+phases run.
 
 ### Turn atomicity and frontier timing
+
+The [Open Links convergence contract](../../design/planning/AFFORDANCE_MODEL.md#assembly-gating-and-walking-convergence-contract)
+names three operations: assemble declarations over a neighbourhood, gate existing
+opportunities without graph mutation, and walk with explicit readiness and phase
+entry. It is a design target, not a claim that every projector is consolidated.
+Relationship effects are inputs to later assembly; they are not additional
+projection engines. Setup and runtime breadth share the operation; frozen shape
+additionally requires a closed construction boundary. Unchanged inputs preserve
+bindings after re-entry or restore; changed inputs need reconciliation.
 
 User interaction begins a turn; presentation of the next live frontier ends it. The
 pipeline never blocks midway for more external instruction. A question that needs a
@@ -313,6 +325,24 @@ Wraps core's `Edge` with phase-control fields:
 **Call/return semantics are edge properties, not graph structure.** One edge UUID in the
 graph serves as the call bookmark — there is no separate return-edge data structure.
 `get_return_edge()` constructs an `AnonymousEdge` pointing back to the predecessor.
+
+**Completion is separate from return disposition.** The rule above describes today's
+exhaustion-based completion. An ordinary jump inside an open call does not discard
+that call, so later exhaustion can still pop it. This does not establish correct
+escape, restart or intended-ending semantics. The
+[#560 completion checkpoint](https://github.com/derekmerck/storytangl/issues/560#issuecomment-7073304705)
+owns explicit return, abandonment and ending policy as well as resume/re-entry.
+Lexical scope exit must not silently unwind the stack. A shared return action would
+resolve the active bookmark at execution, not store one caller in a reusable
+declaration. Retirement must preserve
+call edges that still-open bookmarks require, including persisted call-stack UUIDs.
+No new completion or unwind behavior is implemented by this note.
+
+The completion witness must include normal return, permanent escape and death/restart,
+then a later terminal passage and JSON-restored continuation. Jumping to a start node
+inside the same Ledger is not by itself a fresh run or a call-stack reset. An explicit
+return alone also leaves unanswered how an abandoned call is released and whether
+its completion hooks run; those decisions belong to #560.
 
 **Exhausted-call completion is explicit, not node FINALIZE.** A node's ordinary
 FINALIZE belongs to every traversal step, including an open multi-node callee; it does
