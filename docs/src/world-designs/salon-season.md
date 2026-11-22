@@ -252,6 +252,28 @@ venue, who was present, and when. Like testimony, it is consumer-owned history:
 it outlives the conversation and any binding. Those present are the people who
 can later testify to it. Silence counts as a stance when someone notices it.
 
+**Dress is a remark too, and so is the body.** Putting something on at a
+venue writes the same record as speaking: stance, venue, who was present, and
+when. The garment is a held token, and wearing it is the remark. The only extra
+fact is how long the mark stays visible, because marks differ in how fast they
+can be undone:
+
+| Mark | Undone in | Period readings |
+| --- | --- | --- |
+| Tricolour cockade | A moment | Mandatory for men in practice by 1792 and by decree for women from September 1793, weeks before the Convention proclaimed freedom of dress. Too showy after Thermidor reads as Jacobin zeal |
+| Breeches or trousers, the red cap | An evening | Silk knee-breeches mark the aristocrat. The *sans-culotte*'s trousers, carmagnole jacket and Phrygian cap are protection in 1793 and a target in 1795 |
+| Dress and pockets | A season | The *chemise à la reine* scandal (1783) is both fashion and the Lyon silk trade. Slim 1790s gowns leave no room for tied-on pockets, so papers move into the reticule, mocked as the *ridicule* |
+| Collars | An evening | Thermidor's *muscadins* wear black or green collars, the green reading as royalist |
+| Patches, rouge, stays | A day to a season | Court rouge is aristocratic, Rousseau's natural face virtuous. Addison's *Spectator* (1711) mocked Whig and Tory ladies who patched opposite cheeks. Giving up stays reshapes the silhouette |
+| Hair | Months | Powder gives way to the cropped *à la Titus*. After Thermidor, royalists crop *à la victime*, as the condemned were cropped for the guillotine |
+| Brand | Never | The state's mark on convicts: the fleur-de-lis, later letters such as V for *voleur* |
+
+Reversibility is what makes the body interesting. Crop your hair for the
+Jacobins in spring 1794 and you are still visibly a Jacobin at Thermidor. You
+cannot change your mind as fast as your clothes. Mechanically it is a mark with
+a visible-until date, read like any other fact. And a wardrobe that turns with
+each regime leaves its own record of opportunism.
+
 **Who controls the truth is a reading, not a fact.** The remark sits in the
 *historical truth* layer and never changes. Each regime supplies its own
 reading over the same records, and that reading produces the charge:
