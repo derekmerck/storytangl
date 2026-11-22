@@ -120,9 +120,8 @@ and new derived links appear at the next assembly boundary.
 The shared relationship vocabulary starts with scope membership, explicit custody
 exposure and bound Roles. First-slice witnesses fix their common interpretation;
 declarations state which relationships they require. An extension adds a concrete
-consumer witness and uses the same reconciliation core. This starting vocabulary
-can grow with tested consumers. Mobile/custody donor policies still need their
-own migration witnesses.
+consumer witness and uses the same reconciliation core. Mobile/custody donor
+policies still need their own migration witnesses.
 
 Structural participation and live availability are declared separately. Temporary
 schedules, locks and willingness normally gate existing links; loss of legitimate
@@ -140,8 +139,7 @@ construction parameters. Equal keys retain the binding; changed keys replace it,
 retiring the old binding under the lifetime rule below. Payload, cost or target
 values baked into construction belong in the key; a binding with changed construction
 inputs is stale until assembly replaces it. Gate inputs and live instance state
-are read at their normal evaluation boundaries. Other live values require explicit
-policy for their evaluation.
+are read at their normal evaluation boundaries.
 
 The first slice keeps declarations fixed and tests explicit replacement. In-place
 refresh during assembly needs a consumer witness before it becomes an additional
@@ -192,9 +190,9 @@ call context. Completion policy and active-bookmark retirement remain checkpoint
 
 Witness setup/first entry, ahead-planned movement, unresolved selected destination,
 automatic transition, call/re-entry or phase-resume, and restore/continued play.
-These are witnesses of the common invariants. Include
-two receivers, opposing namespaces, changed relationship inputs, an active call
-during detachment, and construction at a previously unprojected receiver after restore.
+These are witnesses of the common invariants. Include two receivers, opposing
+namespaces, changed relationship inputs, an active call during detachment, and
+construction at a previously unprojected receiver after restore.
 
 First implement shared Action assembly and migrate the complete location-interaction
 family. Then migrate Wait and map travel, followed by fixture, asset, mob and
