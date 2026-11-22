@@ -3,7 +3,9 @@
 **Status:** #706, #707 and #709 are merged characterization, reference-ownership
 and source-bookkeeping foundations. #710 adds retained ordinary call Actions
 for scoped owned scenes in EAGER, mutable stories. LAZY/JIT and frozen
-projection, invocation-context enrichment, and sandbox migration remain follow-ups.
+projection and invocation-context enrichment remain follow-ups. #717 extends the
+shared owned-Scene path to sandbox locations and removes their provider callback.
+Broader Action/family convergence remains pending.
 The Role-owned witness supports a bound scene Role as a distinct offer owner;
 it does not add automatic recasting or a general unbound-Role offer policy.
 The paired Crossroads examples in `worlds/crossroads_receiver` and
@@ -13,6 +15,13 @@ parity or general client conformance.
 The broader offer/request convergence remains in
 [Open Links](../../design/planning/AFFORDANCE_MODEL.md) and
 [#255](https://github.com/derekmerck/storytangl/issues/255).
+
+The [assembly, gating and walking contract](../../design/planning/AFFORDANCE_MODEL.md#assembly-gating-and-walking-convergence-contract)
+governs that convergence. It separates declaration templates from executable Actions,
+relationship inputs from derived links, continuing identity from parameter freshness,
+and readiness from traversal phase entry. The next representation must satisfy this
+contract; its exact graph/reference shape remains a coding checkpoint. #560 separately
+settles what completes or abandons an open call.
 
 ## From authoring to an ordinary action
 

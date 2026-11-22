@@ -3,13 +3,15 @@
 *(formerly "The Affordance Model" — affordance is one direction of the primitive
 defined here, not the whole of it; see the naming note at the end.)*
 
-**Document Version:** 2.3
+**Document Version:** 2.4
 **Status:** CANONICAL — defines the **open link** as StoryTangl's planning
 primitive and frames `Dependency`, `Affordance`, and `Fanout` against it via a
 feature matrix. v2.2 filled in the #255 audit table (issues #255/#268); v2.3
 records the concept-donation/source-binding distinction, the proposed `When` /
 `Time` Story vocabulary, and explicit owner-directed sub-story mutation. Those
 extensions are **design direction, not claims of implemented runtime behavior**.
+v2.4 adds the reconciled assembly/gating/walking contract for #236/#255; runtime
+convergence remains partial.
 Several domain layers (menu fanout, sandbox interactions,
 scheduled events) are *coordinates* in this matrix; some have drifted into
 bespoke vocabularies and are noted as convergence debt rather than separate
@@ -54,6 +56,152 @@ should be an affordance at all rather than prose or explicit structure.
 > availability and choice disclosure apply only after projection.**
 
 The rest of this document expands that paragraph.
+
+---
+
+## Assembly, gating and walking: convergence contract
+
+**Status:** reconciled design target for #236/#255; implementation is partial.
+This governs the next migrations. Representation and call-completion checkpoints
+remain explicit below.
+
+### Three operations
+
+| Operation | Responsibility |
+| --- | --- |
+| Assemble | Reconcile the graph with declarations over a requested neighbourhood. |
+| Gate | Read whether an existing opportunity is still structurally justified and usable now. |
+| Walk | Follow an edge, maintain control flow, and request arrival readiness and phases. |
+
+One reconciliation core compares entailed construction keys with existing bindings,
+materializes missing instances or links, retains continuing bindings, and retires
+obsolete projections. Families supply declarations, construction-key inputs and
+gate policy to this core. Dependency requests and scoped offers share its matching
+and materialization machinery. Several discovery passes may expose further
+requirements; retirement applies only to bindings covered by completed discovery.
+Each migrated family replaces its own create/retain/retire loop with this core.
+
+A declaration describes a contribution. Its owner makes it discoverable; a
+provider supplies a required resource; a receiver is the attachment site; a
+destination is where an Action goes. Each reference states its actual role.
+Current resolver consumers interpret an Affordance's successor as a supplied
+resource; generalization must reconcile that reader explicitly.
+
+Reusable Action declarations belong at the `EntityTemplate` boundary. Only
+receiver-local materializations are executable graph Actions. Scene calls, local
+verbs and automatic actions use ordinary Action vocabulary and one assembly path.
+A bound but unavailable Action remains a valid runtime edge. Catalog references
+or explicitly owned embedded templates use existing constructor form. Their
+precise storage/reference shape remains the slice-3 coding checkpoint.
+
+### Three invariants
+
+**Idempotence:** the same declarations, effective inputs and neighbourhood preserve
+the semantic graph, continuing UIDs, provider choices and attachment order. This holds
+after restore under the same authorities and inputs; changed inputs after a call
+require reconciliation.
+
+**Locality:** each condition uses the context prescribed by its declaration kind.
+The receiving site, source and destination each keep their prescribed evaluation
+role, independently of the offer's authoring owner or attachment history.
+
+| Witness | Evaluation context |
+| --- | --- |
+| Source requirement | Actual receiver or qualifying ancestor |
+| Offer gate / route guard | Receiver / source |
+| Destination admission / entry readiness | Destination / entry |
+
+**Separation:** assembly owns changes to derived opportunities, gating reads their
+current justification and availability, and walking delegates construction to
+assembly. Accepted UPDATE/FINALIZE effects change relationship inputs through
+ordinary APIs; namespace reads and validity checks reflect those changes immediately,
+and new derived links appear at the next assembly boundary.
+
+The shared relationship vocabulary starts with scope membership, explicit custody
+exposure and bound Roles. First-slice witnesses fix their common interpretation;
+declarations state which relationships they require. An extension adds a concrete
+consumer witness and uses the same reconciliation core. Mobile/custody donor
+policies still need their own migration witnesses.
+
+Structural participation and live availability are declared separately. Temporary
+schedules, locks and willingness normally gate existing links; loss of legitimate
+donor scope can end an attachment.
+
+Selection rechecks justification and live gates, refusing stale Actions before
+assembly removes them. Accepted selection that needs a latent destination separately
+requests assembly/readiness before traversal. Creation as a story consequence uses
+normal materialization and provenance.
+
+### Identity, freshness and retirement
+
+A retain key distinguishes declaration occurrence, receiving site and effective
+construction parameters. Equal keys retain the binding; changed keys replace it,
+retiring the old binding under the lifetime rule below. Payload, cost or target
+values baked into construction belong in the key; a binding with changed construction
+inputs is stale until assembly replaces it. Gate inputs and live instance state
+are read at their normal evaluation boundaries.
+
+The first slice keeps declarations fixed and tests explicit replacement. In-place
+refresh during assembly needs a consumer witness before it becomes an additional
+behaviour. `source_ids` retains deduplicated attachment history. Event-occurrence
+identity remains a separate consumer concern.
+
+Loss of justification immediately prevents further selection. Physical removal
+preserves objects required by active calls/bookmarks, including return information.
+The lifetime checkpoint must name the live references that pin an object and when
+existing Ledger/persistence machinery can release it. Historical fragment IDs and
+live bookmarks have different lifetime requirements.
+
+### Breadth, readiness and control flow
+
+The same core accepts broad setup and narrow runtime neighbourhoods. EAGER setup
+establishes the admitted configuration for this playthrough; runtime assembly works
+over the requested neighbourhood. Frame planning provisions the cursor and immediate
+successors in their own contexts. Startup and selected-destination readiness use
+existing on-demand seams.
+
+Frozen shape requires construction closure and refuses newly required expansion.
+Availability stays live. Current setup requires EAGER for freezing; each donation
+family establishes its supported modes through witnesses. Breadth and expansion
+permission are inputs to the same mechanism.
+
+A traversable declaration separates activation, target binding, call completion
+and after-call disposition. PLANNING precedes PREREQS. A guard-closing automatic
+self-loop uses POSTREQS (`last`) so its UPDATE effect can close its guard. A `first`
+redirect runs at PREREQS, before UPDATE. Phase-resume starts at its declared entry
+phase; re-entry requests reconciliation and the chosen state phases.
+
+Current calls complete by exhaustion; a plain jump preserves open calls. #560 owns
+explicit return, abandonment and run-ending completion, including the risk of later
+unrelated exhaustion popping an abandoned frame. A dynamic return resolves active
+call context. Completion policy and active-bookmark retirement remain checkpoints.
+
+### Not implied
+
+- Separate family reconciliation loops, a new `OpenLink` base, registry or serializer.
+- Graph construction or cleanup during gating and read-only viability preview.
+- Declaration-only executable Action prototypes or fake provider endpoints.
+- Attachment history selecting adjacency, binding identity or evaluation context.
+- An empty assembly request proving frozen construction closure.
+- A plain jump or lexical scope exit abandoning a call or resetting a run; explicit
+  return alone settling abandoned-frame lifetime.
+
+### Witnesses and migration
+
+Witness setup/first entry, ahead-planned movement, unresolved selected destination,
+automatic transition, call/re-entry or phase-resume, and restore/continued play.
+These are witnesses of the common invariants. Include two receivers, opposing
+namespaces, changed relationship inputs, an active call during detachment, and
+construction at a previously unprojected receiver after restore.
+
+First implement shared Action assembly and migrate the complete location-interaction
+family. Then migrate Wait and map travel, followed by fixture, asset, mob and
+scheduled contributions in bounded PRs. Each deletes superseded machinery, retains
+or explicitly revises useful capabilities, and checks idempotence and no-change cost.
+Each witness must produce the intended opportunities as well as satisfy the
+invariants. Mobile scope and destinations beyond one radius remain named follow-ups.
+Calendar costs/capacity remain domain policies; #560 owns return execution, #456
+event occurrences, and #692 comparison vocabulary.
 
 ---
 
