@@ -284,6 +284,34 @@ reading over the same records, and that reading produces the charge:
 | Defended a censored pamphleteer | Patriotic | "Indulgent", if the pamphleteer was Desmoulins | A credential |
 | Said nothing about the bread riot | Indifference: suspect | Suspect | Prudence |
 | Praised a minister who later profited | Corruption by association | Worse once the East India affair breaks | Depends who is judging |
+| Kept a confessor who later refused the clergy oath | Refractory ties: suspect | Suspect, now against a state cult of the Supreme Being | Tolerated; public worship is freed again in February 1795 |
+
+**Two adjudicators that cover for each other.** Readings are not impartial
+about who is accused. Under the old regime the crown names the bishops, the
+church votes the crown a "free gift" instead of taxes, and each judge looks
+away from the other's failings:
+
+- At Metz in 1744 the bishop of Soissons refused Louis XV absolution until he
+  sent his mistress away. The king recovered, recalled her, and the bishop fell
+  from favour. No one preached that sermon again.
+- The Toulouse parlement broke the Protestant Jean Calas on the wheel (1762),
+  lending the state's court to the church's quarrel.
+- The Parlement acquitted Cardinal de Rohan, Grand Almoner of France, in the
+  Necklace affair (1786).
+
+The Revolution rebuilds the same arrangement with itself on both sides. The
+Civil Constitution of the Clergy (1790) makes priests state officials and
+splits every parish over the oath. Dechristianization follows, and then, in
+June 1794, Robespierre presides over the Festival of the Supreme Being. Terror
+is declared the emanation of virtue, and the moral and the legal judge become
+one committee. The mockery of that festival is one of the things that brings him
+down.
+
+Mechanically, collusion is a reading whose weights depend on the accused's
+affiliation: an ally's swindle reads as nothing. That is more data, not a new
+mechanism. The confessor is a witness no one else can be. Whether what you
+confessed in 1789 can reach a case, and whether a juring priest would carry it
+there, is a custody question like any other.
 
 Whether a remark reaches a case is the *admitted evidence* layer, and that is
 where the narrative is fought over:
