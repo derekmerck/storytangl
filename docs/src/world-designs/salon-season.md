@@ -235,8 +235,9 @@ modern figure is named or caricatured.
 | War as distraction | Talk of a foreign war to rally the country | The Girondins push for war in 1792 partly for domestic advantage, and that war drives the Terror |
 | Favor and cronyism | Court pensions, purchased offices, the Necklace affair's afterglow | Speculation in assignats and nationalized lands; army supply contracts |
 | The press | Royal censorship, and then the flood of pamphlets | Desmoulins is guillotined after calling for clemency in *Le Vieux Cordelier*. Meanwhile the War Ministry buys *Le Père Duchesne* in bulk for the armies: state-approved news |
+| Paper money | The Caisse d'escompte's notes, convertible to coin only on the crown's say-so since 1788 | Counterfeit assignats printed by émigré presses, widely believed to have British connivance: a forged currency used to sabotage a regime |
 | Scarcity | Bread prices; the Réveillon riot (April 1789) | The price Maximum and hoarding as a capital crime |
-| Suspicion itself | Lettres de cachet | The Law of Suspects (September 1793), under which failing to show enough attachment to the Revolution is itself suspect |
+| Suspicion itself | Lettres de cachet | The Law of Suspects (September 1793), under which failing to show enough attachment to the Revolution is itself suspect. Also the "foreign plot": the charge that foreign gold, through the Baron de Batz, had bought deputies. It could be laid against almost anyone with money or foreign friends |
 
 The Directory's open kleptocracy comes after the Season ends. It can colour an
 epilogue, not a case.
