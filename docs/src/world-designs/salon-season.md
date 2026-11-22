@@ -215,6 +215,76 @@ proven.
   - Each answer moves favor now.
   - If someone witnessed or recorded it, it is also **evidence later.**
 
+### Talk of the salons: the news as a record
+
+The gossip dilemmas are not invented questions. They are **the scandals of the
+day**, and the period supplies plenty: self-dealing, war as a political
+distraction, bought favor, cronyism, kleptocracy, a captured press, and a
+public-health crisis that was really about bread. Whatever you say about them,
+in front of whoever is listening, becomes part of the record the Terror and
+Thermidor will read.
+
+**Stay in period.** The parallels with other ages are obvious enough that
+players will draw them themselves. Historical rhyme is sharper satire than a
+headline, it ages better, and it keeps the world from turning into a tract. No
+modern figure is named or caricatured.
+
+| Theme | In the Season (1789) | Later in the record |
+| --- | --- | --- |
+| Self-dealing | Calonne's deficit and the ministers' pensions | The East India Company liquidation (1793–94): deputies forged a decree to profit, and the affair was used to bring Danton down with them |
+| War as distraction | Talk of a foreign war to rally the country | The Girondins push for war in 1792 partly for domestic advantage, and that war drives the Terror |
+| Favor and cronyism | Court pensions, purchased offices, the Necklace affair's afterglow | Speculation in assignats and nationalized lands; army supply contracts |
+| The press | Royal censorship, and then the flood of pamphlets | Desmoulins is guillotined after calling for clemency in *Le Vieux Cordelier*. Meanwhile the War Ministry buys *Le Père Duchesne* in bulk for the armies: state-approved news |
+| Scarcity | Bread prices; the Réveillon riot (April 1789) | The price Maximum and hoarding as a capital crime |
+| Suspicion itself | Lettres de cachet | The Law of Suspects (September 1793), under which failing to show enough attachment to the Revolution is itself suspect |
+
+The Directory's open kleptocracy comes after the Season ends. It can colour an
+epilogue, not a case.
+
+**Each scandal owns its talk.** A topic is an owned episode, offered at any
+salon while the scandal is live. Its arc (rumour, exposure, trial, aftermath)
+sets when it is available. That is the landed scoped-offer path. Adding a
+scandal adds one episode and touches no salon.
+
+**What you say is a remark record.** It holds the topic, your stance, the
+venue, who was present, and when. Like testimony, it is consumer-owned history:
+it outlives the conversation and any binding. Those present are the people who
+can later testify to it. Silence counts as a stance when someone notices it.
+
+**Who controls the truth is a reading, not a fact.** The remark sits in the
+*historical truth* layer and never changes. Each regime supplies its own
+reading over the same records, and that reading produces the charge:
+
+| Remark in 1789 | Late 1793 | Spring 1794 | Thermidor |
+| --- | --- | --- | --- |
+| Mocked the Queen's spending | Sound republican instinct | Unremarkable | Unremarkable |
+| Defended a censored pamphleteer | Patriotic | "Indulgent", if the pamphleteer was Desmoulins | A credential |
+| Said nothing about the bread riot | Indifference: suspect | Suspect | Prudence |
+| Praised a minister who later profited | Corruption by association | Worse once the East India affair breaks | Depends who is judging |
+
+Whether a remark reaches a case is the *admitted evidence* layer, and that is
+where the narrative is fought over:
+
+- **Victoire and the printers** decide which remarks circulate and in which
+  version. She rarely needs to lie.
+- **Informants misreport.** An informant's account is a claim about the record,
+  not the record itself. A false account is a forgery the player can challenge,
+  or commission.
+- **Patronage buys circulation.** Funding a paper is a wallet spend. Under the
+  Terror it is also a remark of its own.
+
+**Design rule: every stance is dangerous under some reading.** Early outrage,
+loyal applause and prudent silence should each end up in somebody's indictment.
+Being right too early is the classic revolutionary crime. No reading is the
+true one, which is what keeps the world from preaching.
+
+**What it needs from the engine.**
+
+- Topic offers use the landed scoped-offer path.
+- Remark records are the consumer-owned history listed as need 4 in §5's declarative section.
+- Readings are journal retrieval ([#191](https://github.com/derekmerck/storytangl/issues/191)): journal, then slice, then Selector, with each regime supplying the selector and weights.
+- One gap: a donated topic episode cannot yet see which salon invoked it or who was present. Until invocation context lands, the topic reads the venue from the walk (the call's return site) or the salon is passed in as a payload.
+
 ## 3. The Terror: what you're willing to do to them
 
 ### Short episodes, shifting readings
