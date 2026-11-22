@@ -5,8 +5,10 @@ from __future__ import annotations
 import io
 from pathlib import Path
 import re
+import shutil
 
 import pytest
+import yaml
 
 from tangl.cli.app import StoryTanglCLI
 from tangl.loaders import WorldBundle
@@ -129,6 +131,33 @@ def test_crossroads_authoring_cli_witness(world_id: str) -> None:
     assert "Ask Aria about the northern road [locked:" in transcript
     assert "You carry the news of the northern road into the rain." in transcript
     assert transcript.rstrip().endswith("No available choices.")
+
+
+def test_scoped_local_action_through_cli(tmp_path: Path, monkeypatch) -> None:
+    from tangl.service import world_registry
+
+    bundle = tmp_path / "worlds" / "crossroads_sponsor"
+    shutil.copytree(WORLDS_DIR / "crossroads_sponsor", bundle)
+    path = bundle / "script.yaml"
+    script = yaml.safe_load(path.read_text())
+    script["globals"]["lamp_lit"] = False
+    script["scenes"]["inn"]["blocks"]["hearth"]["offered_actions"] = [{
+        "text": "Light the lamp", "successor": "current",
+        "conditions": ["not lamp_lit"], "journal_text": "The lamp glows.",
+        "effects": ["graph.locals['lamp_lit'] = True"],
+    }]
+    path.write_text(yaml.safe_dump(script, sort_keys=False))
+    monkeypatch.setattr(world_registry, "get_world_dirs", lambda: [bundle.parent])
+    manager = build_service_manager(PersistenceManagerFactory.native_in_mem())
+    app = StoryTanglCLI(service_manager=manager, terminal_style="plain")
+    app.stdout = io.StringIO()
+    app.onecmd_plus_hooks("create_user local-offer")
+    app.onecmd_plus_hooks("create_story crossroads_sponsor")
+    initial = app.stdout.getvalue()
+    number = re.search(r"(?m)^\s*(\d+)\. Light the lamp", initial)
+    assert number is not None
+    app.onecmd_plus_hooks(f"do {number.group(1)}")
+    assert "The lamp glows." in app.stdout.getvalue()
 
 
 def test_casting_desk_cli_witness_completes_inspects_and_revisits() -> None:

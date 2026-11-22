@@ -162,6 +162,7 @@ class ActionScript(BaseScriptItem):
         None,
         description="Optional payload carried by the action edge when selected.",
     )
+    journal_text: str | None = None
     accepts: Accepts | None = Field(
         None,
         description=(
@@ -300,6 +301,7 @@ class BlockScript(BaseScriptItem):
     )
 
     actions: list[ActionScript] = Field(None, description="Actions available to the user at the end of this block.", json_schema_extra={"visit_field": True})
+    offered_actions: list[ActionScript] = Field(None, description="Scoped Actions offered by this block.")
     continues: list[ActionScript] = Field(None, description="Continuations to a next block.", json_schema_extra={"visit_field": True})
     redirects: list[ActionScript] = Field(None, description="Automatic redirections to a different block.", json_schema_extra={"visit_field": True})
     roles: list[RoleScript] | dict[UniqueLabel, RoleScript] = Field(

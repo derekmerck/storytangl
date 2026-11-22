@@ -5,7 +5,8 @@ and source-bookkeeping foundations. #710 adds retained ordinary call Actions
 for scoped owned scenes in EAGER, mutable stories. LAZY/JIT and frozen
 projection and invocation-context enrichment remain follow-ups. #717 extends the
 shared owned-Scene path to sandbox locations and removes their provider callback.
-Broader Action/family convergence remains pending.
+Scene calls and location-sponsored Actions now share template-backed scoped
+reconciliation in EAGER mutable stories. Other sponsor families remain pending.
 The Role-owned witness supports a bound scene Role as a distinct offer owner;
 it does not add automatic recasting or a general unbound-Role offer policy.
 The paired Crossroads examples in `worlds/crossroads_receiver` and
@@ -19,9 +20,13 @@ The broader offer/request convergence remains in
 The [assembly, gating and walking contract](../../design/planning/AFFORDANCE_MODEL.md#assembly-gating-and-walking-convergence-contract)
 governs that convergence. It separates declaration templates from executable Actions,
 relationship inputs from derived links, continuing identity from parameter freshness,
-and readiness from traversal phase entry. The next representation must satisfy this
-contract; its exact graph/reference shape remains a coding checkpoint. #560 separately
-settles what completes or abandons an open call.
+and readiness from traversal phase entry. Scoped Action offers embed an Action
+template in constructor form; executable Actions are materialized at receiving
+sites. #560 separately settles what completes or abandons an open call.
+
+An Action successor of `current` means its own receiving site. To refer to a
+block literally named `current`, use its qualified path, such as `inn.current`.
+The same rule applies to ordinary and scoped Actions.
 
 ## From authoring to an ordinary action
 
@@ -35,6 +40,10 @@ local projection, while a matching but unavailable offer retains its projection
 and uses ordinary availability and disclosure. Story revalidates these conditions
 on selection. Recording sites itself performs none of that projection or live
 policy evaluation.
+
+An Action used by an active call remains in the graph as its return bookmark
+when the offer detaches. It is no longer disclosed or selectable; subsequent
+reconciliation removes it after the call stack releases it.
 
 An owned scene can declare `offer: {source_requirement: {has_tags: [tavern]},
 once: true}`. EAGER materialization binds one affordance from its owner to the

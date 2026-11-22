@@ -836,6 +836,8 @@ def _disclosed_choices(caller: Block, *, ctx: PhaseCtx) -> list[tuple[Action, st
     """Share menu disclosure with command lookup before evaluating choice wording."""
     choices: list[tuple[Action, str | None]] = []
     for edge in caller.edges_out(Selector(has_kind=Action, trigger_phase=None)):
+        if edge.offer_id is not None and not scoped_offers.offer_is_attached(edge, caller, ctx=ctx):
+            continue
         # A hidden choice needs no reason, so ask whether it is available before
         # the costlier look at its destination; a guard that refuses it stops
         # there. The answer is passed on rather than asked twice. An edge whose

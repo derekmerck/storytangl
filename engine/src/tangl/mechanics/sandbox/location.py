@@ -252,7 +252,6 @@ class SandboxLocation(HasAssets, MenuBlock):
     """A visitable dynamic hub with location links and present assets."""
 
     links: dict[str, str | SandboxExit] = Field(default_factory=dict)
-    interactions: list[SandboxInteraction] = Field(default_factory=list)
     scheduled_events: list[ScheduledEvent] = Field(default_factory=list)
     fixture_ids: list[UUID] = Field(default_factory=list, json_schema_extra={"include": True})
     visibility_rules: list[SandboxVisibilityRule] = Field(default_factory=list)

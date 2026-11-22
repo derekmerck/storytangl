@@ -473,11 +473,6 @@ class SandboxSliceCompiler:
                 light="light" in traits,
                 content=descriptions.lit or descriptions.look or descriptions.first or "",
                 dark_text=descriptions.dark,
-                interactions=[
-                    interaction_spec.as_interaction(interaction_label)
-                    for interaction_label, interaction_spec
-                    in location_spec.contributes.interactions.items()
-                ],
                 scheduled_events=self._compile_scheduled_events(
                     location_spec.contributes.scheduled_events
                 ),
@@ -499,6 +494,23 @@ class SandboxSliceCompiler:
             location.links = links
             graph.add(location)
             scope.add_child(location)
+            from tangl.story.fabula.materializer import action_template_from_spec
+            from tangl.story.scoped_offers import add_local_action_offer
+
+            for interaction_label, interaction in location_spec.contributes.interactions.items():
+                declaration = {
+                    "text": interaction.text,
+                    "successor": interaction.target,
+                    "journal_text": interaction.journal_text or interaction.journal,
+                    "return": interaction.return_to_location,
+                    "activation": interaction.activation,
+                    "once": interaction.once,
+                    "availability": interaction.availability,
+                    "effects": interaction.effects,
+                }
+                add_local_action_offer(
+                    location, action_template_from_spec(declaration, label=interaction_label),
+                )
             locations[label] = location
         return locations
 

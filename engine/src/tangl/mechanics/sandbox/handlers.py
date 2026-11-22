@@ -2452,35 +2452,6 @@ def project_sandbox_mob_actions(*, caller, ctx, **_kw):
     wants_caller_kind=SandboxLocation,
     wants_exact_kind=False,
 )
-def project_sandbox_location_interactions(*, caller, ctx, **_kw):
-    """Project active location-sponsored interactions into ordinary actions."""
-    if not isinstance(caller, SandboxLocation):
-        return None
-    if not caller.auto_provision:
-        return None
-    graph = caller.graph
-    if graph is None or _graph_frozen_shape(graph):
-        return None
-
-    _clear_dynamic_sandbox_actions(caller, action_kind="location", ctx=ctx)
-    for interaction in caller.interactions:
-        _project_sandbox_interaction(
-            caller,
-            graph=graph,
-            ctx=ctx,
-            interaction=interaction,
-            source="sandbox_location",
-            sponsor_label=caller.get_label(),
-            sponsor_kind="location",
-            tags={"location"},
-        )
-    return None
-
-
-@on_provision(
-    wants_caller_kind=SandboxLocation,
-    wants_exact_kind=False,
-)
 def project_sandbox_wait(*, caller, ctx, **_kw):
     """Project a normal self-loop wait action for sandbox locations."""
     if not isinstance(caller, SandboxLocation):

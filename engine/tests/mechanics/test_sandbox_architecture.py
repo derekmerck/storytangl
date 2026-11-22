@@ -25,6 +25,7 @@ from tangl.story import Action, MenuBlock, StoryGraph
 from tangl.story.concepts import Actor
 from tangl.story.fragments import ChoiceFragment, ContentFragment
 from tangl.story.system_handlers import render_block, render_block_choices
+from tangl.vm import Ledger
 from tangl.vm.dispatch import do_provision
 from tangl.vm.runtime.frame import PhaseCtx
 
@@ -219,11 +220,13 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
     assert isinstance(compiled.assets["lamp"], Token)
     assert compiled.assets["lamp"].readable is True
     assert isinstance(compiled.mobs["guide"], SandboxMob)
-    assert isinstance(road.interactions[0], SandboxInteraction)
-    assert [predicate.expr for predicate in road.interactions[0].availability] == [
+    from tangl.story.scoped_offers import ScopedActionOffer
+    offer = next(road.edges_out(Selector(has_kind=ScopedActionOffer)))
+    declaration = offer.action_template.payload
+    assert [predicate.expr for predicate in declaration.availability] == [
         "True"
     ]
-    assert [effect.expr for effect in road.interactions[0].effects] == ["listened = True"]
+    assert [effect.expr for effect in declaration.effects] == ["listened = True"]
     assert compiled.scope.scheduled_events[0].label == "dawn"
     assert road.scheduled_events[0].label == "wagon"
     assert len(compiled.assets["lamp"].interactions) == 1
@@ -244,8 +247,8 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
     )
     interaction = next(
         action
-        for action in _sandbox_actions(road)
-        if action.ui_hints.contribution == "interaction"
+        for action in road.edges_out(Selector(has_kind=Action))
+        if action.offer_id == offer.uid
     )
     assert isinstance(movement, Action)
     assert movement.successor is cave
@@ -254,6 +257,12 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
 
     choices = render_block_choices(caller=road, ctx=road_ctx)
     assert any(isinstance(fragment, ChoiceFragment) for fragment in choices or [])
+    road.locals["listened"] = False
+    ledger = Ledger.from_graph(compiled.graph, entry_id=road.uid)
+    ledger.resolve_choice(interaction.uid)
+    assert road.locals["listened"] is True
+    assert any(isinstance(fragment, ContentFragment) and "road hums" in fragment.content
+               for fragment in ledger.get_journal())
 
     cave_ctx = PhaseCtx(graph=compiled.graph, cursor_id=cave.uid)
     do_provision(cave, ctx=cave_ctx)
@@ -294,7 +303,7 @@ FAMILY_DISCRIMINATORS: dict[str, frozenset[str]] = {
         f"sandbox:{kind}": frozenset({"dynamic", "sandbox", kind})
         for kind in (
             "movement", "asset", "unlock", "lock", "fixture",
-            "mob", "location", "wait", "event", "incremental",
+            "mob", "wait", "event", "incremental",
         )
     },
 }
