@@ -87,7 +87,9 @@ Current first-pass surface:
 - `project_sandbox_mob_actions`: planning handler that projects present mob
   affordances and interactions as ordinary choices.
 - Location-sponsored interactions lower to shared scoped Action offers;
-  unchanged declarations retain their receiver-local Actions.
+  unchanged declarations retain their receiver-local Actions. Their sandbox
+  timing request uses the scope's interaction duration when the action arrives
+  at a sandbox location; it is separate from explicit call-completion costs.
 - `project_sandbox_wait`: planning handler that projects wait as a normal
   self-loop choice.
 - `project_sandbox_scheduled_events`: planning handler that projects known

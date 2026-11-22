@@ -832,7 +832,7 @@ class StoryMaterializer:
                 from ..scoped_offers import add_local_action_offer
 
                 for template in node.action_templates.get("offered_actions", []):
-                    add_local_action_offer(node, template)
+                    add_local_action_offer(node, template, ctx=state.ctx)
                 self._wire_actions_for_block(
                     node=node, specs=node.redirects, state=state, field="redirects"
                 )

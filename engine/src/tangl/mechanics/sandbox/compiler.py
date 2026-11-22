@@ -507,6 +507,8 @@ class SandboxSliceCompiler:
                     "once": interaction.once,
                     "availability": interaction.availability,
                     "effects": interaction.effects,
+                    # A location-arrival cost, not the call-completion override.
+                    "payload": {"sandbox_interaction_time_cost": {"kind": "interaction"}},
                 }
                 add_local_action_offer(
                     location, action_template_from_spec(declaration, label=interaction_label),

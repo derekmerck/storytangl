@@ -1148,6 +1148,8 @@ def _selected_sandbox_time_cost(ctx: VmPhaseCtx) -> SandboxTimeCost | None:
     payload = _selected_payload(ctx)
     if isinstance(payload, dict) and "sandbox_time_cost" in payload:
         return _coerce_time_cost(payload["sandbox_time_cost"])
+    if isinstance(payload, dict) and "sandbox_interaction_time_cost" in payload:
+        return _coerce_time_cost(payload["sandbox_interaction_time_cost"])
     selected_edge = ctx.selected_edge
     if not isinstance(selected_edge, Action):
         return None

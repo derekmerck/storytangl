@@ -25,9 +25,12 @@ class ScopedActionOffer(Affordance):
     )
 
 
-def add_local_action_offer(owner: Block, template: EntityTemplate[Action]) -> ScopedActionOffer:
+def add_local_action_offer(
+    owner: Block, template: EntityTemplate[Action], *, ctx: VmPhaseCtx | None = None,
+) -> ScopedActionOffer:
     """Attach a declaration whose structural scope is this receiving block."""
     return ScopedActionOffer(
+        uid=_next_provision_uid(_ctx=ctx),
         registry=owner.graph, predecessor_id=owner.uid, requirement=Requirement(),
         source_requirement=Requirement(uid=owner.uid), action_template=template,
     )
