@@ -354,6 +354,7 @@ const handleStoryUpdate = (envelope: RuntimeEnvelope) => {
                 :initial-envelope="activeSession.envelope"
                 :active-choice-ids="activeSession.choiceIds"
                 :stage-extent="store.stage_extent"
+                :preferences="store.preference_values"
                 @write-pending="writePending = $event"
                 @resynchronize="resynchronizeStory"
                 @story-update="handleStoryUpdate"

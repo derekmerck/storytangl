@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr, field_validator, model_validator
@@ -86,6 +87,16 @@ class ClipBinding(BaseModel):
             raise ValueError("clip binding rows must be unique")
         return self
 
+    def select(self, preferences: Mapping[str, PreferenceValue]) -> str | None:
+        """The clip of the row matching the viewer's values on every axis.
+
+        ``None`` when no row matches; the use then keeps its authored
+        ``media_clip``, or its still. Every client applies this one rule, and
+        ``engine/tests/presentation/staging_bindings.json`` pins it for each.
+        """
+        values = [preferences[axis] for axis in self.axes]
+        return next((row.clip for row in self.rows if row.values == values), None)
+
 
 class VisibilityBinding(BaseModel):
     preference_id: str = Field(min_length=1)
@@ -97,6 +108,14 @@ class VisibilityBinding(BaseModel):
         if len(value) != len(set(value)):
             raise ValueError("visibility binding values must be unique")
         return value
+
+    def admits(self, preferences: Mapping[str, PreferenceValue]) -> bool:
+        """Whether the viewer's value for the bound preference shows the media.
+
+        Hiding is drawing only: the media keeps its place in the stage state.
+        Pinned for every client by ``engine/tests/presentation/staging_bindings.json``.
+        """
+        return preferences[self.preference_id] in self.values
 
 # Coarse staging grid, named from the viewer's side of the screen. Deliberately
 # not theatrical: "stage left" is the performer's left and therefore the

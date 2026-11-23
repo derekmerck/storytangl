@@ -3,10 +3,12 @@ import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
 import StageView from './StageView.vue'
-import { reparteeSteps } from '@tests/fixtures'
+import { server } from '@tests/setup'
+import { reparteeClerk, reparteeSteps } from '@tests/fixtures'
 import type { MediaStoryFragment } from '@/types'
 
 const quay = reparteeSteps[1]!.fragments[1] as MediaStoryFragment
+const shown = { 'sprites-visible': true, 'clerk-motion': 'idle' }
 
 /** Report one frame width to every observer, as the browser does on layout. */
 const observeFrameWidth = (width: number) => {
@@ -33,7 +35,7 @@ describe('StageView', () => {
   it('rescales the canvas when the world declares its extent after mounting', async () => {
     observeFrameWidth(640)
     const wrapper = mount(StageView, {
-      props: { images: [quay], extent: { width: 320, height: 200 } },
+      props: { images: [quay], extent: { width: 320, height: 200 }, preferences: {} },
     })
     await nextTick()
     const canvas = () => wrapper.find('.stage-canvas').attributes('style')
@@ -48,7 +50,11 @@ describe('StageView', () => {
   it('keeps a figure restated in a later step as the same element', async () => {
     const clerk = { ...(reparteeSteps[1]!.fragments[2] as MediaStoryFragment), rit_id: 'clerk-rit' }
     const wrapper = mount(StageView, {
-      props: { images: [quay, { ...clerk, uid: 'court-clerk' }], extent: { width: 320, height: 200 } },
+      props: {
+        images: [quay, { ...clerk, uid: 'court-clerk' }],
+        extent: { width: 320, height: 200 },
+        preferences: shown,
+      },
     })
     const figure = () => wrapper.find('img[data-stage-role="dialog_im"]').element
 
@@ -64,7 +70,11 @@ describe('StageView', () => {
     const crowd = { ...figure, rit_id: 'extra' }
     const other = { ...figure, rit_id: 'other', uid: 'other' }
     const wrapper = mount(StageView, {
-      props: { images: [quay, other, { ...crowd, uid: 'a' }], extent: { width: 320, height: 200 } },
+      props: {
+        images: [quay, other, { ...crowd, uid: 'a' }],
+        extent: { width: 320, height: 200 },
+        preferences: shown,
+      },
     })
     // A later step restates the room with two figures drawn from one resource.
     await wrapper.setProps({
@@ -76,5 +86,28 @@ describe('StageView', () => {
       expect.stringContaining('Duplicate keys')
     )
     warn.mockRestore()
+  })
+
+  it("redraws the clerk from the viewer's preferences without a request", async () => {
+    const requests: string[] = []
+    server.events.on('request:start', ({ request }) => requests.push(request.url))
+    const wrapper = mount(StageView, {
+      props: {
+        images: [quay, reparteeClerk],
+        extent: { width: 320, height: 200 },
+        preferences: { 'sprites-visible': true, 'clerk-motion': 'idle' },
+      },
+    })
+    const clerk = () => wrapper.find('img[data-stage-role="dialog_im"]')
+
+    expect(clerk().attributes('data-clip')).toBe('idle')
+    await wrapper.setProps({ preferences: { 'sprites-visible': true, 'clerk-motion': 'call' } })
+    expect(clerk().attributes('data-clip')).toBe('call')
+    await wrapper.setProps({ preferences: { 'sprites-visible': false, 'clerk-motion': 'call' } })
+    expect(clerk().exists()).toBe(false)
+    expect(wrapper.find('img[data-stage-role="narrative_im"]').exists()).toBe(true)
+
+    expect(requests).toEqual([])
+    server.events.removeAllListeners()
   })
 })

@@ -24,6 +24,7 @@ import {
   isMediaFragment,
   normalizeEnvelope,
 } from './fragmentUtils'
+import type { PreferenceValues } from '@/worldPreferences'
 import { isStagedMedia, type StageExtent } from './stage'
 import { foldSteps } from './stageFold'
 
@@ -39,6 +40,7 @@ const props = defineProps<{
   initialEnvelope: RuntimeEnvelope
   activeChoiceIds: string[]
   stageExtent: StageExtent
+  preferences: PreferenceValues
 }>()
 const activeChoiceIds = ref([...props.activeChoiceIds])
 const currentStep = ref(props.initialEnvelope.step)
@@ -231,6 +233,7 @@ const doCommand = (command: string) => submit({ find_edge: { kind: 'command', co
         ref="stageRefs"
         :images="stageImages"
         :extent="stageExtent"
+        :preferences="preferences"
       />
       <StoryBlock
         ref="sceneRefs"

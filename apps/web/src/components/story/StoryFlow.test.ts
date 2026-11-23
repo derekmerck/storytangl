@@ -24,7 +24,7 @@ const mountFlow = (
   activeChoiceIds = envelope.fragments.filter(isChoiceFragment).map((item) => item.uid)
 ) =>
   mount(StoryFlow, {
-    props: { initialEnvelope: envelope, activeChoiceIds, stageExtent: DEFAULT_STAGE_EXTENT },
+    props: { initialEnvelope: envelope, activeChoiceIds, stageExtent: DEFAULT_STAGE_EXTENT, preferences: {} },
     global: { plugins: [vuetify] },
   })
 const offered: RuntimeEnvelope = {
@@ -164,6 +164,7 @@ describe('StoryFlow session rendering', () => {
         initialEnvelope: offered,
         activeChoiceIds: ['choice'],
         stageExtent: DEFAULT_STAGE_EXTENT,
+        preferences: {},
         onStoryUpdate: updated,
       },
       global: { plugins: [vuetify] },
@@ -202,6 +203,7 @@ describe('StoryFlow session rendering', () => {
         initialEnvelope: reparteeSteps[0]!,
         activeChoiceIds: ['quay-go'],
         stageExtent: { width: 640, height: 400 },
+        preferences: { 'sprites-visible': true, 'clerk-motion': 'idle' },
       },
       global: { plugins: [vuetify] },
     })
@@ -238,7 +240,12 @@ describe('StoryFlow session rendering', () => {
       fragments: reparteeSteps.flatMap(({ fragments }) => fragments),
     }
     const wrapper = mount(StoryFlow, {
-      props: { initialEnvelope: history, activeChoiceIds: ['yard-go'], stageExtent: DEFAULT_STAGE_EXTENT },
+      props: {
+        initialEnvelope: history,
+        activeChoiceIds: ['yard-go'],
+        stageExtent: DEFAULT_STAGE_EXTENT,
+        preferences: { 'sprites-visible': true, 'clerk-motion': 'idle' },
+      },
       global: { plugins: [vuetify] },
     })
     await flushPromises()

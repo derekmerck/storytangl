@@ -1,6 +1,8 @@
 import type { MediaStoryFragment } from '@/types'
+import type { PreferenceValues } from '@/worldPreferences'
 import { mediaContentUrl } from './fragmentUtils'
 import { mediaElement, mediaRole } from './fragmentViewUtils'
+import { isVisible } from './stageBindings'
 
 /**
  * What the stage draws and where. The semantics follow the pygame client's
@@ -38,13 +40,28 @@ export const isStagedMedia = (fragment: MediaStoryFragment): boolean =>
   mediaElement(fragment) === 'img' &&
   mediaContentUrl(fragment) !== undefined
 
-/** The backdrop (last one stated wins) and the figures in arrival order, capped. */
-export const castStage = (images: MediaStoryFragment[]) => ({
-  backdrop: images.filter((image) => mediaRole(image) === BACKDROP_ROLE).at(-1),
-  figures: images
-    .filter((image) => FIGURE_ROLES.includes(mediaRole(image)))
-    .slice(0, STAGED_LIMIT),
-})
+/**
+ * What the viewer sees: the last visible backdrop, and the visible figures in
+ * arrival order, capped. Each figure keeps its arrival index among dialog
+ * figures, counted before hiding, so hiding one does not move the others; the
+ * cap counts only what is drawn. Both as pygame's stage does.
+ */
+export const castStage = (images: MediaStoryFragment[], preferences: PreferenceValues) => {
+  let dialogIndex = 0
+  return {
+    backdrop: images
+      .filter((image) => mediaRole(image) === BACKDROP_ROLE && isVisible(image, preferences))
+      .at(-1),
+    figures: images
+      .filter((image) => FIGURE_ROLES.includes(mediaRole(image)))
+      .map((figure) => ({
+        figure,
+        index: mediaRole(figure) === 'dialog_im' ? dialogIndex++ : 0,
+      }))
+      .filter(({ figure }) => isVisible(figure, preferences))
+      .slice(0, STAGED_LIMIT),
+  }
+}
 
 /**
  * CSS placing one figure, drawn at its natural size, on a stage of `extent`
