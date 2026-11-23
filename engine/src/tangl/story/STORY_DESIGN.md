@@ -213,6 +213,12 @@ Each new start constructs its own graph and selects its own entry/context. A
 future post-setup seal would apply only to that playthrough after its arrival
 recruitment, not to another player's start or NG+ run.
 
+After ``story_ready``, frozen EAGER setup reconciles shared scoped Action offers
+across realized Blocks using the ordinary scoped reconciler. This closes the
+admitted bindings for that setup, including receivers beyond the initial frontier;
+it does not realize latent destinations. Later requests for a new or changed
+binding fail explicitly while live availability remains read-only.
+
 ### Runtime materialization domain work
 
 ``StoryMaterializer.story_post_materialize`` invokes

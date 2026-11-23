@@ -2,8 +2,8 @@
 
 **Status:** #706, #707 and #709 are merged characterization, reference-ownership
 and source-bookkeeping foundations. #710 adds retained ordinary call Actions
-for scoped owned scenes in EAGER, mutable stories. LAZY/JIT and frozen
-projection and invocation-context enrichment remain follow-ups. #717 extends the
+for scoped owned scenes in EAGER, mutable stories. LAZY/JIT projection and
+invocation-context enrichment remain follow-ups. #717 extends the
 shared owned-Scene path to sandbox locations and removes their provider callback.
 Scene calls and location-sponsored Actions now share template-backed scoped
 reconciliation in EAGER mutable stories. Other sponsor families remain pending.
@@ -123,8 +123,11 @@ An `actors.aria.episodes.chat` declaration becomes the ordinary qualified
 receiver Action, make it the default entry, or imply the owner participates in
 the scene. An explicit offer supplies the additional projection policy. Explicit
 Actions can traverse it using existing EAGER traversal and JSON restoration.
-Frozen EAGER construction binds the reference; no general frozen donation
-readiness is claimed. LAZY remains unsupported for this shape: in the tested
+Frozen EAGER setup reconciles scoped Actions for all realized Blocks after entry
+selection and story-ready hooks. Unchanged bindings retain their IDs and live
+gates remain live; a newly required or changed binding is refused at runtime.
+Targets not already realized remain outside this readiness slice. LAZY remains
+unsupported for this shape: in the tested
 actor-qualified destination, initial setup left the episode unmaterialized and
 selecting its unresolved Action failed validation. It is not eagerly expanded to
 hide that gap.
