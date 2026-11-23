@@ -106,12 +106,26 @@ def offer_is_eligible(action: Action, receiver: Block, *, ctx: VmPhaseCtx) -> bo
 
 
 @on_provision(wants_caller_kind=Block, wants_exact_kind=False, priority=Priority.LATE)
-def project_scoped_action_offers(*, caller: Block, ctx: VmPhaseCtx, **_kw) -> None:
+def project_scoped_action_offers(
+    *, caller: Block, ctx: VmPhaseCtx, _setup: bool = False, **_kw,
+) -> None:
     """Reconcile local Actions against the receiver's currently scoped offers."""
-    if isinstance(caller.graph, StoryGraph) and caller.graph.frozen_shape:
-        return None
     ctx.invalidate_namespaces()
     offers = _scoped_offers(caller, ctx=ctx)
+    frozen = isinstance(caller.graph, StoryGraph) and caller.graph.frozen_shape and not _setup
+    if frozen:
+        actions = {edge.offer_id: edge for edge in caller.edges_out(Selector(has_kind=Action))
+                   if edge.offer_id is not None and "retired_offer" not in edge.tags}
+        for offer_id, offer in offers.items():
+            target = _target(offer, caller)
+            action = actions.get(offer_id)
+            if ((action is not None and action.templ_hash != offer.action_template.content_hash())
+                    or (target is not None and (action is None or action.successor_id != target.uid))):
+                raise ValueError(
+                    f"Frozen story cannot bind scoped Action offer {offer.get_label()!r} "
+                    f"at {caller.get_label()!r}"
+                )
+        return None
     pinned = set(ctx.get_meta().get("call_stack_ids") or ())
     actions = {}
     for edge in list(caller.edges_out(Selector(has_kind=Action))):

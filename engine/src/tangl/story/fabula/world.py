@@ -686,6 +686,14 @@ class World(TraversableGraphFactory):
             namespace=namespace or {},
             init_mode=init_mode,
         )
+        if freeze_shape:
+            from ..episode import Block
+            from ..scoped_offers import project_scoped_action_offers
+
+            for block in list(graph.find_all(Selector(has_kind=Block))):
+                project_scoped_action_offers(
+                    caller=block, ctx=PhaseCtx(graph=graph, cursor_id=block.uid), _setup=True,
+                )
         materializer._recount_materialized(state=state)
         return result
 
