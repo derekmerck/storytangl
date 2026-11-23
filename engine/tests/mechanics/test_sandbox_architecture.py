@@ -14,6 +14,10 @@ import pytest
 
 from tangl.core import Selector, Token
 from tangl.mechanics.sandbox import (
+    SandboxClockPolicy,
+    ChargeFacet,
+    LightSourceFacet,
+    SwitchableFacet,
     SandboxCompiledAssetType,
     SandboxInteraction,
     SandboxLocation,
@@ -25,8 +29,11 @@ from tangl.story import Action, MenuBlock, StoryGraph
 from tangl.story.concepts import Actor
 from tangl.story.fragments import ChoiceFragment, ContentFragment
 from tangl.story.system_handlers import render_block, render_block_choices
+from tangl.vm import Ledger
 from tangl.vm.dispatch import do_provision
 from tangl.vm.runtime.frame import PhaseCtx
+from tangl.mechanics.sandbox.dispatch import on_sandbox_tick, sandbox_dispatch
+from tangl.mechanics.sandbox.time import get_world_turn
 
 
 ENGINE_ROOT = Path(__file__).resolve().parents[2]
@@ -219,11 +226,13 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
     assert isinstance(compiled.assets["lamp"], Token)
     assert compiled.assets["lamp"].readable is True
     assert isinstance(compiled.mobs["guide"], SandboxMob)
-    assert isinstance(road.interactions[0], SandboxInteraction)
-    assert [predicate.expr for predicate in road.interactions[0].availability] == [
+    from tangl.story.scoped_offers import ScopedActionOffer
+    offer = next(road.edges_out(Selector(has_kind=ScopedActionOffer)))
+    declaration = offer.action_template.payload
+    assert [predicate.expr for predicate in declaration.availability] == [
         "True"
     ]
-    assert [effect.expr for effect in road.interactions[0].effects] == ["listened = True"]
+    assert [effect.expr for effect in declaration.effects] == ["listened = True"]
     assert compiled.scope.scheduled_events[0].label == "dawn"
     assert road.scheduled_events[0].label == "wagon"
     assert len(compiled.assets["lamp"].interactions) == 1
@@ -244,8 +253,8 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
     )
     interaction = next(
         action
-        for action in _sandbox_actions(road)
-        if action.ui_hints.contribution == "interaction"
+        for action in road.edges_out(Selector(has_kind=Action))
+        if action.offer_id == offer.uid
     )
     assert isinstance(movement, Action)
     assert movement.successor is cave
@@ -254,6 +263,12 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
 
     choices = render_block_choices(caller=road, ctx=road_ctx)
     assert any(isinstance(fragment, ChoiceFragment) for fragment in choices or [])
+    road.locals["listened"] = False
+    ledger = Ledger.from_graph(compiled.graph, entry_id=road.uid)
+    ledger.resolve_choice(interaction.uid)
+    assert road.locals["listened"] is True
+    assert any(isinstance(fragment, ContentFragment) and "road hums" in fragment.content
+               for fragment in ledger.get_journal())
 
     cave_ctx = PhaseCtx(graph=compiled.graph, cursor_id=cave.uid)
     do_provision(cave, ctx=cave_ctx)
@@ -271,6 +286,77 @@ def test_sandbox_compiles_to_canonical_story_primitives() -> None:
         isinstance(fragment, ContentFragment) and fragment.content == "The guide is here."
         for fragment in fragments or []
     )
+
+
+@pytest.mark.parametrize("duration", [1, 3])
+def test_compact_location_interaction_uses_clock_policy_and_ticks(duration: int) -> None:
+    compiled = SandboxSliceCompiler().compile(deepcopy(ARCHITECTURE_SLICE))
+    compiled.scope.clock_policy = SandboxClockPolicy(default_durations={"interaction": duration})
+    road = compiled.locations["road"]
+    lamp_type = SandboxCompiledAssetType(
+        label=f"timed_lamp_{duration}", name="timed lamp", switchable=SwitchableFacet(),
+        light_source=LightSourceFacet(), charge=ChargeFacet(current=5, maximum=5),
+    )
+    lamp = Token[SandboxCompiledAssetType](token_from=lamp_type.label, label="timed_lamp", lit=True)
+    compiled.graph.add(lamp)
+    compiled.scope.player_assets.add_asset(lamp)
+    ledger = Ledger.from_graph(compiled.graph, entry_id=road.uid)
+    do_provision(road, ctx=ledger.get_frame()._make_ctx())
+    action = next(edge for edge in road.edges_out(Selector(has_kind=Action)) if edge.offer_id)
+    ticks = []
+
+    @on_sandbox_tick
+    def observe_tick(*, caller, clock_tick, **_kw):
+        if caller.uid == road.uid:
+            ticks.append(clock_tick)
+        return []
+
+    try:
+        ledger.resolve_choice(action.uid)
+    finally:
+        sandbox_dispatch.remove(observe_tick._behavior.uid)
+    assert get_world_turn(road) == duration
+    assert ticks == list(range(1, duration + 1))
+    assert lamp.charge.current == 5 - duration
+
+
+@pytest.mark.parametrize("entry_cost", [None, 2])
+def test_compact_interaction_to_block_only_pays_explicit_entry_cost(entry_cost) -> None:
+    from tangl.story import Block
+
+    data = deepcopy(ARCHITECTURE_SLICE)
+    data["locations"]["road"]["contributes"]["interactions"]["listen"].update(
+        target="private_room", return_to_location=True,
+    )
+    compiled = SandboxSliceCompiler().compile(data)
+    road = compiled.locations["road"]
+    block = Block(label="private_room", locals=(
+        {"entry_time_cost": {"duration": entry_cost}} if entry_cost is not None else {}
+    ))
+    compiled.graph.add(block)
+    compiled.scope.add_child(block)
+    ledger = Ledger.from_graph(compiled.graph, entry_id=road.uid)
+    do_provision(road, ctx=ledger.get_frame()._make_ctx())
+    action = next(edge for edge in road.edges_out(Selector(has_kind=Action)) if edge.offer_id)
+    ledger.resolve_choice(action.uid)
+    assert ledger.cursor_id == road.uid
+    assert get_world_turn(road) == (entry_cost or 0)
+
+
+def test_compact_returning_location_interaction_charges_only_once() -> None:
+    data = deepcopy(ARCHITECTURE_SLICE)
+    data["locations"]["road"]["contributes"]["interactions"]["listen"].update(
+        target="cave", return_to_location=True,
+    )
+    compiled = SandboxSliceCompiler().compile(data)
+    road, cave = compiled.locations["road"], compiled.locations["cave"]
+    cave.auto_provision = False
+    ledger = Ledger.from_graph(compiled.graph, entry_id=road.uid)
+    do_provision(road, ctx=ledger.get_frame()._make_ctx())
+    action = next(edge for edge in road.edges_out(Selector(has_kind=Action)) if edge.offer_id)
+    ledger.resolve_choice(action.uid)
+    assert ledger.cursor_id == road.uid
+    assert get_world_turn(road) == 1
 
 
 # Cleanup-discriminator contract. Each projector family removes its own stale
@@ -294,7 +380,7 @@ FAMILY_DISCRIMINATORS: dict[str, frozenset[str]] = {
         f"sandbox:{kind}": frozenset({"dynamic", "sandbox", kind})
         for kind in (
             "movement", "asset", "unlock", "lock", "fixture",
-            "mob", "location", "wait", "event", "incremental",
+            "mob", "wait", "event", "incremental",
         )
     },
 }

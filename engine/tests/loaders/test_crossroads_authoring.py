@@ -146,6 +146,33 @@ def test_shipped_variants_have_the_same_service_journey(tmp_path, monkeypatch):
     assert journeys[0] == journeys[1]
 
 
+def test_offered_local_action_through_service_json(tmp_path, monkeypatch):
+    bundle = tmp_path / "worlds" / "crossroads_sponsor"
+    shutil.copytree(WORLDS / "crossroads_sponsor", bundle)
+    script_path = bundle / "script.yaml"
+    script = yaml.safe_load(script_path.read_text())
+    script["globals"]["lamp_lit"] = False
+    script["scenes"]["inn"]["blocks"]["hearth"]["offered_actions"] = [{
+        "text": "Light the lamp", "successor": "current",
+        "conditions": ["not lamp_lit"], "journal_text": "The lamp glows.",
+        "effects": ["graph.locals['lamp_lit'] = True"],
+    }]
+    script_path.write_text(yaml.safe_dump(script, sort_keys=False))
+    monkeypatch.setattr(world_registry, "get_world_dirs", lambda: [bundle.parent])
+    world_registry.clear_discovered_world_registries()
+    World.clear_instances()
+    service = ServiceManager(PersistenceManagerFactory.json_file(base_path=tmp_path / "store"))
+    user = UUID(service.create_user(secret="offered-lamp").details["user_id"])
+    envelope = service.create_story(user_id=user, world_id="crossroads_sponsor")
+    choice = _choices(envelope)["Light the lamp"]
+    assert choice.available
+    envelope = service.resolve_choice(user_id=user, request=DirectEdgeRequest(edge_id=choice.edge_id))
+    assert any(isinstance(f, ContentFragment) and f.content == "The lamp glows."
+               for f in envelope.fragments)
+    assert not _choices(envelope)["Light the lamp"].available
+    assert _choices(envelope)["Light the lamp"].edge_id == choice.edge_id
+
+
 def test_aria_busy_extension_keeps_offer_identity_and_once(tmp_path, monkeypatch):
     bundle = tmp_path / "worlds" / "crossroads_sponsor"
     shutil.copytree(WORLDS / "crossroads_sponsor", bundle)

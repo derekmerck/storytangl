@@ -62,8 +62,7 @@ Current first-pass surface:
   `WorldTime.day` remains the repeating weekday.
 - `ScheduleEntry` / `Schedule` / `ScheduledEvent` / `ScheduledPresence`: small
   schedule matching primitives. `ScheduledEvent` is a time/presence gate over
-  the same sponsored interaction surface used by locations, mobs, assets, and
-  fixtures.
+  the sandbox sponsored interaction surface.
 - `project_sandbox_location_links`: planning handler that projects movement
   links into normal dynamic actions, unless a manual action already covers that
   target. Direction aliases such as `n`, `s`, `e`, `w`, `u`, and `d` are
@@ -87,8 +86,10 @@ Current first-pass surface:
   choices.
 - `project_sandbox_mob_actions`: planning handler that projects present mob
   affordances and interactions as ordinary choices.
-- `project_sandbox_location_interactions`: planning handler that projects active
-  location-sponsored interactions as ordinary choices.
+- Location-sponsored interactions lower to shared scoped Action offers;
+  unchanged declarations retain their receiver-local Actions. Their sandbox
+  timing request uses the scope's interaction duration when the action arrives
+  at a sandbox location; it is separate from explicit call-completion costs.
 - `project_sandbox_wait`: planning handler that projects wait as a normal
   self-loop choice.
 - `project_sandbox_scheduled_events`: planning handler that projects known
@@ -232,11 +233,11 @@ Scheduled mobs also count as present actors for scheduled-event gates. This
 establishes a runtime home for offscreen actors without adding pathing, fleeing,
 combat, trade negotiation, or lazy dialog scene generation yet.
 
-Sponsored interactions are the first shared local-choice surface. A
-`SandboxInteraction` lowers to a normal `Action` edge with target, activation,
-optional call/return, availability, effects, selected-action journal text, and
-provenance hints. Present mobs and active locations can sponsor these
-interactions, as can present/carried assets and reachable fixtures. This is a
+Sponsored interactions use ordinary Actions. Location contributions use shared
+scoped Action templates. `SandboxInteraction` remains the authored form for
+present mobs, present/carried assets, and reachable fixtures, with target,
+activation, return, availability, effects, journal text and provenance hints.
+This is a
 sandbox instance of a broader StoryTangl pattern — the scoped contribution: a
 concept that is in scope can sponsor a choice without owning a separate
 runtime.

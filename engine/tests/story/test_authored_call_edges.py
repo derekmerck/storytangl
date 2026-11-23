@@ -19,6 +19,7 @@ from pydantic import ValidationError
 from tangl.core import Selector
 from tangl.ir.story_ir import ActionScript
 from tangl.journal.fragments import ChoiceFragment
+from tangl.persistence.serializers import JsonSerializationHandler as Json
 from tangl.story import InitMode
 from tangl.story.episode import Action
 from tangl.story.fabula.world import World
@@ -26,6 +27,36 @@ from tangl.story.system_handlers import render_block_choices
 from tangl.vm import AnonymousEdge, Ledger, ResolutionPhase
 from tangl.vm.dispatch import dispatch as vm_dispatch, on_postreqs
 from tangl.vm.runtime.frame import PhaseCtx
+
+
+def test_lazy_same_checkpoint_retains_action_identity_and_provenance() -> None:
+    graph = _graph("lazy_action_provenance", init_mode=InitMode.LAZY,
+                   clinic={"actions": [{"text": "Ask", "successor": "town"}]})
+    ledger = Ledger.from_graph(graph, entry_id=_node(graph, "road").uid)
+    data = Json.serialize(ledger.unstructure())
+    identities = []
+    for _ in range(2):
+        restored = Ledger.structure(Json.deserialize(data))
+        restored.resolve_choice(_edge(restored.graph, "road", "Get medical help").uid)
+        action = _edge(restored.graph, "clinic", "Ask")
+        identities.append((action.uid, action.templ_hash))
+    assert identities[0] == identities[1]
+
+
+def test_lazy_same_checkpoint_retains_new_offer_identity_and_history() -> None:
+    graph = _graph("lazy_offer_provenance", init_mode=InitMode.LAZY,
+                   clinic={"offered_actions": [{"text": "Ask", "successor": "current"}]})
+    ledger = Ledger.from_graph(graph, entry_id=_node(graph, "road").uid)
+    data = Json.serialize(ledger.unstructure())
+    identities = []
+    for _ in range(2):
+        restored = Ledger.structure(Json.deserialize(data))
+        restored.resolve_choice(_edge(restored.graph, "road", "Get medical help").uid)
+        action = _edge(restored.graph, "clinic", "Ask")
+        offer = restored.graph.get(action.offer_id)
+        identities.append((action.uid, action.templ_hash, offer.uid, list(offer.source_ids),
+                           action.unstructure(), offer.unstructure()))
+    assert identities[0] == identities[1]
 
 
 def _script(clinic: dict, call: dict) -> dict:

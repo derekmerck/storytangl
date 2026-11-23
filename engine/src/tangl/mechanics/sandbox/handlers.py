@@ -1148,6 +1148,8 @@ def _selected_sandbox_time_cost(ctx: VmPhaseCtx) -> SandboxTimeCost | None:
     payload = _selected_payload(ctx)
     if isinstance(payload, dict) and "sandbox_time_cost" in payload:
         return _coerce_time_cost(payload["sandbox_time_cost"])
+    if isinstance(payload, dict) and "sandbox_interaction_time_cost" in payload:
+        return _coerce_time_cost(payload["sandbox_interaction_time_cost"])
     selected_edge = ctx.selected_edge
     if not isinstance(selected_edge, Action):
         return None
@@ -2445,35 +2447,6 @@ def project_sandbox_mob_actions(*, caller, ctx, **_kw):
                 tags={"mob"},
                 mob=mob_label,
             )
-    return None
-
-
-@on_provision(
-    wants_caller_kind=SandboxLocation,
-    wants_exact_kind=False,
-)
-def project_sandbox_location_interactions(*, caller, ctx, **_kw):
-    """Project active location-sponsored interactions into ordinary actions."""
-    if not isinstance(caller, SandboxLocation):
-        return None
-    if not caller.auto_provision:
-        return None
-    graph = caller.graph
-    if graph is None or _graph_frozen_shape(graph):
-        return None
-
-    _clear_dynamic_sandbox_actions(caller, action_kind="location", ctx=ctx)
-    for interaction in caller.interactions:
-        _project_sandbox_interaction(
-            caller,
-            graph=graph,
-            ctx=ctx,
-            interaction=interaction,
-            source="sandbox_location",
-            sponsor_label=caller.get_label(),
-            sponsor_kind="location",
-            tags={"location"},
-        )
     return None
 
 

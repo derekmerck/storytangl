@@ -667,13 +667,12 @@ than by creating a dialogue or encounter subsystem.
 
 1. **Stabilize present mobs and active locations as sponsors.** `SandboxMob`
    already has schedule and presence projection, mutable state, and `HasAssets`;
-   `SandboxLocation` is the active hub. Both now carry `interactions`, whose
-   entries name a label, target traversable, optional selected-action journal
-   text, `once`, availability, effects, activation, and `return_to_location`.
+   `SandboxLocation` is the active hub. Location contributions lower through
+   the shared scoped Action path; mobs retain their existing interaction family.
 
 2. **Project sponsored interactions as ordinary actions.** When a mob is
-   present or a location is active, the projector lowers each active interaction
-   into an `Action` edge. Jump-and-return uses the existing
+   present, its projector lowers each active interaction into an `Action` edge.
+   Location declarations instead use the shared scoped Action reconciler. Jump-and-return uses the existing
    `return_phase=PLANNING` pattern. Once-only interactions use the existing
    visit-history suppression already used by scheduled events.
 

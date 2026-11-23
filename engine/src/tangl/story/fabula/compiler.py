@@ -948,6 +948,11 @@ class StoryCompiler:
                     root_scene_labels=root_scene_labels,
                     default_activation=DEFAULT_ACTIVATION_BY_FIELD["redirects"],
                 )
+                offered_actions = self._canonicalize_action_specs(
+                    self._normalize_list(block_data.get("offered_actions")),
+                    scene_label=scene_label,
+                    root_scene_labels=root_scene_labels,
+                )
                 next_qualified = self._next_block_label(blocks, block_index, scene_label)
                 for spec_list in (actions, continues, redirects):
                     for spec in spec_list:
@@ -976,23 +981,27 @@ class StoryCompiler:
                     authored_path_prefix=f"{block_authored_path}.redirects",
                     field_name="redirects",
                 )
+                self._collect_successor_issues(
+                    collector=collector, specs=offered_actions, source_label=qualified_label,
+                    authored_path_prefix=f"{block_authored_path}.offered_actions",
+                    field_name="offered_actions",
+                )
 
                 block_roles = self._normalize_list(block_data.get("roles"))
                 block_settings = self._normalize_list(block_data.get("settings"))
+                block_kind = self._resolve_kind(
+                    block_data.get("kind") or block_data.get("block_cls"),
+                    fallback=Block, collector=collector, authored_path=block_authored_path,
+                )
                 block_payload = self._build_payload(
-                    kind=self._resolve_kind(
-                        block_data.get("kind")
-                        or block_data.get("block_cls"),
-                        fallback=Block,
-                        collector=collector,
-                        authored_path=block_authored_path,
-                    ),
+                    kind=block_kind,
                     payload={
                         **block_data,
                         "label": block_data.get("label") or block_label,
                         "actions": actions,
                         "continues": continues,
                         "redirects": redirects,
+                        "offered_actions": offered_actions,
                         "roles": block_roles,
                         "settings": block_settings,
                         "media": self._normalize_list(block_data.get("media")),
@@ -1196,6 +1205,7 @@ class StoryCompiler:
     def _decompile_template(self, template: EntityTemplate) -> dict[str, Any]:
         data = _decompile_source_value(EntityTemplate.decompile(template))
         if isinstance(template.payload, Block):
+            data.pop("action_templates", None)
             self._decompile_block_effects(data)
         if isinstance(template, TemplateGroup):
             children = list(template.members())
@@ -1355,7 +1365,10 @@ class StoryCompiler:
             if not (isinstance(canonical, str) and canonical):
                 canonical = authored
             if isinstance(canonical, str) and canonical:
-                if "." in canonical:
+                if canonical == "current":
+                    payload["successor_ref"] = canonical
+                    payload["successor_is_absolute"] = False
+                elif "." in canonical:
                     payload["successor_ref"] = canonical
                     payload["successor_is_absolute"] = False
                 elif canonical in root_scene_labels:
@@ -1378,7 +1391,7 @@ class StoryCompiler:
     ) -> None:
         for index, spec in enumerate(specs):
             canonical_ref = _coerce_text(spec.get("successor_ref"))
-            if not canonical_ref:
+            if not canonical_ref or canonical_ref == "current":
                 continue
             authored_ref = _coerce_text(spec.get("authored_successor_ref")) or canonical_ref
             subject_label = StoryCompiler._diagnostic_subject_label(
@@ -1638,6 +1651,26 @@ class StoryCompiler:
 
         if issubclass(kind, Block):
             StoryCompiler._lower_node_effects(payload)
+            from .materializer import _EDGE_LABEL_STEM, action_template_from_spec
+
+            templates = dict(payload.get("action_templates") or {})
+            for field in ("actions", "continues", "redirects", "offered_actions"):
+                specs = StoryCompiler._normalize_list(payload.get(field))
+                specs = [with_default_activation(spec, DEFAULT_ACTIVATION_BY_FIELD.get(field))
+                         for spec in specs]
+                payload[field] = specs
+                if field not in templates:
+                    templates[field] = [
+                        action_template_from_spec(
+                            {**spec, "successor_ref": _coerce_text(
+                                spec.get("successor_ref") or spec.get("successor")
+                                or spec.get("next") or spec.get("target_ref") or spec.get("target_node")
+                            )},
+                            label=f"{_EDGE_LABEL_STEM.get(field, field)}_{default_label}_{index}",
+                        )
+                        for index, spec in enumerate(specs)
+                    ]
+            payload["action_templates"] = templates
 
         if issubclass(kind, Block) and isinstance(payload.get("content"), str):
             _report_invalid_dialog_callout(

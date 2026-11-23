@@ -4,8 +4,11 @@ from typing import Any
 
 from pydantic import Field
 
+from tangl.core import EntityTemplate
 from tangl.presentation.hints import PresentationHints
 from tangl.vm import TraversableNode
+
+from .action import Action
 
 
 class Block(TraversableNode):
@@ -42,6 +45,11 @@ class Block(TraversableNode):
     actions: list[dict[str, Any]] = Field(default_factory=list)
     continues: list[dict[str, Any]] = Field(default_factory=list)
     redirects: list[dict[str, Any]] = Field(default_factory=list)
+    offered_actions: list[dict[str, Any]] = Field(default_factory=list)
+    action_templates: dict[str, list[EntityTemplate[Action]]] = Field(
+        default_factory=dict,
+        json_schema_extra={"include": True, "unstructurable": True},
+    )
     roles: list[dict[str, Any]] = Field(default_factory=list)
     settings: list[dict[str, Any]] = Field(default_factory=list)
     media: list[dict[str, Any]] = Field(default_factory=list)

@@ -752,19 +752,17 @@ def test_location_interaction_can_be_trivial_self_loop_action() -> None:
         location_name="Road",
         content="Cover is {cover}.",
         locals={"cover": "thin"},
-        interactions=[
-            SandboxInteraction(
-                label="hide",
-                text="Hide in the roadside ruins",
-                target="current",
-                journal_text="You crouch behind the broken wall.",
-                effects=[Effect(expr="cover = 'good'")],
-            )
-        ],
     )
     graph.add(road)
+    from tangl.story.fabula.materializer import action_template_from_spec
+    from tangl.story.scoped_offers import add_local_action_offer
+    add_local_action_offer(road, action_template_from_spec({
+        "text": "Hide in the roadside ruins", "successor": "current",
+        "journal_text": "You crouch behind the broken wall.",
+        "effects": ["cover = 'good'"],
+    }, label="hide"))
     do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
-    hide = _dynamic_sandbox_actions_with_tag(road, "interaction")[0]
+    hide = next(edge for edge in road.edges_out(Selector(has_kind=Action)) if edge.offer_id)
     ledger = Ledger.from_graph(graph, entry_id=road.uid)
 
     ledger.resolve_choice(hide.uid)
@@ -782,17 +780,10 @@ def test_location_interaction_can_be_trivial_self_loop_action() -> None:
 
 
 def test_block_targeted_interaction_does_not_acquire_a_location_time_charge() -> None:
-    graph = Graph(label="interaction_block_target")
+    graph = StoryGraph(label="interaction_block_target")
     scope = SandboxScope(label="scope", locals={"world_turn": 0})
     road = SandboxLocation(
         label="road",
-        interactions=[
-            SandboxInteraction(
-                label="enter",
-                text="Enter the building",
-                target="building",
-            )
-        ],
     )
     building = Block(label="building", content="Inside.")
     graph.add(scope)
@@ -800,8 +791,13 @@ def test_block_targeted_interaction_does_not_acquire_a_location_time_charge() ->
     graph.add(building)
     scope.add_child(road)
     scope.add_child(building)
+    from tangl.story.fabula.materializer import action_template_from_spec
+    from tangl.story.scoped_offers import add_local_action_offer
+    add_local_action_offer(road, action_template_from_spec({
+        "text": "Enter the building", "successor": "building",
+    }, label="enter"))
     do_provision(road, ctx=PhaseCtx(graph=graph, cursor_id=road.uid))
-    interaction = _dynamic_sandbox_actions_with_tag(road, "interaction")[0]
+    interaction = next(edge for edge in road.edges_out(Selector(has_kind=Action)) if edge.offer_id)
 
     ledger = Ledger.from_graph(graph, entry_id=road.uid)
     ledger.resolve_choice(interaction.uid)

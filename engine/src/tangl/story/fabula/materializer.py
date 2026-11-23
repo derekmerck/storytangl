@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import TypeAdapter
 
 from tangl.core import EntityTemplate, GraphFactory, GraphItem, Selector, TemplateRegistry
+from tangl.core.runtime_op import Effect, Predicate
 from tangl.media.media_creators.media_spec import MediaSpec
 from tangl.media.media_resource import MediaDep
 from tangl.media.media_resource.media_provisioning import MediaInventoryProvisioner
@@ -61,6 +62,37 @@ def _authored_flag(spec: Mapping[str, Any], key: str) -> bool:
     return _AUTHORED_FLAG.validate_python(spec.get(key, False))
 
 
+def action_template_from_spec(spec: Mapping[str, Any], *, label: str) -> EntityTemplate[Action]:
+    """Lower an authored Action declaration to its reusable template."""
+    def expressions(value: Any) -> list[dict[str, Any] | Predicate | Effect]:
+        if not isinstance(value, list):
+            return []
+        return [{"expr": item} if isinstance(item, str) else item
+                for item in value if isinstance(item, (str, dict, Predicate, Effect))]
+
+    activation = spec.get("trigger") or spec.get("activation")
+    action = Action(
+        label=spec.get("label") or label,
+        text=spec.get("text") or spec.get("content") or spec.get("label") or "",
+        successor_ref=spec.get("successor_ref") or spec.get("successor") or spec.get("target_ref"),
+        activation=activation,
+        predicate=spec.get("predicate"),
+        availability=[*expressions(spec.get("availability")), *expressions(spec.get("conditions"))],
+        effects=expressions(spec.get("effects")),
+        payload=spec.get("payload"),
+        journal_text=spec.get("journal_text"),
+        accepts=spec.get("accepts") or spec.get("payload_schema"),
+        blockers=spec.get("blockers"),
+        unavailable_choice_disclosure=spec.get("unavailable_choice_disclosure"),
+        ui_hints=spec.get("ui_hints") or spec.get("ui_hint") or spec.get("hints")
+        or spec.get("presentation_hints"),
+        trigger_phase=Action.trigger_phase_from_activation(activation),
+        once=_authored_flag(spec, "once"),
+        return_phase=ResolutionPhase.PLANNING if _authored_flag(spec, "return") else None,
+    )
+    return EntityTemplate[Action](payload=action)
+
+
 @dataclass(slots=True)
 class _MaterializationState:
     graph: StoryGraph
@@ -71,6 +103,7 @@ class _MaterializationState:
     codec_state: dict[str, Any] = field(default_factory=dict)
     codec_id: str | None = None
     bundle_id: str | None = None
+    ctx: VmPhaseCtx | None = None
 
 class StoryMaterializer:
     """StoryMaterializer()
@@ -150,6 +183,7 @@ class StoryMaterializer:
             )
 
         state = self._runtime_state(graph=graph)
+        state.ctx = _ctx
         self._run_runtime_topology_passes(nodes=[entity], state=state)
         ctx = (
             _ctx.derive(cursor_id=entity.uid)
@@ -287,18 +321,24 @@ class StoryMaterializer:
                     )
                 scene.owner_id = owners[0].uid
                 if scene.offer is not None:
+                    from ..scoped_offers import ScopedActionOffer
+
                     offers = state.graph.find_edges(Selector(
-                        has_kind=Affordance, predecessor_id=owners[0].uid, successor=scene,
+                        has_kind=ScopedActionOffer, predecessor_id=owners[0].uid, successor=scene,
                     ))
-                    if not any("owned_scene_offer" in offer.tags for offer in offers):
-                        Affordance(
+                    if not any(offers):
+                        action_template = action_template_from_spec({
+                            "once": scene.offer.once, "return": True,
+                        }, label=f"offer_{scene.label}")
+                        action_template.payload.successor_id = scene.uid
+                        ScopedActionOffer(
                             registry=state.graph,
                             predecessor_id=owners[0].uid,
                             successor_id=scene.uid,
                             requirement=Requirement(provider_id=scene.uid),
                             source_requirement=scene.offer.source_requirement.model_copy(deep=True),
                             availability=scene.offer.availability,
-                            tags={"owned_scene_offer"},
+                            action_template=action_template,
                         )
         self._wire_menu_fanouts(nodes=nodes, state=state)
         self._wire_block_actions(nodes=nodes, state=state)
@@ -789,6 +829,10 @@ class StoryMaterializer:
     ) -> None:
         for node in nodes:
             if isinstance(node, Block):
+                from ..scoped_offers import add_local_action_offer
+
+                for template in node.action_templates.get("offered_actions", []):
+                    add_local_action_offer(node, template, ctx=state.ctx)
                 self._wire_actions_for_block(
                     node=node, specs=node.redirects, state=state, field="redirects"
                 )
@@ -927,62 +971,17 @@ class StoryMaterializer:
                     "(expected one of: successor, next, successor_ref, target_ref, target_node)"
                 )
                 raise ValueError(msg)
-            activation = self._coerce_str(spec.get("trigger") or spec.get("activation"))
-            trigger_phase = Action.trigger_phase_from_activation(activation)
-
-            # Authored ``conditions``/``effects`` on actions, continues, and
-            # redirects must reach the edge as availability predicates and
-            # effects; without this they are silently dropped and the edge
-            # gates/mutates nothing.
-            def _as_exprs(value: Any) -> list[dict[str, Any]]:
-                if not isinstance(value, list):
-                    return []
-                out: list[dict[str, Any]] = []
-                for item in value:
-                    if isinstance(item, str):
-                        out.append({"expr": item})
-                    elif isinstance(item, dict):
-                        out.append(dict(item))
-                return out
-
-            action = Action(
-                registry=state.graph,
-                # Named for the list it came from: a block's first continue and
-                # its first action would otherwise both be ``action_<block>_0``.
-                label=spec.get("label") or f"{_EDGE_LABEL_STEM[field]}_{node.label}_{index}",
-                predecessor_id=node.uid,
-                text=self._coerce_str(spec.get("text") or spec.get("content") or spec.get("label"))
-                or "",
-                successor_ref=successor_ref,
-                activation=activation,
-                predicate=self._coerce_str(spec.get("predicate")),
-                availability=[
-                    *_as_exprs(spec.get("availability")),
-                    *_as_exprs(spec.get("conditions")),
-                ],
-                effects=_as_exprs(spec.get("effects")),
-                payload=spec.get("payload"),
-                accepts=spec.get("accepts") or spec.get("payload_schema"),
-                blockers=spec.get("blockers"),
-                unavailable_choice_disclosure=spec.get("unavailable_choice_disclosure"),
-                ui_hints=(
-                    spec.get("ui_hints")
-                    or spec.get("ui_hint")
-                    or spec.get("hints")
-                    or spec.get("presentation_hints")
-                ),
-                trigger_phase=trigger_phase,
-                once=_authored_flag(spec, "once"),
-                # ``return: true`` makes this a call: the reader goes there,
-                # and comes back here. Same meaning as a sandbox interaction's
-                # ``return_to_location``, and the same phase. Parsed as a bool,
-                # like ``once``, so ``return: "false"`` is not a call.
-                return_phase=(
-                    ResolutionPhase.PLANNING if _authored_flag(spec, "return") else None
-                ),
+            templates = node.action_templates.get(field, [])
+            template = templates[index] if index < len(templates) else action_template_from_spec(
+                {**spec, "successor_ref": successor_ref},
+                label=f"{_EDGE_LABEL_STEM[field]}_{node.label}_{index}",
             )
+            action = template.materialize(
+                uid=_next_provision_uid(_ctx=state.ctx), predecessor_id=node.uid,
+            )
+            state.graph.add(action)
 
-            target = self._find_runtime_entity(
+            target = node if successor_ref == "current" else self._find_runtime_entity(
                 graph=state.graph,
                 reference=successor_ref,
                 kind=TraversableNode,

@@ -8,8 +8,12 @@ gated nothing and the first continue always won. These tests pin the fix.
 
 from __future__ import annotations
 
+import pytest
+
 from tangl.core import Selector
 from tangl.core.runtime_op import Predicate
+from tangl.journal.fragments import ContentFragment
+from tangl.mechanics.sandbox import SandboxLocation
 from tangl.story import InitMode
 from tangl.story.episode import Action
 from tangl.story.fabula.world import World
@@ -66,6 +70,76 @@ def _graph():
 
 def _node(graph, label: str):
     return next(n for n in graph.find_nodes(Selector()) if n.get_label() == label)
+
+
+def test_current_action_journals_and_updates_its_receiver() -> None:
+    script = _script()
+    start = script["scenes"]["s"]["blocks"]["start"]
+    start["locals"] = {"hidden": False}
+    start["actions"] = [{
+        "text": "Hide", "successor": "current", "journal_text": "You hide.",
+        "effects": ["hidden = True"],
+    }]
+    world = World.from_script_data(script_data=script)
+    graph = world.create_story("current_action_story", init_mode=InitMode.EAGER).graph
+    receiver = _node(graph, "start")
+    action = next(receiver.edges_out(Selector(has_kind=Action)))
+    assert action.successor is receiver
+    ledger = Ledger.from_graph(graph=graph, entry_id=receiver.uid)
+    ledger.resolve_choice(action.uid)
+    assert receiver.locals["hidden"] is True
+    assert any(isinstance(item, ContentFragment) and item.content == "You hide."
+               for item in ledger.get_journal())
+
+
+@pytest.mark.parametrize("kind", [None, SandboxLocation])
+def test_offered_current_action_uses_the_shared_action_template(kind) -> None:
+    script = _script()
+    start = script["scenes"]["s"]["blocks"]["start"]
+    start["locals"] = {"hidden": False}
+    if kind is not None:
+        start["kind"] = kind
+        start["wait_enabled"] = False
+    start["actions"] = []
+    start["offered_actions"] = [{
+        "text": "Hide", "successor": "current", "journal_text": "You hide.",
+        "effects": ["hidden = True"], "payload": {"source": "cover"},
+        "accepts": {"kind": "text", "required": True},
+    }]
+    world = World.from_script_data(script_data=script)
+    graph = world.create_story("offered_current_story", init_mode=InitMode.EAGER).graph
+    receiver = _node(graph, "start")
+    ledger = Ledger.from_graph(graph=graph, entry_id=receiver.uid)
+    from tangl.vm.dispatch import do_provision
+    do_provision(receiver, ctx=ledger.get_frame()._make_ctx())
+    (action,) = receiver.edges_out(Selector(has_kind=Action))
+    assert action.successor is receiver
+    assert action.payload == {"source": "cover"}
+    with pytest.raises(ValueError):
+        ledger.resolve_choice(action.uid, choice_payload={"text": ""})
+    ledger.resolve_choice(action.uid, choice_payload={"text": "quietly"})
+    assert receiver.locals["hidden"] is True
+    assert any(isinstance(item, ContentFragment) and item.content == "You hide."
+               for item in ledger.get_journal())
+
+
+def test_offered_last_self_loop_runs_until_its_guard_closes() -> None:
+    script = _script()
+    start = script["scenes"]["s"]["blocks"]["start"]
+    start["locals"] = {"announced": False}
+    start["actions"] = []
+    start["offered_actions"] = [{
+        "successor": "current", "trigger": "last", "conditions": ["not announced"],
+        "effects": ["announced = True"],
+    }]
+    world = World.from_script_data(script_data=script)
+    graph = world.create_story("offered_automatic_story", init_mode=InitMode.EAGER).graph
+    receiver = _node(graph, "start")
+    ledger = Ledger.from_graph(graph=graph, entry_id=receiver.uid)
+    frame = ledger.get_frame()
+    frame.goto_node(receiver)
+    assert receiver.locals["announced"] is True
+    assert frame.cursor.uid == receiver.uid
 
 
 class TestEdgeConditionsWiring:
