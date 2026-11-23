@@ -19,12 +19,15 @@ const props = defineProps<{
 
 const { remapURL } = useGlobal()
 const frame = ref<HTMLElement | null>(null)
-const scale = ref(1)
+// The frame's width is observed; the scale follows it and the extent, which
+// can arrive after the frame has settled and so fire no resize of its own.
+const frameWidth = ref(0)
+const scale = computed(() => (frameWidth.value || props.extent.width) / props.extent.width)
 let observer: ResizeObserver | undefined
 
 onMounted(() => {
   observer = new ResizeObserver(([entry]) => {
-    scale.value = entry!.contentRect.width / props.extent.width
+    frameWidth.value = entry!.contentRect.width
   })
   observer.observe(frame.value!)
 })
