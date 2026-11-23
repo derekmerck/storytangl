@@ -148,6 +148,7 @@ App.vue (root)
 │   └── StoryStatus (status display)
 └── v-main (content area)
     └── StoryFlow (fragment registry + scene container)
+        ├── StageView (folded stage, drawn before the current scene)
         └── StoryBlock (scene shell, repeated)
             ├── fragment renderers
             └── StoryAction (choice fragment, repeated)
@@ -207,6 +208,10 @@ export const useStore = defineStore('main', {
   `media_type`; `media_role` says where media goes, never what element plays it.
   No source or no element for the type renders an explicit placeholder.
 - **URL remapping**: `remapURL()` converts relative to absolute URLs
+- **Stage**: `StageView` draws `narrative_im` as the backdrop and `staged_im`/`dialog_im`
+  as figures on a logical canvas at the world's `stage_extent`, laid out by
+  `stage.ts` with pygame's `stage.py` as the semantic reference. Which steps restate
+  the stage is `stageFold.ts`, client policy that #409 replaces.
 - **Legacy blocks**: `makeMediaDict()` keys a `JournalStoryUpdate` media array by role
 - **Preferences**: world `ui-preferences` values live in `localStorage` per world
   (`worldPreferences.ts`), never in a request or the ledger

@@ -11,10 +11,15 @@ import type {
 import { useGlobal } from '@/composables/globals'
 import { savePlayerSecret } from '@/playerSession'
 import { loadPreferenceValues, savePreferenceValues, type PreferenceValues } from '@/worldPreferences'
+import { DEFAULT_STAGE_EXTENT, type StageExtent } from '@/components/story/stage'
+
+const PRESENTATION_CHANNELS = ['ui-stage', 'ui-preferences']
 
 interface StoreState {
   current_world_uid: string
   current_world_info?: BrandingValue
+  /** The current world's logical stage, or the default when it declares none. */
+  stage_extent: StageExtent
   /** The current world's declared viewer preferences, and this browser's values for them. */
   world_preferences: PreferenceDeclaration[]
   preference_values: PreferenceValues
@@ -29,6 +34,7 @@ export const useStore = defineStore('main', {
   state: (): StoreState => ({
     current_world_uid: import.meta.env.VITE_DEFAULT_WORLD,
     current_world_info: undefined,
+    stage_extent: DEFAULT_STAGE_EXTENT,
     world_preferences: [],
     preference_values: {},
     user_secret: import.meta.env.VITE_DEFAULT_USER_SECRET,
@@ -54,21 +60,24 @@ export const useStore = defineStore('main', {
     },
 
     /**
-     * Fetch the world-static presentation channels this world advertises. A
-     * world that declares no preferences advertises no `ui-preferences`
-     * channel, and is not asked for one.
+     * Fetch the world-static presentation channels this world advertises, in
+     * one request. A world that declares no stage or no preferences advertises
+     * no such channel, and is not asked for one.
      */
     async getWorldPresentation(worldUid: string) {
       const catalog = await $http.value.get<ProjectedState>(`/world/${worldUid}/info`)
-      const advertised = catalog.data.channels.some(
-        (channel) => channel.channel_id === 'ui-preferences'
-      )
-      if (this.current_world_uid !== worldUid || !advertised) return
+      const advertised = catalog.data.channels
+        .map((channel) => channel.channel_id)
+        .filter((id) => PRESENTATION_CHANNELS.includes(id))
+      if (this.current_world_uid !== worldUid || advertised.length === 0) return
       const response = await $http.value.get<ProjectedState>(`/world/${worldUid}/info`, {
-        params: { channels: 'ui-preferences' },
+        params: { channels: advertised.join(',') },
       })
       if (this.current_world_uid !== worldUid) return
       for (const { value } of response.data.sections) {
+        if (value.value_type === 'stage_extent') {
+          this.stage_extent = { width: value.width, height: value.height }
+        }
         if (value.value_type === 'ui_preferences') {
           this.world_preferences = value.preferences
           this.preference_values = loadPreferenceValues(worldUid, value.preferences)

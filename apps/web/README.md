@@ -11,12 +11,13 @@ explicit story creation, and Continue through the user's current ledger pointer.
 Story/status readers wait for session entry. History is readable, while only
 current choice occurrences can submit. Grouped and standalone attributed lines
 share one renderer, media chooses its element by `media_type`, and a world's
-declared `ui-preferences` get local controls. Staging and audio ownership
-remain work under #611 and #571.
+declared `ui-preferences` get local controls. One stage at the world's
+`stage_extent` leads the current scene: the backdrop fills it and figures stand
+at their natural size, placed by `media_x`/`media_y`. Audio ownership remains #571.
 
 The [Chromium smoke](e2e/README.md) builds the client and serves it through the
 real REST app, proving the reference-world entry, two choices, status,
-same-server reload, and `concept_naming_demo` attribution. Vitest/MSW remains
+same-server reload, `concept_naming_demo` attribution and `repartee_loop` staging. Vitest/MSW remains
 component evidence, not a substitute.
 
 ---

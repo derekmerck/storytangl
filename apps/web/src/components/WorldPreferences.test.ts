@@ -8,11 +8,11 @@ import * as directives from 'vuetify/directives'
 import WorldPreferences from './WorldPreferences.vue'
 import { useStore } from '@/store'
 import { server } from '@tests/setup'
-import { reparteePreferencesInfo } from '@tests/fixtures'
+import { reparteePresentationInfo } from '@tests/fixtures'
 import type { UiPreferencesValue } from '@/types'
 
 const vuetify = createVuetify({ components, directives })
-const declared = (reparteePreferencesInfo.sections[0]!.value as UiPreferencesValue).preferences
+const declared = (reparteePresentationInfo.sections[1]!.value as UiPreferencesValue).preferences
 
 const mountPreferences = () => {
   setActivePinia(createPinia())

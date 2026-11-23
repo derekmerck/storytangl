@@ -12,7 +12,7 @@ import uvicorn
 
 from tangl.config import settings
 
-WITNESSED_WORLDS = ("reference", "concept_naming_demo")
+WITNESSED_WORLDS = ("reference", "concept_naming_demo", "repartee_loop")
 """The worlds the browser witnesses play; each is copied from the checkout."""
 
 

@@ -1,9 +1,9 @@
-import type { ProjectedState } from '@/types'
+import type { MediaStoryFragment, ProjectedState, RuntimeEnvelope } from '@/types'
 
 /**
  * World info for `repartee_loop`, as the real REST app serves it: the bare
- * catalog advertises its channels, and `?channels=ui-preferences` returns the
- * declarations from `worlds/repartee_loop/world.yaml`.
+ * catalog advertises its channels, and `?channels=ui-stage,ui-preferences`
+ * returns the stage and preference declarations from its `world.yaml`.
  */
 export const reparteeWorldCatalog: ProjectedState = {
   channels: [
@@ -15,9 +15,16 @@ export const reparteeWorldCatalog: ProjectedState = {
   sections: [],
 }
 
-export const reparteePreferencesInfo: ProjectedState = {
+export const reparteePresentationInfo: ProjectedState = {
   channels: [],
   sections: [
+    {
+      section_id: 'ui-stage',
+      title: 'Stage extent',
+      kind: 'stage_extent',
+      value: { value_type: 'stage_extent', width: 320, height: 200 },
+      hints: null,
+    },
     {
       section_id: 'ui-preferences',
       title: 'Preferences',
@@ -48,3 +55,67 @@ export const reparteePreferencesInfo: ProjectedState = {
     },
   ],
 }
+
+const metadata = { world_id: 'repartee_loop', ledger_id: 'repartee-ledger' }
+const image = (uid: string, role: string, file: string, staging_hints = {}): MediaStoryFragment => ({
+  uid,
+  fragment_type: 'media',
+  media_role: role,
+  text: null,
+  scope: 'world',
+  media_type: 'image',
+  content_format: 'url',
+  staging_hints,
+  url: `/media/world/repartee_loop/images/${file}`,
+})
+
+/** The clerk as `repartee_loop` stages it, hints exactly as the service sends them. */
+export const reparteeClerk = image('clerk', 'dialog_im', 'clerk_sprite.png', {
+  media_transition: 'from_left',
+  media_timing: 'loop',
+  media_visibility: { preference_id: 'sprites-visible', values: [true] },
+  media_x: 'left',
+  media_y: 'bottom',
+  media_flip_h: true,
+  media_clip: 'idle',
+  media_clip_binding: {
+    axes: ['clerk-motion'],
+    rows: [
+      { values: ['idle'], clip: 'idle' },
+      { values: ['call'], clip: 'call' },
+      { values: ['response'], clip: 'response' },
+    ],
+  },
+})
+
+/** Its first three steps: the quay, the clerk on the quay, then the map plate alone. */
+export const reparteeSteps: RuntimeEnvelope[] = [
+  {
+    step: 1,
+    metadata,
+    fragments: [
+      { uid: 'quay-text', fragment_type: 'content', content: 'At the quay, every introduction is also a challenge.' },
+      image('quay-bg', 'narrative_im', 'quai_bg.png', { media_shape: 'landscape' }),
+      { uid: 'quay-go', fragment_type: 'choice', edge_id: 'quay-edge', text: 'Step into the practice court' },
+    ],
+  },
+  {
+    step: 2,
+    metadata,
+    fragments: [
+      { uid: 'court-text', fragment_type: 'content', content: 'The clerk hands you one opening line.' },
+      image('court-bg', 'narrative_im', 'quai_bg.png', { media_shape: 'landscape' }),
+      reparteeClerk,
+      { uid: 'court-go', fragment_type: 'choice', edge_id: 'court-edge', text: 'Step out onto the quay' },
+    ],
+  },
+  {
+    step: 3,
+    metadata,
+    fragments: [
+      { uid: 'map-text', fragment_type: 'content', content: 'The district runs from the water to the salon steps.' },
+      image('map', 'map_im', 'quay_map.png'),
+      { uid: 'map-go', fragment_type: 'choice', edge_id: 'map-edge', text: 'Go to The Practice Yard' },
+    ],
+  },
+]

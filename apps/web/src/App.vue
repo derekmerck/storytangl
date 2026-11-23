@@ -7,6 +7,7 @@ import AppFooter from '@/components/AppFooter.vue'
 import StoryStatus from '@/components/StoryStatus.vue'
 import WorldPreferences from '@/components/WorldPreferences.vue'
 import StoryFlow from '@/components/story/StoryFlow.vue'
+import { DEFAULT_STAGE_EXTENT } from '@/components/story/stage'
 import type { InfoState, RuntimeEnvelope, UserInfo } from '@/types'
 import { useGlobal } from '@/composables/globals'
 import { clearPlayerSecret, loadPlayerSecret } from '@/playerSession'
@@ -45,6 +46,7 @@ const resetSession = () => {
   statusRefreshKey.value = 0
   store.current_world_uid = ''
   store.current_world_info = undefined
+  store.stage_extent = DEFAULT_STAGE_EXTENT
   store.world_preferences = []
   store.preference_values = {}
 }
@@ -351,6 +353,7 @@ const handleStoryUpdate = (envelope: RuntimeEnvelope) => {
                 :key="sessionGeneration"
                 :initial-envelope="activeSession.envelope"
                 :active-choice-ids="activeSession.choiceIds"
+                :stage-extent="store.stage_extent"
                 @write-pending="writePending = $event"
                 @resynchronize="resynchronizeStory"
                 @story-update="handleStoryUpdate"

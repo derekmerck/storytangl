@@ -15,7 +15,7 @@ import { HttpResponse, http, server } from '@tests/setup'
 import {
   crossroadsRuntimeEnvelope,
   crossroadsNextRuntimeEnvelope,
-  reparteePreferencesInfo,
+  reparteePresentationInfo,
   reparteeWorldCatalog,
   sandboxInfoState,
   sandboxProjectedState,
@@ -238,7 +238,7 @@ describe('App.vue', () => {
       http.get(`${DEFAULT_API_URL}/world/tangl_world/info`, ({ request }) =>
         HttpResponse.json(
           new URL(request.url).searchParams.has('channels')
-            ? reparteePreferencesInfo
+            ? reparteePresentationInfo
             : reparteeWorldCatalog
         )
       )

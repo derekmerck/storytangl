@@ -122,7 +122,9 @@ async function assertHistoryAndFrontier(page: Page, envelope: RuntimeEnvelope) {
       page.locator('button.choice-button').filter({ hasText: choice.text! })
     ).toBeEnabled()
   }
-  const image = page.locator('img[src$="/media/world/reference/images/tavern.svg"]').last()
+  // The stage draws the current room once; restored media must decode there.
+  const image = page.getByTestId('stage').locator('img[data-stage-role="narrative_im"]')
+  await expect(image).toHaveAttribute('src', /\/media\/world\/reference\/images\/.+\.svg$/)
   await expect
     .poll(() => image.evaluate((item) => (item as HTMLImageElement).naturalWidth))
     .toBeGreaterThan(0)

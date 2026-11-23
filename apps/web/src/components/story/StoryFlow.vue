@@ -3,10 +3,12 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { isAxiosError } from 'axios'
 
 import CommandBar from './CommandBar.vue'
+import StageView from './StageView.vue'
 import StoryBlock from './StoryBlock.vue'
 import type {
   GroupStoryFragment,
   GrammarHint,
+  MediaStoryFragment,
   RuntimeEnvelope,
   RuntimeMetadata,
   StoryFragment,
@@ -19,8 +21,11 @@ import {
   isControlFragment,
   isGroupFragment,
   isChoiceFragment,
+  isMediaFragment,
   normalizeEnvelope,
 } from './fragmentUtils'
+import { isStagedMedia, type StageExtent } from './stage'
+import { foldStage } from './stageFold'
 
 const { $http, $debug, $verbose } = useGlobal()
 const storyRoutePrefix = import.meta.env.VITE_STORY_ROUTE_PREFIX || '/story'
@@ -30,7 +35,11 @@ const emit = defineEmits<{
   writePending: [pending: boolean]
   resynchronize: [message: string]
 }>()
-const props = defineProps<{ initialEnvelope: RuntimeEnvelope; activeChoiceIds: string[] }>()
+const props = defineProps<{
+  initialEnvelope: RuntimeEnvelope
+  activeChoiceIds: string[]
+  stageExtent: StageExtent
+}>()
 const activeChoiceIds = ref([...props.activeChoiceIds])
 const currentStep = ref(props.initialEnvelope.step)
 let alive = true
@@ -47,6 +56,23 @@ const sceneRefs = ref<InstanceType<typeof StoryBlock>[]>([])
 const sceneCounter = ref(0)
 const loading = ref(false)
 
+const stageImages = computed(() =>
+  scenes.value.reduce<MediaStoryFragment[]>(
+    (stage, scene) =>
+      foldStage(
+        stage,
+        scene.memberIds
+          .map((id) => fragmentRegistry.value[id])
+          .filter(
+            (fragment): fragment is MediaStoryFragment =>
+              fragment !== undefined && isMediaFragment(fragment) && isStagedMedia(fragment)
+          )
+      ),
+    []
+  )
+)
+// One stage at most; a ref inside v-for still collects an array.
+const stageRefs = ref<InstanceType<typeof StageView>[]>([])
 const debugEnabled = computed(() => $debug.value && $verbose.value)
 const commandGrammar = computed<GrammarHint>(() => currentMetadata.value.grammar ?? {})
 
@@ -127,7 +153,8 @@ const applyEnvelope = async (envelope: RuntimeEnvelope) => {
   scenes.value.push(...newScenes)
 
   await nextTick(() => {
-    const target = sceneRefs.value[startingIndex]
+    // The stage leads the current scene, so a turn starts where its room is shown.
+    const target = stageRefs.value[0] ?? sceneRefs.value[startingIndex]
     const element = target?.$el as HTMLElement | undefined
     element?.scrollIntoView({ behavior: startingIndex ? 'smooth' : 'auto' })
   })
@@ -203,17 +230,23 @@ const doCommand = (command: string) => submit({ find_edge: { kind: 'command', co
       </v-alert>
     </div>
 
-    <StoryBlock
-      v-for="scene in scenes"
-      :key="scene.key"
-      ref="sceneRefs"
-      :scene="scene"
-      :fragments="fragmentRegistry"
-      :metadata="scene.metadata"
-      :disabled="loading"
-      :active-choice-ids="activeChoiceIds"
-      @doAction="doAction"
-    />
+    <template v-for="(scene, index) in scenes" :key="scene.key">
+      <StageView
+        v-if="index === scenes.length - 1 && stageImages.length > 0"
+        ref="stageRefs"
+        :images="stageImages"
+        :extent="stageExtent"
+      />
+      <StoryBlock
+        ref="sceneRefs"
+        :scene="scene"
+        :fragments="fragmentRegistry"
+        :metadata="scene.metadata"
+        :disabled="loading"
+        :active-choice-ids="activeChoiceIds"
+        @doAction="doAction"
+      />
+    </template>
 
     <CommandBar
       :grammar="commandGrammar"

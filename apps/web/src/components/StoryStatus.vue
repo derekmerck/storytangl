@@ -103,7 +103,7 @@ const normalizeSection = (section: ProjectedSection): StatusSection => {
   if (value.value_type === 'scalar') {
     return { ...base, items: [{ key: 'Value', value: formatPrimitive(value.value) }] }
   }
-  // Viewer preferences are world-static controls, not story state to list.
+  // Stage extent and viewer preferences are world-static presentation, not story state.
   return { ...base, items: [] }
 }
 

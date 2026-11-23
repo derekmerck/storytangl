@@ -4,12 +4,18 @@ import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 import StoryFlow from './StoryFlow.vue'
+import StageView from './StageView.vue'
 import StoryBlock from './StoryBlock.vue'
 import { isChoiceFragment } from './fragmentUtils'
+import { DEFAULT_STAGE_EXTENT } from './stage'
 import type { RuntimeEnvelope } from '@/types'
 import { useGlobal } from '@/composables/globals'
 import { HttpResponse, http, server } from '@tests/setup'
-import { commandHintRuntimeEnvelope, crossroadsRuntimeEnvelope } from '@tests/fixtures'
+import {
+  commandHintRuntimeEnvelope,
+  crossroadsRuntimeEnvelope,
+  reparteeSteps,
+} from '@tests/fixtures'
 
 const api = 'http://localhost:8000/api/v2'
 const vuetify = createVuetify({ components, directives })
@@ -18,7 +24,7 @@ const mountFlow = (
   activeChoiceIds = envelope.fragments.filter(isChoiceFragment).map((item) => item.uid)
 ) =>
   mount(StoryFlow, {
-    props: { initialEnvelope: envelope, activeChoiceIds },
+    props: { initialEnvelope: envelope, activeChoiceIds, stageExtent: DEFAULT_STAGE_EXTENT },
     global: { plugins: [vuetify] },
   })
 const offered: RuntimeEnvelope = {
@@ -154,7 +160,12 @@ describe('StoryFlow session rendering', () => {
       )
     )
     const wrapper = mount(StoryFlow, {
-      props: { initialEnvelope: offered, activeChoiceIds: ['choice'], onStoryUpdate: updated },
+      props: {
+        initialEnvelope: offered,
+        activeChoiceIds: ['choice'],
+        stageExtent: DEFAULT_STAGE_EXTENT,
+        onStoryUpdate: updated,
+      },
       global: { plugins: [vuetify] },
     })
     await flushPromises()
@@ -181,5 +192,42 @@ describe('StoryFlow session rendering', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     expect(submitted).toEqual([{ find_edge: { kind: 'command', command: 'look around' } }])
+  })
+
+  it('draws one stage before the current scene, folding repartee_loop steps', async () => {
+    const steps = [...reparteeSteps.slice(1)]
+    server.use(http.post(`${api}/story/do`, () => HttpResponse.json(steps.shift())))
+    const wrapper = mount(StoryFlow, {
+      props: {
+        initialEnvelope: reparteeSteps[0]!,
+        activeChoiceIds: ['quay-go'],
+        stageExtent: { width: 640, height: 400 },
+      },
+      global: { plugins: [vuetify] },
+    })
+    await flushPromises()
+    const staged = () =>
+      wrapper.findAll('[data-testid="stage"] img').map((img) => img.attributes('data-stage-role'))
+
+    expect(staged()).toEqual(['narrative_im'])
+    expect(wrapper.find('.stage-canvas').attributes('style')).toContain('width: 640px')
+
+    wrapper.findComponent(StoryBlock).vm.$emit('doAction', 'quay-edge')
+    await flushPromises()
+    expect(wrapper.findAllComponents(StageView)).toHaveLength(1)
+    // A turn opens on its room: the stage, not the text below it, scrolls into view.
+    expect(vi.mocked(HTMLElement.prototype.scrollIntoView).mock.contexts.at(-1)).toBe(
+      wrapper.find('[data-testid="stage"]').element
+    )
+    expect(staged()).toEqual(['narrative_im', 'dialog_im'])
+    expect(wrapper.findAll('img[src$="quai_bg.png"]')).toHaveLength(1)
+
+    // The map plate states no room: the quay and its clerk stay staged.
+    wrapper.findAllComponents(StoryBlock).at(-1)!.vm.$emit('doAction', 'court-edge')
+    await flushPromises()
+    expect(staged()).toEqual(['narrative_im', 'dialog_im'])
+    const blocks = wrapper.findAllComponents(StoryBlock)
+    expect(blocks.at(-1)!.findComponent({ name: 'VImg' }).props('src')).toContain('quay_map.png')
+    expect(wrapper.find('[data-testid="stage"] + *').html()).toContain('The district runs')
   })
 })

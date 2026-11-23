@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { http, HttpResponse, server } from '@tests/setup'
 import { flushPromises } from '@vue/test-utils'
-import { reparteePreferencesInfo, reparteeWorldCatalog } from '@tests/fixtures'
+import { reparteePresentationInfo, reparteeWorldCatalog } from '@tests/fixtures'
 
 const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
 
@@ -118,8 +118,8 @@ describe('Store', () => {
           const url = new URL(request.url)
           requests.push(url.search)
           return HttpResponse.json(
-            url.searchParams.get('channels') === 'ui-preferences'
-              ? reparteePreferencesInfo
+            url.searchParams.get('channels') === 'ui-stage,ui-preferences'
+              ? reparteePresentationInfo
               : reparteeWorldCatalog
           )
         })
@@ -129,13 +129,15 @@ describe('Store', () => {
       requests.length = 0
     })
 
-    it('fetches advertised preferences and starts from their defaults', async () => {
+    it('fetches the advertised stage and preferences, starting from defaults', async () => {
       serveRepartee()
       const store = useStore()
       store.current_world_uid = 'repartee_loop'
+      expect(store.stage_extent).toEqual({ width: 320, height: 200 })
       await store.getWorldPresentation('repartee_loop')
 
-      expect(requests).toEqual(['', '?channels=ui-preferences'])
+      expect(requests).toEqual(['', '?channels=ui-stage,ui-preferences'])
+      expect(store.stage_extent).toEqual({ width: 320, height: 200 })
       expect(store.world_preferences.map((item) => item.id)).toEqual([
         'sprites-visible',
         'clerk-motion',
@@ -144,6 +146,33 @@ describe('Store', () => {
         'sprites-visible': true,
         'clerk-motion': 'idle',
       })
+    })
+
+    it("takes the world's declared stage extent", async () => {
+      server.use(
+        http.get(`${DEFAULT_API_URL}/world/wide/info`, ({ request }) =>
+          HttpResponse.json(
+            new URL(request.url).searchParams.has('channels')
+              ? {
+                  channels: [],
+                  sections: [
+                    {
+                      section_id: 'ui-stage',
+                      title: 'Stage extent',
+                      value: { value_type: 'stage_extent', width: 640, height: 400 },
+                    },
+                  ],
+                }
+              : { channels: [{ channel_id: 'ui-stage', shortcuts: [] }], sections: [] }
+          )
+        )
+      )
+      const store = useStore()
+      store.current_world_uid = 'wide'
+      await store.getWorldPresentation('wide')
+
+      expect(store.stage_extent).toEqual({ width: 640, height: 400 })
+      expect(store.world_preferences).toEqual([])
     })
 
     it('asks only for channels the world advertises', async () => {
