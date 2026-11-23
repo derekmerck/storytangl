@@ -987,17 +987,6 @@ class StoryCompiler:
                     field_name="offered_actions",
                 )
 
-                from .materializer import _EDGE_LABEL_STEM, action_template_from_spec
-
-                action_templates = {
-                    field: [action_template_from_spec(
-                        spec, label=f"{_EDGE_LABEL_STEM.get(field, field)}_{block_label}_{index}",
-                    ) for index, spec in enumerate(specs)]
-                    for field, specs in (("actions", actions), ("continues", continues),
-                                         ("redirects", redirects),
-                                         ("offered_actions", offered_actions))
-                }
-
                 block_roles = self._normalize_list(block_data.get("roles"))
                 block_settings = self._normalize_list(block_data.get("settings"))
                 block_kind = self._resolve_kind(
@@ -1013,8 +1002,6 @@ class StoryCompiler:
                         "continues": continues,
                         "redirects": redirects,
                         "offered_actions": offered_actions,
-                        **({"action_templates": action_templates}
-                           if issubclass(block_kind, Block) else {}),
                         "roles": block_roles,
                         "settings": block_settings,
                         "media": self._normalize_list(block_data.get("media")),
@@ -1664,6 +1651,26 @@ class StoryCompiler:
 
         if issubclass(kind, Block):
             StoryCompiler._lower_node_effects(payload)
+            from .materializer import _EDGE_LABEL_STEM, action_template_from_spec
+
+            templates = dict(payload.get("action_templates") or {})
+            for field in ("actions", "continues", "redirects", "offered_actions"):
+                specs = StoryCompiler._normalize_list(payload.get(field))
+                specs = [with_default_activation(spec, DEFAULT_ACTIVATION_BY_FIELD.get(field))
+                         for spec in specs]
+                payload[field] = specs
+                if field not in templates:
+                    templates[field] = [
+                        action_template_from_spec(
+                            {**spec, "successor_ref": _coerce_text(
+                                spec.get("successor_ref") or spec.get("successor")
+                                or spec.get("next") or spec.get("target_ref") or spec.get("target_node")
+                            )},
+                            label=f"{_EDGE_LABEL_STEM.get(field, field)}_{default_label}_{index}",
+                        )
+                        for index, spec in enumerate(specs)
+                    ]
+            payload["action_templates"] = templates
 
         if issubclass(kind, Block) and isinstance(payload.get("content"), str):
             _report_invalid_dialog_callout(
