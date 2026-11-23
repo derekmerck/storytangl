@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { http, HttpResponse, server } from '@tests/setup'
 import { flushPromises } from '@vue/test-utils'
+import { reparteePreferencesInfo, reparteeWorldCatalog } from '@tests/fixtures'
 
 const DEFAULT_API_URL = 'http://localhost:8000/api/v2'
 
@@ -107,5 +108,88 @@ describe('Store', () => {
     expect(store.user_api_key).toBeDefined()
     expect($http.value.defaults.headers.common['X-Api-Key']).toBe(store.user_api_key)
     expect(localStorage.getItem('storytangl.player-secret')).toBe('new-secret-123')
+  })
+
+  describe('world preferences', () => {
+    const requests: string[] = []
+    const serveRepartee = () =>
+      server.use(
+        http.get(`${DEFAULT_API_URL}/world/repartee_loop/info`, ({ request }) => {
+          const url = new URL(request.url)
+          requests.push(url.search)
+          return HttpResponse.json(
+            url.searchParams.get('channels') === 'ui-preferences'
+              ? reparteePreferencesInfo
+              : reparteeWorldCatalog
+          )
+        })
+      )
+
+    beforeEach(() => {
+      requests.length = 0
+    })
+
+    it('fetches advertised preferences and starts from their defaults', async () => {
+      serveRepartee()
+      const store = useStore()
+      store.current_world_uid = 'repartee_loop'
+      await store.getWorldPresentation('repartee_loop')
+
+      expect(requests).toEqual(['', '?channels=ui-preferences'])
+      expect(store.world_preferences.map((item) => item.id)).toEqual([
+        'sprites-visible',
+        'clerk-motion',
+      ])
+      expect(store.preference_values).toEqual({
+        'sprites-visible': true,
+        'clerk-motion': 'idle',
+      })
+    })
+
+    it('asks only for channels the world advertises', async () => {
+      const store = useStore()
+      await store.getWorldPresentation('tangl_world')
+
+      expect(store.world_preferences).toEqual([])
+      expect(store.preference_values).toEqual({})
+    })
+
+    it('keeps values in this browser per world, never in a request', async () => {
+      serveRepartee()
+      const store = useStore()
+      store.current_world_uid = 'repartee_loop'
+      await store.getWorldPresentation('repartee_loop')
+      requests.length = 0
+
+      store.setPreference('clerk-motion', 'call')
+      store.setPreference('sprites-visible', false)
+
+      expect(requests).toEqual([])
+      expect(JSON.parse(localStorage.getItem('storytangl.ui-preferences.repartee_loop')!)).toEqual(
+        { 'sprites-visible': false, 'clerk-motion': 'call' }
+      )
+      store.preference_values = {}
+      await store.getWorldPresentation('repartee_loop')
+      expect(store.preference_values).toEqual({
+        'sprites-visible': false,
+        'clerk-motion': 'call',
+      })
+    })
+
+    it('resets a stored value the world no longer declares', async () => {
+      serveRepartee()
+      localStorage.setItem(
+        'storytangl.ui-preferences.repartee_loop',
+        JSON.stringify({ 'sprites-visible': 'yes', 'clerk-motion': 'dance' })
+      )
+      const store = useStore()
+      store.current_world_uid = 'repartee_loop'
+      await store.getWorldPresentation('repartee_loop')
+
+      expect(store.preference_values).toEqual({
+        'sprites-visible': true,
+        'clerk-motion': 'idle',
+      })
+    })
   })
 })

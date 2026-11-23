@@ -15,6 +15,8 @@ import { HttpResponse, http, server } from '@tests/setup'
 import {
   crossroadsRuntimeEnvelope,
   crossroadsNextRuntimeEnvelope,
+  reparteePreferencesInfo,
+  reparteeWorldCatalog,
   sandboxInfoState,
   sandboxProjectedState,
 } from '@tests/fixtures'
@@ -229,6 +231,26 @@ describe('App.vue', () => {
     expect(wrapper.findComponent(StoryFlow).exists()).toBe(false)
     expect(wrapper.find('.v-navigation-drawer').exists()).toBe(false)
     expect(useStore().current_world_uid).toBe('')
+  })
+
+  it("offers the active world's preferences and drops them on a player switch", async () => {
+    server.use(
+      http.get(`${DEFAULT_API_URL}/world/tangl_world/info`, ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.has('channels')
+            ? reparteePreferencesInfo
+            : reparteeWorldCatalog
+        )
+      )
+    )
+    const wrapper = mountApp()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="world-preferences"]').text()).toContain('Clerk motion')
+    wrapper.findComponent(AppNavbar).vm.$emit('recover-player')
+    await flushPromises()
+    expect(useStore().world_preferences).toEqual([])
+    expect(useStore().preference_values).toEqual({})
   })
 
   it('renders the full application shell', async () => {

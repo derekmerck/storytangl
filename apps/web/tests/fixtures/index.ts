@@ -10,3 +10,4 @@ export {
   composePayloadRuntimeEnvelope,
   sandboxPayloadRuntimeEnvelope,
 } from './payloadInteractions'
+export { reparteePreferencesInfo, reparteeWorldCatalog } from './reparteeLoop'

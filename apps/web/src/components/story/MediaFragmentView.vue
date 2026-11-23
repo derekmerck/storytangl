@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import { useGlobal } from '@/composables/globals'
 import type { MediaStoryFragment } from '@/types'
 import { fragmentText, mediaContentUrl } from './fragmentUtils'
-import { hasLandscapeShape, isPendingMedia, mediaRole } from './fragmentViewUtils'
+import { hasLandscapeShape, mediaElement, mediaRole } from './fragmentViewUtils'
 
 const props = defineProps<{
   fragment: MediaStoryFragment
@@ -14,11 +14,13 @@ const props = defineProps<{
 const { remapURL } = useGlobal()
 
 const role = computed(() => mediaRole(props.fragment))
+const element = computed(() => mediaElement(props.fragment))
 const url = computed(() => {
   const value = mediaContentUrl(props.fragment)
   return value ? remapURL(value) : undefined
 })
-const showPlaceholder = computed(() => isPendingMedia(props.fragment) || !url.value)
+// No source (pending or unresolved) and no element for this media_type both fall back.
+const showPlaceholder = computed(() => !url.value || !element.value)
 const placeholderClasses = computed(() => [
   'media-placeholder',
   { 'media-placeholder--small': props.compact },
@@ -33,16 +35,12 @@ const placeholderClasses = computed(() => [
       data-testid="pending-media"
     >
       <span>{{ role }}</span>
-      <code>{{ fragmentText(fragment.content) }}</code>
+      <code>{{ fragment.text ?? fragmentText(fragment.content) }}</code>
     </div>
 
-    <audio
-      v-else-if="role.includes('audio') || role.includes('music') || role.includes('sfx')"
-      :src="url"
-      controls
-    />
+    <audio v-else-if="element === 'audio'" :src="url" controls />
 
-    <video v-else-if="role.includes('video')" :src="url" controls />
+    <video v-else-if="element === 'video'" :src="url" controls />
 
     <v-parallax
       v-else-if="hasLandscapeShape(fragment)"

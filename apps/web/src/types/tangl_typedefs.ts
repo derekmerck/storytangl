@@ -230,6 +230,35 @@ export interface BrandingValue {
   dark?: ThemeTokens | null
 }
 
+/** A viewer preference value: never story state, never sent to the service. */
+export type PreferenceValue = boolean | string
+
+interface PreferenceBase {
+  id: string
+  label: string
+  help?: string | null
+  shortcut?: string | null
+}
+
+export interface BooleanPreference extends PreferenceBase {
+  kind: 'boolean'
+  default: boolean
+}
+
+export interface EnumPreference extends PreferenceBase {
+  kind: 'enum'
+  values: string[]
+  default: string
+}
+
+export type PreferenceDeclaration = BooleanPreference | EnumPreference
+
+/** The world-static `ui-preferences` channel: what a viewer may choose locally. */
+export interface UiPreferencesValue {
+  value_type: 'ui_preferences'
+  preferences: PreferenceDeclaration[]
+}
+
 export type SectionValue =
   | ScalarValue
   | KvListValue
@@ -237,6 +266,7 @@ export type SectionValue =
   | TableValue
   | BadgeListValue
   | BrandingValue
+  | UiPreferencesValue
 
 export interface ProjectedSection {
   section_id: string

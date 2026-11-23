@@ -102,6 +102,7 @@ describe('StoryBlock', () => {
         fragment_type: 'media',
         content: 'https://example.com/portrait.svg',
         content_format: 'url',
+        media_type: 'vector',
         media_role: 'narrative_im',
         staging_hints: { media_shape: 'portrait' },
       },
@@ -112,6 +113,54 @@ describe('StoryBlock', () => {
 
     expect(img.exists()).toBe(true)
     expect(img.props('src')).toBe('https://example.com/portrait.svg')
+  })
+
+  // The element comes from what a payload is (media_type), never from what it
+  // is for (media_role): a role named like an image can carry audio.
+  it.each([
+    ['character_vox', 'audio', 'bark.wav', 'audio'],
+    ['music', 'audio', 'theme.mp3', 'audio'],
+    ['narrative_im', 'image', 'quai_bg.png', 'img'],
+    ['staged_im', 'image', 'clerk_sprite.png', 'img'],
+    ['dialog_im', 'vector', 'clerk.svg', 'img'],
+    ['cutscene', 'video', 'intro.mp4', 'video'],
+    ['narrative_im', 'other', 'scene.xyz', 'placeholder'],
+  ])('renders %s %s media from %s as %s', (role, mediaType, file, element) => {
+    const media = {
+      uid: 'media',
+      fragment_type: 'media' as const,
+      content_format: 'url',
+      url: `/media/world/w/${file}`,
+      media_type: mediaType,
+      media_role: role,
+    }
+    const wrapper = mountBlock({ media }, ['media'])
+
+    const images = wrapper.findAll('img').length + wrapper.findAllComponents({ name: 'VImg' }).length
+    expect(images > 0).toBe(element === 'img')
+    expect(wrapper.find('audio').exists()).toBe(element === 'audio')
+    expect(wrapper.find('video').exists()).toBe(element === 'video')
+    expect(wrapper.find('[data-testid="pending-media"]').exists()).toBe(element === 'placeholder')
+  })
+
+  it('renders a standalone attributed line through the attribution path', () => {
+    const fragments: Record<string, StoryFragment> = {
+      line: {
+        uid: 'line',
+        fragment_type: 'attributed',
+        who: 'the blonde girl',
+        how: 'dialog',
+        media: '',
+        content: 'Hi, I am Rin.',
+      },
+    }
+
+    const wrapper = mountBlock(fragments, ['line'])
+
+    expect(wrapper.find('[data-testid="fragment-fallback"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="attributed-line"]').text()).toContain('the blonde girl')
+    expect(wrapper.text()).toContain('Hi, I am Rin.')
+    expect(wrapper.text()).not.toContain('attributed')
   })
 
   it('renders published presence prose and associated piece media', (): void => {
@@ -136,6 +185,7 @@ describe('StoryBlock', () => {
         fragment_type: 'media',
         content: 'https://example.com/student-id.svg',
         content_format: 'url',
+        media_type: 'vector',
         media_role: 'credential_card',
       },
       relation: {
@@ -181,6 +231,7 @@ describe('StoryBlock', () => {
         uid: 'media',
         fragment_type: 'media',
         content_format: 'url',
+        media_type: 'image',
         url: '',
         media_role: 'dialog_im',
       },
@@ -200,6 +251,7 @@ describe('StoryBlock', () => {
         uid: 'media',
         fragment_type: 'media',
         content_format: 'url',
+        media_type: 'image',
         url: '/media/story/abc/hero_portrait-1.png',
         rit_id: '2f1e5a90-0000-4000-8000-000000000000',
         media_role: 'dialog_im',
@@ -235,13 +287,14 @@ describe('StoryBlock', () => {
         fragment_type: 'media',
         content: 'https://example.com/avatar.svg',
         content_format: 'url',
+        media_type: 'vector',
         media_role: 'avatar_im',
       },
     }
 
     const wrapper = mountBlock(fragments, ['dialog'])
 
-    expect(wrapper.text()).toContain('Guard')
+    expect(wrapper.find('[data-testid="attributed-line"]').text()).toContain('Guard')
     expect(wrapper.text()).toContain('Who goes there?')
     expect(wrapper.find('.v-avatar').exists()).toBe(true)
   })

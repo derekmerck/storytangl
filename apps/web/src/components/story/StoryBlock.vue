@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
+import AttributedLineView from './AttributedLineView.vue'
 import ContentFragmentView from './ContentFragmentView.vue'
 import GroupFragmentView from './GroupFragmentView.vue'
 import KvFragmentView from './KvFragmentView.vue'
@@ -12,6 +13,7 @@ import UnknownFragmentFallback from './UnknownFragmentFallback.vue'
 import type { ChoiceStoryFragment, StoryFragment, StorySceneModel } from '@/types'
 import { useGlobal } from '@/composables/globals'
 import {
+  isAttributedFragment,
   isChoiceFragment,
   isGroupFragment,
   isMediaFragment,
@@ -113,6 +115,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleChoiceKey))
         <div v-for="fragment in flowMembers" :key="fragment.uid" class="fragment-row">
           <ContentFragmentView v-if="fragment.fragment_type === 'content'" :fragment="fragment" />
 
+          <AttributedLineView
+            v-else-if="isAttributedFragment(fragment)"
+            :line="fragment"
+            class="standalone-line"
+          />
+
           <MediaFragmentView v-else-if="isMediaFragment(fragment)" :fragment="fragment" />
 
           <GroupFragmentView
@@ -157,6 +165,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleChoiceKey))
 <style scoped>
 .story-scene {
   overflow: hidden;
+}
+
+.standalone-line {
+  margin: 0 16px;
 }
 
 .fragment-row + .fragment-row {
