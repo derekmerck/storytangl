@@ -152,7 +152,7 @@ Story create, update, and action endpoints publish
 schema for `RuntimeEnvelope.to_dto()` output, not a second fragment hierarchy:
 `fragments` remains a list of independent JSON records. Using the engine
 `RuntimeEnvelope` model directly as the REST response model would rehydrate
-fragments as `BaseFragment` and restore internal `seq`, `step`, and `tags`
+fragments as `BaseFragment` and restore internal `seq` and `tags`
 defaults, so the transport schema deliberately avoids that shape drift.
 
 `RuntimeEnvelope.metadata.grammar` is a reserved typed sub-key rather than a

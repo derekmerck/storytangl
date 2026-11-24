@@ -62,7 +62,7 @@ def test_json_media_uses_normal_pydantic_json_value_encoding() -> None:
     }
 
 
-def test_fragment_to_dto_omits_stream_bookkeeping() -> None:
+def test_fragment_to_dto_omits_stream_bookkeeping_but_delivers_step() -> None:
     fragment = ChoiceFragment(
         edge_id=uuid4(),
         text="Take the brass lamp.",
@@ -74,7 +74,7 @@ def test_fragment_to_dto_omits_stream_bookkeeping() -> None:
     assert payload["fragment_type"] == "choice"
     assert payload["text"] == "Take the brass lamp."
     assert "seq" not in payload
-    assert "step" not in payload
+    assert payload["step"] == 4
     assert "tags" not in payload
 
 

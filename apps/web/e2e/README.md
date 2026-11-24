@@ -40,7 +40,11 @@ realized anonymously and then by name, and no fragment-type fallback.
 on a 320x200 stage scaled as a whole. It checks that the 102x112 clerk stands at
 its natural size times the scale, a gutter in from the left, on the floor and
 mirrored. It checks that a map plate keeps the room staged, and that the next
-room replaces the room and stations its figure on the right.
+room replaces the room and stations its figure on the right. A reload then
+restores the whole journal as one envelope, and the stage, folded at journal
+steps, shows that room without the earlier clerk. Witnesses tolerate only
+`net::ERR_ABORTED` on media, which is what a reload does to an `<audio>`
+element's in-flight load.
 
 The separate `test:e2e:restart` witness owns two real backend processes on the
 same port and one temporary JSON store. It copies the reference bundle once,

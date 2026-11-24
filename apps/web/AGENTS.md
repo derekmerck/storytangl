@@ -211,7 +211,8 @@ export const useStore = defineStore('main', {
 - **Stage**: `StageView` draws `narrative_im` as the backdrop and `staged_im`/`dialog_im`
   as figures on a logical canvas at the world's `stage_extent`, laid out by
   `stage.ts` with pygame's `stage.py` as the semantic reference. Which steps restate
-  the stage is `stageFold.ts`, client policy that #409 replaces.
+  the stage is `stageFold.ts`, client policy that #409 replaces. A step is a run of
+  equal fragment `step`, never an envelope: a restored history is one flat envelope.
 - **Legacy blocks**: `makeMediaDict()` keys a `JournalStoryUpdate` media array by role
 - **Preferences**: world `ui-preferences` values live in `localStorage` per world
   (`worldPreferences.ts`), never in a request or the ledger

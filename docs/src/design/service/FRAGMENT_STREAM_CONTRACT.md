@@ -62,6 +62,12 @@ bookkeeping selected by `dto_exclude` field metadata. A fragment's `uid` is also
 a stable reference target within the envelope and across later update/delete
 control fragments.
 
+A stepped fragment carries its journal `step`. It is a delivered boundary, not
+bookkeeping: one action's envelope may hold several steps, and a full-history
+update is one flat list, so `step` is how a client folds presentation state
+(the stage, the room) the way the story was played. Fragments not yet stepped
+omit it.
+
 Service-built envelopes now include `presentation.music`, a read-only desired-BGM
 synchronization snapshot folded from full canonical history before journal-window
 limits or media policy. No cue in the returned batch means keep, while explicit
@@ -85,8 +91,8 @@ Clients should treat each envelope as a fragment event batch:
 1. Normalize each fragment into a record with `uid` and `fragment_type`.
 2. Apply `update` and `delete` control fragments to the local registry.
 3. Store all other fragments by `uid`.
-4. Build presentation shells from `group` fragments, especially
-   `group_type="scene"`.
+4. Associate grouped fragments through `group` fragments. The envelope is the
+   turn's shell; within it, runs of equal `step` are the journal steps.
 5. Render known fragment types with widgets and unknown types with visible
    fallback.
 
@@ -206,10 +212,14 @@ placeholder. Clients should show that placeholder when no final URL/data exists.
 `GroupFragment` is a relational overlay, not a nested object model.
 
 - `member_ids` references peer fragments in the registry.
-- `group_type="scene"` creates a presentation shell for the current turn.
-- `group_type="dialog"` associates attributed lines and peer media.
-- Other group types such as `zone`, `hand`, `board`, or `status_sidecar` are
-  valid extension points.
+- Today the journal carries `zone` and `piece_media` groups (the credentials
+  game) and `beat` overlays (`tangl.journal.compose.beat_overlay`, for composed
+  worlds).
+- `scene` (a presentation shell for a turn) and `dialog` (attributed lines with
+  peer media) are reserved vocabulary that clients accept, but nothing emits
+  them today. A client splits a turn by `step`, not by scene shells.
+- Other group types such as `hand`, `board`, or `status_sidecar` are valid
+  extension points.
 
 Groups may reference other groups. Clients may flatten those references for
 presentation, but the registry remains id-based.

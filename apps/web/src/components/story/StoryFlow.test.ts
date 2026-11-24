@@ -230,4 +230,25 @@ describe('StoryFlow session rendering', () => {
     expect(blocks.at(-1)!.findComponent({ name: 'VImg' }).props('src')).toContain('quay_map.png')
     expect(wrapper.find('[data-testid="stage"] + *').html()).toContain('The district runs')
   })
+
+  it('restores the stage live play reached, folding history at its journal steps', async () => {
+    // Continue delivers the whole journal as one flat envelope; each fragment keeps its step.
+    const history: RuntimeEnvelope = {
+      step: 4,
+      fragments: reparteeSteps.flatMap(({ fragments }) => fragments),
+    }
+    const wrapper = mount(StoryFlow, {
+      props: { initialEnvelope: history, activeChoiceIds: ['yard-go'], stageExtent: DEFAULT_STAGE_EXTENT },
+      global: { plugins: [vuetify] },
+    })
+    await flushPromises()
+
+    // The yard replaced the quay and its clerk, as it does when played step by step.
+    expect(
+      wrapper.findAll('[data-testid="stage"] img').map((img) => img.attributes('src'))
+    ).toEqual([
+      expect.stringContaining('warehouse_bg.png'),
+      expect.stringContaining('worker_sprite.png'),
+    ])
+  })
 })

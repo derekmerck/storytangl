@@ -69,5 +69,12 @@ test('repartee_loop stages its backdrop once and places its figures', async ({ p
   expect(right.bottom).toBeCloseTo(0, 0)
   await expect(page.locator('img[src$="quai_bg.png"]')).toHaveCount(0)
   await info.attach('worker-in-yard', { body: await stage.screenshot(), contentType: 'image/png' })
+
+  // Continue restores the journal as one flat envelope. Folded at its journal
+  // steps, it stages the yard as live play did, without the court's clerk.
+  await page.reload()
+  await expect(backdrop).toHaveAttribute('src', /warehouse_bg\.png$/)
+  await expect(stage.locator('img')).toHaveCount(2)
+  await expect(worker).toHaveAttribute('src', /worker_sprite\.png$/)
   expect(errors).toEqual([])
 })

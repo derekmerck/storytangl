@@ -1,4 +1,4 @@
-import type { MediaStoryFragment, ProjectedState, RuntimeEnvelope } from '@/types'
+import type { MediaStoryFragment, ProjectedState, RuntimeEnvelope, StoryFragment } from '@/types'
 
 /**
  * World info for `repartee_loop`, as the real REST app serves it: the bare
@@ -88,34 +88,35 @@ export const reparteeClerk = image('clerk', 'dialog_im', 'clerk_sprite.png', {
   },
 })
 
-/** Its first three steps: the quay, the clerk on the quay, then the map plate alone. */
+/** One step's envelope; the service stamps each fragment with its journal step. */
+const played = (step: number, fragments: StoryFragment[]): RuntimeEnvelope => ({
+  step,
+  metadata,
+  fragments: fragments.map((fragment) => ({ ...fragment, step })),
+})
+
+/** Its first four steps: the quay, the clerk on the quay, the map plate alone, the yard. */
 export const reparteeSteps: RuntimeEnvelope[] = [
-  {
-    step: 1,
-    metadata,
-    fragments: [
-      { uid: 'quay-text', fragment_type: 'content', content: 'At the quay, every introduction is also a challenge.' },
-      image('quay-bg', 'narrative_im', 'quai_bg.png', { media_shape: 'landscape' }),
-      { uid: 'quay-go', fragment_type: 'choice', edge_id: 'quay-edge', text: 'Step into the practice court' },
-    ],
-  },
-  {
-    step: 2,
-    metadata,
-    fragments: [
-      { uid: 'court-text', fragment_type: 'content', content: 'The clerk hands you one opening line.' },
-      image('court-bg', 'narrative_im', 'quai_bg.png', { media_shape: 'landscape' }),
-      reparteeClerk,
-      { uid: 'court-go', fragment_type: 'choice', edge_id: 'court-edge', text: 'Step out onto the quay' },
-    ],
-  },
-  {
-    step: 3,
-    metadata,
-    fragments: [
-      { uid: 'map-text', fragment_type: 'content', content: 'The district runs from the water to the salon steps.' },
-      image('map', 'map_im', 'quay_map.png'),
-      { uid: 'map-go', fragment_type: 'choice', edge_id: 'map-edge', text: 'Go to The Practice Yard' },
-    ],
-  },
+  played(1, [
+    { uid: 'quay-text', fragment_type: 'content', content: 'At the quay, every introduction is also a challenge.' },
+    image('quay-bg', 'narrative_im', 'quai_bg.png', { media_shape: 'landscape' }),
+    { uid: 'quay-go', fragment_type: 'choice', edge_id: 'quay-edge', text: 'Step into the practice court' },
+  ]),
+  played(2, [
+    { uid: 'court-text', fragment_type: 'content', content: 'The clerk hands you one opening line.' },
+    image('court-bg', 'narrative_im', 'quai_bg.png', { media_shape: 'landscape' }),
+    reparteeClerk,
+    { uid: 'court-go', fragment_type: 'choice', edge_id: 'court-edge', text: 'Step out onto the quay' },
+  ]),
+  played(3, [
+    { uid: 'map-text', fragment_type: 'content', content: 'The district runs from the water to the salon steps.' },
+    image('map', 'map_im', 'quay_map.png'),
+    { uid: 'map-go', fragment_type: 'choice', edge_id: 'map-edge', text: 'Go to The Practice Yard' },
+  ]),
+  played(4, [
+    { uid: 'yard-text', fragment_type: 'content', content: 'The worker looks up from the crates.' },
+    image('yard-bg', 'narrative_im', 'warehouse_bg.png', { media_shape: 'landscape' }),
+    image('worker', 'dialog_im', 'worker_sprite.png', { media_x: 'right', media_y: 'bottom' }),
+    { uid: 'yard-go', fragment_type: 'choice', edge_id: 'yard-edge', text: 'Back to the quay' },
+  ]),
 ]

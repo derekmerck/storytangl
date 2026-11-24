@@ -25,7 +25,7 @@ import {
   normalizeEnvelope,
 } from './fragmentUtils'
 import { isStagedMedia, type StageExtent } from './stage'
-import { foldStage } from './stageFold'
+import { foldSteps } from './stageFold'
 
 const { $http, $debug, $verbose } = useGlobal()
 const storyRoutePrefix = import.meta.env.VITE_STORY_ROUTE_PREFIX || '/story'
@@ -57,18 +57,13 @@ const sceneCounter = ref(0)
 const loading = ref(false)
 
 const stageImages = computed(() =>
-  scenes.value.reduce<MediaStoryFragment[]>(
-    (stage, scene) =>
-      foldStage(
-        stage,
-        scene.memberIds
-          .map((id) => fragmentRegistry.value[id])
-          .filter(
-            (fragment): fragment is MediaStoryFragment =>
-              fragment !== undefined && isMediaFragment(fragment) && isStagedMedia(fragment)
-          )
-      ),
-    []
+  foldSteps(
+    scenes.value
+      .flatMap((scene) => scene.memberIds.map((id) => fragmentRegistry.value[id]))
+      .filter(
+        (fragment): fragment is MediaStoryFragment =>
+          fragment !== undefined && isMediaFragment(fragment) && isStagedMedia(fragment)
+      )
   )
 )
 // One stage at most; a ref inside v-for still collects an array.

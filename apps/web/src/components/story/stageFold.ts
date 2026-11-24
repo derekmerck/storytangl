@@ -11,6 +11,11 @@ import { mediaRole } from './fragmentViewUtils'
  * any figures it brings join it. The pygame client's `merge_turns` folds the
  * same way and goes further (speaker-keyed portraits, inherited staging); that
  * is its own policy, not ported here.
+ *
+ * Steps are runs of equal journal `step`, which the service delivers on each
+ * fragment, as pygame's `build_turns` groups them. One envelope may hold several
+ * steps, and a restored history is one flat envelope, so the envelope is not
+ * the unit: folding by `step` makes restored play stage what live play did.
  */
 const ROOM_ROLES = ['narrative_im', 'staged_im']
 
@@ -19,3 +24,12 @@ export const foldStage = (
   step: MediaStoryFragment[]
 ): MediaStoryFragment[] =>
   step.some((image) => ROOM_ROLES.includes(mediaRole(image))) ? step : [...stage, ...step]
+
+export const foldSteps = (images: MediaStoryFragment[]): MediaStoryFragment[] => {
+  const steps: MediaStoryFragment[][] = []
+  images.forEach((image, index) => {
+    if (index === 0 || image.step !== images[index - 1]!.step) steps.push([])
+    steps.at(-1)!.push(image)
+  })
+  return steps.reduce(foldStage, [])
+}

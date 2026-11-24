@@ -74,7 +74,7 @@ def test_runtime_envelope_to_dto_uses_fragment_dto_projection() -> None:
     assert choice["text"] == "Buy rations."
     assert choice["accepts"]["kind"] == "quantity"
     assert "seq" not in choice
-    assert "step" not in choice
+    assert choice["step"] == 1
     assert "tags" not in choice
 
 
@@ -94,7 +94,7 @@ def test_runtime_envelope_payload_validates_dto_without_restoring_bookkeeping() 
     assert payload["fragments"][0]["content"] == "Start"
     assert "seq" not in payload["fragments"][0]
     assert "tags" not in payload["fragments"][0]
-    assert "step" not in payload["fragments"][0]
+    assert payload["fragments"][0]["step"] == 1
 
 
 def test_runtime_envelope_to_dto_preserves_public_envelope_fields() -> None:

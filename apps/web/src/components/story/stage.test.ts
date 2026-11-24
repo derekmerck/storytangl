@@ -2,11 +2,17 @@ import { describe, expect, it } from 'vitest'
 
 import type { MediaStoryFragment, StagingHints } from '@/types'
 import { castStage, figureStyle, isStagedMedia, STAGED_LIMIT } from './stage'
-import { foldStage } from './stageFold'
+import { foldStage, foldSteps } from './stageFold'
 
 const extent = { width: 640, height: 400 }
-const image = (uid: string, role: string, hints: StagingHints = {}): MediaStoryFragment => ({
+const image = (
+  uid: string,
+  role: string,
+  hints: StagingHints = {},
+  step?: number
+): MediaStoryFragment => ({
   uid,
+  step,
   fragment_type: 'media',
   media_type: 'image',
   media_role: role,
@@ -104,5 +110,19 @@ describe('foldStage', () => {
   it('adds the figures of a step that states no room', () => {
     const face = image('face', 'dialog_im')
     expect(foldStage(room, [face])).toEqual([...room, face])
+  })
+})
+
+describe('foldSteps', () => {
+  it('folds one envelope at its journal steps, so a later room replaces an earlier one', () => {
+    const court = [image('court', 'narrative_im', {}, 2), image('clerk', 'dialog_im', {}, 2)]
+    const yard = [image('yard', 'narrative_im', {}, 4), image('worker', 'dialog_im', {}, 4)]
+    expect(foldSteps([...court, ...yard])).toEqual(yard)
+  })
+
+  it('keeps the room through steps that bring only figures', () => {
+    const court = [image('court', 'narrative_im', {}, 2), image('clerk', 'dialog_im', {}, 2)]
+    const face = image('face', 'dialog_im', {}, 3)
+    expect(foldSteps([...court, face])).toEqual([...court, face])
   })
 })

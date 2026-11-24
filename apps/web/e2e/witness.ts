@@ -7,9 +7,12 @@ export const watchErrors = (page: Page): string[] => {
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
   })
-  page.on('requestfailed', (request) =>
-    errors.push(`${request.url()}: ${request.failure()?.errorText}`)
-  )
+  page.on('requestfailed', (request) => {
+    const failure = request.failure()?.errorText
+    // A reload cancels an <audio> element's in-flight load; that is not a failure.
+    const cancelled = failure === 'net::ERR_ABORTED' && request.resourceType() === 'media'
+    if (!cancelled) errors.push(`${request.url()}: ${failure}`)
+  })
   page.on('response', (response) => {
     const path = new URL(response.url()).pathname
     if (/^\/(api|media)\//.test(path) && response.status() >= 400) {
