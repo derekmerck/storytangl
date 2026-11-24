@@ -399,6 +399,42 @@ derived API key is request transport, not a second identity. See the canonical
 [player-session bootstrap note](https://github.com/derekmerck/storytangl/blob/main/apps/web/notes/PLAYER_SESSION_BOOTSTRAP.md)
 for create-or-restore, rotation, and explicitly deferred security policy.
 
+### Identity, not authentication
+
+Service knows **who is playing**, not how they proved it. A `User` is a bearer
+secret: its API key is the secret's salted hash (`tangl.utils.hash_secret`), and
+`user_id_by_key` finds the User that key belongs to. Every client meets one
+contract: hold a secret, present its key. Login and profiles are different ways
+of bringing a client to the right secret, and neither belongs to Service.
+
+| Concern | Owner | Portable? |
+| --- | --- | --- |
+| Who is playing: `User`, secret, privileged flag | Service (this note) | yes; the shared contract |
+| How a request becomes a user | the transport, e.g. one dependency in `apps/server` | the swap point |
+| Login screen or profile picker | each client | no, by design |
+
+**Multi-user remote backends.** Authenticate *in front of* the server, not in
+it. A reverse proxy or identity gateway performs the login and forwards the
+authenticated identity; the server's key-resolving dependency is replaced by one
+that maps that identity to a User, either by deriving a secret from it or by a
+stored mapping. Service, Story, VM and Core do not change, and every client keeps
+working because each still ends up holding a key. The replacement is an ordinary
+FastAPI dependency override, not a new plugin registry. Login inside one client
+(browser OAuth, for example) is possible but serves only that client.
+
+**Single-user built-in backends.** A profile is another `User` in local
+persistence. Profile management is a client-side picker over named secrets kept
+in the working tree; choosing one hands its secret to the in-process bridge,
+which already accepts one. A display name may live in that profile list, or on
+`User` if the backend should know it.
+
+**Before exposing a server publicly.** `POST /user/create` is open, so it
+belongs behind the same gateway. All secrets share one configured salt
+(`service.salt`), whose default is committed in `defaults.toml`; a public
+deployment sets its own. The browser keeps its recovery secret in local storage.
+None of this matters to a single-user built-in backend, and hardening it is not a
+Service goal.
+
 ## World Support
 
 `WorldRegistry` is the canonical world discovery/loading path.
