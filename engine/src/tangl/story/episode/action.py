@@ -36,6 +36,8 @@ class Action(TraversableEdge):
     # Generated edge labels identify bindings, not player-facing wording.
     fallback_text: str = ""
     successor_ref: str | None = None
+    authored_successor_ref: str | None = None
+    successor_is_absolute: bool = False
     activation: str | None = None
     payload: Any = None
     accepts: Accepts | None = None
@@ -45,15 +47,15 @@ class Action(TraversableEdge):
     journal_text: str | None = None
     offer_id: UUID | None = None
 
-    def available(self, *, ctx=None, ns=None) -> bool:
+    def source_available(self, *, ctx=None, ns=None) -> bool:
         if self.offer_id is None:
-            return super().available(ctx=ctx, ns=ns)
+            return super().source_available(ctx=ctx, ns=ns)
         from ..scoped_offers import offer_is_eligible
 
         receiver = self.predecessor
         if receiver is None or ctx is None or not offer_is_eligible(self, receiver, ctx=ctx):
             return False
-        return super().available(ctx=ctx, ns=ns)
+        return super().source_available(ctx=ctx, ns=ns)
 
     def validate_payload(self, payload: Any) -> bool:
         """Enforce explicit text declarations on the effective payload before movement.

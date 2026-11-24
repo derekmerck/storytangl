@@ -449,9 +449,7 @@ def test_lazy_continue_whose_destination_cannot_be_provisioned_is_not_followed()
     assert lazy.label == "fallback"
 
 
-def test_lazy_choice_destinations_wait_for_selection(tmp_path: Path) -> None:
-    # Only triggered edges are provisioned on entry: a choice is previewed, and
-    # its destination materializes when it is selected.
+def test_lazy_choice_destinations_are_ready_during_planning(tmp_path: Path) -> None:
     world = World.from_script_data(
         script_data=_runtime_parity_script(),
         resources=_resource_manager(tmp_path),
@@ -460,7 +458,7 @@ def test_lazy_choice_destinations_wait_for_selection(tmp_path: Path) -> None:
     ledger = Ledger.from_graph(story.graph, entry_id=story.graph.initial_cursor_id)
     ledger.get_frame().goto_node(ledger.cursor)
 
-    assert not any(isinstance(v, Block) and v.label == "middle" for v in story.graph.values())
+    assert any(isinstance(v, Block) and v.label == "middle" for v in story.graph.values())
 
     ledger.resolve_choice(_choice_action(ledger, "Enter").uid)
     assert ledger.cursor.label == "middle"

@@ -286,7 +286,7 @@ def test_lazy_nested_scope_and_receiver_bind_before_their_first_planning_pass() 
     ledger.resolve_choice(move.uid)
     assert ("entry", {"Scope", "Local"}) in seen
     assert set(_offers(ledger.cursor)) == {"Scope", "Local"}
-    assert graph.find_one(Selector(has_path="annex.target")) is None
+    assert graph.find_one(Selector(has_path="annex.target")) is not None
     ids = {text: action.uid for text, action in _offers(ledger.cursor).items()}
     receiver_step = ledger.cursor_steps
     restored = Ledger.structure(ledger.unstructure())
@@ -295,7 +295,7 @@ def test_lazy_nested_scope_and_receiver_bind_before_their_first_planning_pass() 
     assert restored.cursor.path == "annex.target"
     restored.rollback_to_step(receiver_step, reason="replay lazy receiver")
     assert {text: action.uid for text, action in _offers(restored.cursor).items()} == ids
-    assert restored.graph.find_one(Selector(has_path="annex.target")) is None
+    assert restored.graph.find_one(Selector(has_path="annex.target")) is not None
 
 
 def test_lazy_offer_target_selection_and_once_gate_survive_restore_and_replay() -> None:

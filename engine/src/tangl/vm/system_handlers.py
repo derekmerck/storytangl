@@ -363,18 +363,19 @@ def validate_successor_exists(*, caller, ctx, **kw):
     if successor is None:
         return False
     if hasattr(caller, "available"):
-        if not bool(caller.available(ctx=ctx)):
-            return False
-        if isinstance(successor, TraversableNode) and successor.is_container:
-            from .provision import Resolver
+        if isinstance(successor, TraversableNode):
+            from .provision import Dependency, Resolver
 
-            preview = Resolver.from_ctx(ctx).preview_frontier_node(
-                successor,
-                allow_stubs=ctx.causality_mode == CausalityMode.HARD_DIRTY,
-                _ctx=ctx,
-            )
-            return preview.viable
-        return True
+            unresolved = successor.edges_out(Selector(has_kind=Dependency, satisfied=False))
+            if successor.is_container or next(unresolved, None) is not None:
+                preview = Resolver.from_ctx(ctx).preview_frontier_node(
+                    successor,
+                    allow_stubs=ctx.causality_mode == CausalityMode.HARD_DIRTY,
+                    _ctx=ctx,
+                )
+                if not preview.viable:
+                    return False
+        return bool(caller.available(ctx=ctx))
     if hasattr(successor, "available"):
         ns = ctx.get_ns(successor) if ctx is not None and hasattr(ctx, "get_ns") else None
         return bool(successor.available(ns=ns))

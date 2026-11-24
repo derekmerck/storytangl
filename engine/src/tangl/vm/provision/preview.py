@@ -20,3 +20,4 @@ class ViabilityResult:
     chain: list[str] = field(default_factory=list)
     scope_distance: int = 0
     blockers: list[Blocker] = field(default_factory=list)
+    requires_readiness: bool = False

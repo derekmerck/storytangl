@@ -156,9 +156,15 @@ live bookmarks have different lifetime requirements.
 
 The same core accepts broad setup and narrow runtime neighbourhoods. EAGER setup
 establishes the admitted configuration for this playthrough; runtime assembly works
-over the requested neighbourhood. Frame planning provisions the cursor and immediate
-successors in their own contexts. Startup and selected-destination readiness use
-existing on-demand seams.
+over the requested neighbourhood. Frame planning provisions immediate destinations
+and their containing scopes in their own contexts; selection uses the same readiness
+path. Beyond that neighbourhood a structurally viable destination requires readiness,
+not a verdict based on template locals. Gating remains read-only. After source and
+payload checks, selection may assemble dormant shape; admission reads the established
+namespace before a bookmark or traversal. A refused destination can remain assembled.
+Readiness runs no arrival phases. Tentative scarce claims require explicit release and
+are outside this path; retained ordinary casting is not a tentative claim. Container
+crossing and completion remain #726 and #560, respectively.
 
 Frozen shape requires construction closure and refuses newly required expansion.
 Availability stays live. Current setup requires EAGER for freezing; each donation

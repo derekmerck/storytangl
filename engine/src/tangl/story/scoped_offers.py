@@ -7,7 +7,9 @@ from uuid import UUID
 from pydantic import Field
 
 from tangl.core import EntityTemplate, Node, Priority, Selector
-from tangl.vm import Affordance, FindProvisioner, Requirement, TraversableNode, on_provision
+from tangl.vm import (
+    Affordance, Dependency, FindProvisioner, Requirement, TraversableNode, on_provision,
+)
 from tangl.vm.ctx import VmPhaseCtx
 from tangl.vm.provision.provisioner import _next_provision_uid
 from tangl.vm.traversable import HasAvailability
@@ -83,10 +85,26 @@ def _attached_offer(action: Action, receiver: Block, *, ctx: VmPhaseCtx) -> Scop
         return None
     if action.templ_hash != offer.action_template.content_hash():
         return None
+    dependency = _destination_dependency(action)
+    if dependency is not None:
+        return offer if dependency.successor_id == action.successor_id else None
     target = _target(offer, receiver)
     if target is None or action.successor_id != target.uid:
         return None
     return offer
+
+
+def _destination_dependency(action: Action) -> Dependency | None:
+    return next(action.graph.find_edges(Selector(
+        has_kind=Dependency, predecessor_id=action.uid, label="destination",
+    )), None)
+
+
+def _remove_projection(action: Action, *, ctx: VmPhaseCtx) -> None:
+    graph = action.graph
+    for dep in list(graph.find_edges(Selector(has_kind=Dependency, predecessor_id=action.uid))):
+        graph.remove(dep.uid, _ctx=ctx)
+    graph.remove(action.uid, _ctx=ctx)
 
 
 def offer_is_attached(action: Action, receiver: Block, *, ctx: VmPhaseCtx) -> bool:
@@ -119,8 +137,17 @@ def project_scoped_action_offers(
         for offer_id, offer in offers.items():
             target = _target(offer, caller)
             action = actions.get(offer_id)
+            latent = False
+            if target is None and action is None and offer.action_template.payload.successor_ref:
+                from tangl.vm.provision import Resolver
+
+                from .fabula.materializer import action_destination_requirement
+
+                requirement = action_destination_requirement(offer.action_template.payload)
+                latent = Resolver.from_ctx(ctx).preview_requirement(requirement, _ctx=ctx).viable
             if ((action is not None and action.templ_hash != offer.action_template.content_hash())
-                    or (target is not None and (action is None or action.successor_id != target.uid))):
+                    or (target is not None and (action is None or action.successor_id != target.uid))
+                    or latent):
                 raise ValueError(
                     f"Frozen story cannot bind scoped Action offer {offer.get_label()!r} "
                     f"at {caller.get_label()!r}"
@@ -133,31 +160,45 @@ def project_scoped_action_offers(
             continue
         if "retired_offer" in edge.tags:
             if edge.uid not in pinned:
-                caller.graph.remove(edge.uid, _ctx=ctx)
+                _remove_projection(edge, ctx=ctx)
             continue
         actions[edge.offer_id] = edge
     for offer_id, action in list(actions.items()):
         offer = offers.get(offer_id)
         target = _target(offer, caller) if offer is not None else None
-        if (offer is None or target is None
+        dependency = _destination_dependency(action)
+        bound = dependency is not None and dependency.successor_id == action.successor_id
+        if (offer is None or (target is None and not bound)
                 or action.templ_hash != offer.action_template.content_hash()
-                or action.successor_id != target.uid):
+                or (not bound and action.successor_id != target.uid)):
             if action.uid in pinned:
                 action.tags = action.tags | {"retired_offer"}
             else:
-                caller.graph.remove(action.uid, _ctx=ctx)
+                _remove_projection(action, ctx=ctx)
             del actions[offer_id]
     for offer_id, offer in offers.items():
         if offer_id not in actions:
             target = _target(offer, caller)
             if target is None:
-                continue
+                declaration = offer.action_template.payload
+                if not declaration.successor_ref:
+                    continue
+                from .fabula.materializer import action_destination_requirement
+
+                requirement = action_destination_requirement(declaration)
+                if isinstance(caller.graph, StoryGraph) and caller.graph.frozen_shape:
+                    raise ValueError("Frozen story cannot bind a latent scoped Action destination")
             offer.record_source(caller, reattach=caller.uid in offer.source_ids)
             action = offer.action_template.materialize(
                 uid=_next_provision_uid(_ctx=ctx),
                 predecessor_id=caller.uid,
-                successor_id=target.uid,
+                successor_id=target.uid if target is not None else None,
                 offer_id=offer.uid,
             )
             caller.graph.add(action, _ctx=ctx)
+            if target is None:
+                Dependency(
+                    uid=_next_provision_uid(_ctx=ctx), registry=caller.graph, label="destination",
+                    predecessor_id=action.uid, requirement=requirement,
+                )
     return None
