@@ -28,7 +28,12 @@ test('repartee_loop stages its backdrop once and places its figures', async ({ p
   await expect(backdrop).toHaveAttribute('src', /quai_bg\.png$/)
   await expect.poll(() => backdrop.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(320)
 
-  await choose(page, 'Step into the practice court')
+  const court = await choose(page, 'Step into the practice court')
+  // Figures key on their resource, so the clerk must arrive carrying one.
+  const sent = court.fragments.find(
+    (fragment: { media_role?: string }) => fragment.media_role === 'dialog_im'
+  )
+  expect(sent.rit_id).toEqual(expect.any(String))
   await expect(page.locator('img[src$="quai_bg.png"]')).toHaveCount(1)
   const clerk = stage.locator('img[data-stage-role="dialog_im"]')
   await expect(clerk).toHaveAttribute('src', /clerk_sprite\.png$/)
@@ -57,7 +62,7 @@ test('repartee_loop stages its backdrop once and places its figures', async ({ p
 
   await choose(page, 'Go to The Practice Yard')
   await expect(backdrop).toHaveAttribute('src', /warehouse_bg\.png$/)
-  // The turn scrolls to its room, clear of the fixed app bar.
+  // The update scrolls to its room, clear of the fixed app bar.
   const bar = await box(page.locator('.v-app-bar'))
   await expect.poll(async () => (await box(stage)).y).toBeGreaterThanOrEqual(bar.y + bar.height)
   await expect(stage).toBeInViewport({ ratio: 1 })

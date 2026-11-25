@@ -148,7 +148,7 @@ const applyEnvelope = async (envelope: RuntimeEnvelope) => {
   scenes.value.push(...newScenes)
 
   await nextTick(() => {
-    // The stage leads the current scene, so a turn starts where its room is shown.
+    // The stage leads the latest update, so each update opens where its room is shown.
     const target = stageRefs.value[0] ?? sceneRefs.value[startingIndex]
     const element = target?.$el as HTMLElement | undefined
     element?.scrollIntoView({ behavior: startingIndex ? 'smooth' : 'auto' })

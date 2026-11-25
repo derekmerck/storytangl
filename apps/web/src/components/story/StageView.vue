@@ -34,16 +34,26 @@ onMounted(() => {
 onBeforeUnmount(() => observer?.disconnect())
 
 const cast = computed(() => castStage(props.images))
+// A figure is keyed by its resource, so one restated in a later step stays the
+// same element (and will not replay an entrance). RITs are content-addressed,
+// so repeats of one resource are numbered; media with no RIT keys on its uid.
 const placed = computed(() => {
   let dialogIndex = 0
-  return cast.value.figures.map((figure) => ({
-    figure,
-    style: figureStyle(
+  const repeats = new Map<string, number>()
+  return cast.value.figures.map((figure) => {
+    const rit = figure.rit_id
+    const repeat = rit ? (repeats.get(rit) ?? 0) : 0
+    if (rit) repeats.set(rit, repeat + 1)
+    return {
       figure,
-      mediaRole(figure) === 'dialog_im' ? dialogIndex++ : 0,
-      props.extent
-    ),
-  }))
+      key: rit ? `${rit}#${repeat}` : figure.uid,
+      style: figureStyle(
+        figure,
+        mediaRole(figure) === 'dialog_im' ? dialogIndex++ : 0,
+        props.extent
+      ),
+    }
+  })
 })
 const source = (fragment: MediaStoryFragment): string => remapURL(mediaContentUrl(fragment)!)
 </script>
@@ -74,8 +84,8 @@ const source = (fragment: MediaStoryFragment): string => remapURL(mediaContentUr
         data-stage-role="narrative_im"
       >
       <img
-        v-for="{ figure, style } in placed"
-        :key="figure.uid"
+        v-for="{ figure, key, style } in placed"
+        :key="key"
         :src="source(figure)"
         :alt="figure.text ?? ''"
         :style="style"
@@ -93,7 +103,7 @@ const source = (fragment: MediaStoryFragment): string => remapURL(mediaContentUr
   margin-right: auto;
   overflow: hidden;
   position: relative;
-  /* Scrolled to each turn; clear the fixed app bar rather than sit under it. */
+  /* Scrolled to on each update; clear the fixed app bar rather than sit under it. */
   scroll-margin-top: calc(var(--v-layout-top, 0px) + 16px);
   width: 100%;
 }

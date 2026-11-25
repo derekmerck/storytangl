@@ -378,9 +378,9 @@ export interface MediaStoryFragment extends BaseStoryFragment {
   scope?: string | null
   staging_hints?: StagingHints | null
   /**
-   * Present when the payload came from a resource in the inventory. A client
-   * that learns to ask the service for another representation would key on
-   * this; nothing needs it yet.
+   * Present when the payload came from a resource in the inventory. The stage
+   * keys figures on it, so a resource restated in a later step stays one
+   * element; a client asking for another representation would key on it too.
    */
   rit_id?: string | null
   url?: string

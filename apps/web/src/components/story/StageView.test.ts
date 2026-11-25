@@ -44,4 +44,37 @@ describe('StageView', () => {
     expect(canvas()).toContain('width: 640px')
     expect(canvas()).toContain('scale(1)')
   })
+
+  it('keeps a figure restated in a later step as the same element', async () => {
+    const clerk = { ...(reparteeSteps[1]!.fragments[2] as MediaStoryFragment), rit_id: 'clerk-rit' }
+    const wrapper = mount(StageView, {
+      props: { images: [quay, { ...clerk, uid: 'court-clerk' }], extent: { width: 320, height: 200 } },
+    })
+    const figure = () => wrapper.find('img[data-stage-role="dialog_im"]').element
+
+    // A later step restates the room: new fragment uids, the same resources.
+    const first = figure()
+    await wrapper.setProps({ images: [{ ...quay, uid: 'later-bg' }, { ...clerk, uid: 'later-clerk' }] })
+    expect(figure()).toBe(first)
+  })
+
+  it('numbers repeats of one resource so each is its own figure', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const figure = reparteeSteps[1]!.fragments[2] as MediaStoryFragment
+    const crowd = { ...figure, rit_id: 'extra' }
+    const other = { ...figure, rit_id: 'other', uid: 'other' }
+    const wrapper = mount(StageView, {
+      props: { images: [quay, other, { ...crowd, uid: 'a' }], extent: { width: 320, height: 200 } },
+    })
+    // A later step restates the room with two figures drawn from one resource.
+    await wrapper.setProps({
+      images: [quay, { ...crowd, uid: 'b' }, { ...crowd, uid: 'c' }, { ...other, uid: 'd' }],
+    })
+
+    expect(wrapper.findAll('img[data-stage-role="dialog_im"]')).toHaveLength(3)
+    expect(warn.mock.calls.map(([message]) => String(message))).not.toContainEqual(
+      expect.stringContaining('Duplicate keys')
+    )
+    warn.mockRestore()
+  })
 })

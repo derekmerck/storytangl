@@ -215,7 +215,7 @@ describe('StoryFlow session rendering', () => {
     wrapper.findComponent(StoryBlock).vm.$emit('doAction', 'quay-edge')
     await flushPromises()
     expect(wrapper.findAllComponents(StageView)).toHaveLength(1)
-    // A turn opens on its room: the stage, not the text below it, scrolls into view.
+    // An update opens on its room: the stage, not the text below it, scrolls into view.
     expect(vi.mocked(HTMLElement.prototype.scrollIntoView).mock.contexts.at(-1)).toBe(
       wrapper.find('[data-testid="stage"]').element
     )
