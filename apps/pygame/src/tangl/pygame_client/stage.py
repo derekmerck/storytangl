@@ -481,7 +481,7 @@ class Stage:
         loaded: list[tuple[StageImage, pygame.Surface]] = []
         unloadable: list[StageImage] = []
         for image in turn.images:
-            if image.visibility is not None and media_visibility[image.visibility.preference_id] not in image.visibility.values:
+            if image.visibility is not None and not image.visibility.admits(media_visibility):
                 continue
             clip, client_selected = self._selected_clip(image, media_visibility)
             image = replace(image, clip=clip, client_selected_clip=client_selected)
@@ -500,14 +500,11 @@ class Stage:
     ) -> tuple[str | None, bool]:
         binding = image.clip_binding
         if binding is not None:
-            values = [preferences[axis] for axis in binding.axes]
-            for row in binding.rows:
-                if row.values == values:
-                    return row.clip, True
             # A missing row deliberately falls back to the authored clip (or
             # still), but it is still a preference-driven selection: changing
             # back and forth must not restart this occurrence's elapsed time.
-            return image.clip, True
+            clip = binding.select(preferences)
+            return (image.clip if clip is None else clip), True
         return image.clip, False
 
     @staticmethod
@@ -1345,7 +1342,7 @@ class Stage:
             identity = (image.role, image.source, placement)
             key = (*identity, occurrences[identity])
             occurrences[identity] += 1
-            visible = image.visibility is None or preferences[image.visibility.preference_id] in image.visibility.values
+            visible = image.visibility is None or image.visibility.admits(preferences)
             admitted = visible and len(placed) < STAGED_LIMIT
             if image.clip is not None or image.clip_binding is not None:
                 self._resident_keys.add(key)
@@ -1458,10 +1455,7 @@ class Stage:
             # One timer per staged occurrence: the same sprite used twice gets two,
             # whether it was placed explicitly or given a default slot by arrival.
 
-            visible = (
-                image.visibility is None
-                or preferences[image.visibility.preference_id] in image.visibility.values
-            )
+            visible = image.visibility is None or image.visibility.admits(preferences)
             drawn, (at_x, at_y) = self._clip_frame(
                 image, portrait.get_size(), key, fresh=fresh, schedule=visible
             )

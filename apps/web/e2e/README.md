@@ -42,9 +42,13 @@ its natural size times the scale, a gutter in from the left, on the floor and
 mirrored. It checks that a map plate keeps the room staged, and that the next
 room replaces the room and stations its figure on the right. A reload then
 restores the whole journal as one envelope, and the stage, folded at journal
-steps, shows that room without the earlier clerk. Witnesses tolerate only
-`net::ERR_ABORTED` on media, which is what a reload does to an `<audio>`
-element's in-flight load.
+steps, shows that room without the earlier clerk.
+`preferences.spec.ts` plays `repartee_loop` and changes its declared preferences
+from the drawer. "Clerk motion" changes the clerk's resolved clip
+(`data-clip`); playback is not yet implemented. "Decorative sprites" hides and
+shows the clerk. No request is written, the values outlive a reload, and the
+story step is unchanged. Witnesses tolerate only `net::ERR_ABORTED` on media,
+which is what a reload does to an `<audio>` element's in-flight load.
 
 The separate `test:e2e:restart` witness owns two real backend processes on the
 same port and one temporary JSON store. It copies the reference bundle once,

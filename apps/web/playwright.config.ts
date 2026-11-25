@@ -2,7 +2,12 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: ['reference.spec.ts', 'attribution.spec.ts', 'stage.spec.ts'],
+  testMatch: [
+    'reference.spec.ts',
+    'attribution.spec.ts',
+    'stage.spec.ts',
+    'preferences.spec.ts',
+  ],
   fullyParallel: false,
   workers: 1,
   retries: 0,

@@ -345,6 +345,18 @@ export interface AttributedStoryFragment extends BaseStoryFragment {
   hints?: PresentationHints | null
 }
 
+/** Show bound media only while the viewer's preference holds one of `values`. */
+export interface VisibilityBinding {
+  preference_id: string
+  values: PreferenceValue[]
+}
+
+/** Pick a clip by the viewer's values on `axes`: the first row matching all of them. */
+export interface ClipBinding {
+  axes: string[]
+  rows: Array<{ values: PreferenceValue[]; clip: string }>
+}
+
 /**
  * Per-use staging advice, mirroring `tangl.presentation.hints.StagingHints`.
  * A numeric `media_x` is the image's horizontal centre and a numeric `media_y`
@@ -357,6 +369,8 @@ export interface StagingHints {
   media_flip_h?: boolean | null
   media_timing?: string | null
   media_clip?: string | null
+  media_visibility?: VisibilityBinding | null
+  media_clip_binding?: ClipBinding | null
   [key: string]: unknown
 }
 

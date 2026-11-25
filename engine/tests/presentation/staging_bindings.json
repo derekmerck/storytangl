@@ -1,0 +1,86 @@
+{
+  "description": "How a viewer's local ui-preferences resolve media_visibility and media_clip_binding. VisibilityBinding.admits and ClipBinding.select in tangl.presentation.hints are the rule; every client's tests read these cases so the clients agree. A clip of null means no row matched and the use keeps its authored media_clip. Values compare strictly: a string never matches a boolean.",
+  "visibility": [
+    {
+      "name": "a boolean preference that is on shows bound art",
+      "binding": {"preference_id": "sprites-visible", "values": [true]},
+      "preferences": {"sprites-visible": true},
+      "admits": true
+    },
+    {
+      "name": "the same preference off hides it",
+      "binding": {"preference_id": "sprites-visible", "values": [true]},
+      "preferences": {"sprites-visible": false},
+      "admits": false
+    },
+    {
+      "name": "an enum value among several allowed shows it",
+      "binding": {"preference_id": "detail", "values": ["full", "some"]},
+      "preferences": {"detail": "some"},
+      "admits": true
+    },
+    {
+      "name": "an enum value not allowed hides it",
+      "binding": {"preference_id": "detail", "values": ["full", "some"]},
+      "preferences": {"detail": "none"},
+      "admits": false
+    },
+    {
+      "name": "a string is not the boolean it spells",
+      "binding": {"preference_id": "sprites-visible", "values": ["true"]},
+      "preferences": {"sprites-visible": true},
+      "admits": false
+    },
+    {
+      "name": "only the bound preference counts",
+      "binding": {"preference_id": "sprites-visible", "values": [true]},
+      "preferences": {"sprites-visible": true, "detail": "none"},
+      "admits": true
+    }
+  ],
+  "clip": [
+    {
+      "name": "one axis selects its row",
+      "binding": {
+        "axes": ["clerk-motion"],
+        "rows": [
+          {"values": ["idle"], "clip": "idle"},
+          {"values": ["call"], "clip": "call"},
+          {"values": ["response"], "clip": "response"}
+        ]
+      },
+      "preferences": {"clerk-motion": "call"},
+      "clip": "call"
+    },
+    {
+      "name": "two axes must both match",
+      "binding": {
+        "axes": ["clerk-motion", "sprites-visible"],
+        "rows": [
+          {"values": ["call", true], "clip": "call"},
+          {"values": ["call", false], "clip": "call_still"}
+        ]
+      },
+      "preferences": {"clerk-motion": "call", "sprites-visible": false},
+      "clip": "call_still"
+    },
+    {
+      "name": "no matching row keeps the authored clip",
+      "binding": {
+        "axes": ["clerk-motion", "sprites-visible"],
+        "rows": [
+          {"values": ["call", true], "clip": "call"},
+          {"values": ["call", false], "clip": "call_still"}
+        ]
+      },
+      "preferences": {"clerk-motion": "idle", "sprites-visible": true},
+      "clip": null
+    },
+    {
+      "name": "a string is not the boolean it spells",
+      "binding": {"axes": ["lit"], "rows": [{"values": [true], "clip": "lit"}]},
+      "preferences": {"lit": "true"},
+      "clip": null
+    }
+  ]
+}

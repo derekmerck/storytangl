@@ -13,11 +13,14 @@ current choice occurrences can submit. Grouped and standalone attributed lines
 share one renderer, media chooses its element by `media_type`, and a world's
 declared `ui-preferences` get local controls. One stage at the world's
 `stage_extent` leads the current scene: the backdrop fills it and figures stand
-at their natural size, placed by `media_x`/`media_y`. Audio ownership remains #571.
+at their natural size, placed by `media_x`/`media_y`. Preferences hide bound
+art (`media_visibility`) and choose each figure's clip (`media_clip_binding`),
+which is recorded but not yet played. Audio ownership remains #571.
 
 The [Chromium smoke](e2e/README.md) builds the client and serves it through the
 real REST app, proving the reference-world entry, two choices, status,
-same-server reload, `concept_naming_demo` attribution and `repartee_loop` staging. Vitest/MSW remains
+same-server reload, `concept_naming_demo` attribution, and `repartee_loop`
+staging and preferences. Vitest/MSW remains
 component evidence, not a substitute.
 
 ---

@@ -216,7 +216,9 @@ export const useStore = defineStore('main', {
   flat envelope. Figures key on `rit_id`, so a restated resource stays one element.
 - **Legacy blocks**: `makeMediaDict()` keys a `JournalStoryUpdate` media array by role
 - **Preferences**: world `ui-preferences` values live in `localStorage` per world
-  (`worldPreferences.ts`), never in a request or the ledger
+  (`worldPreferences.ts`), never in a request or the ledger. `stageBindings.ts`
+  ports `VisibilityBinding.admits`/`ClipBinding.select`; keep it agreeing with
+  `engine/tests/presentation/staging_bindings.json`, which both clients' tests read.
 
 ## Environment variables
 Create `.env.local` for development:

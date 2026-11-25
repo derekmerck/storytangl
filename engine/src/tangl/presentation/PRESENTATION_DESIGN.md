@@ -269,6 +269,9 @@ or two preference axes and maps full value rows to clip names; a missing row
 falls back to the authored clip or still. These values are presentation-only:
 they neither contact Service nor mutate story state, and client preference
 changes preserve resident occurrence slots and elapsed playback.
+`VisibilityBinding.admits` and `ClipBinding.select` state these two rules once;
+the pygame stage calls them, and the web client's port is tested against the same
+cases (`engine/tests/presentation/staging_bindings.json`).
 
 Slice 3 remains design-only: it asks how a turn may advertise a local cycle over
 the alternatives its own staging declares. Such controls appear only while those

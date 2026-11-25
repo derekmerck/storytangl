@@ -3,18 +3,23 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { useGlobal } from '@/composables/globals'
 import type { MediaStoryFragment } from '@/types'
+import type { PreferenceValues } from '@/worldPreferences'
 import { mediaContentUrl } from './fragmentUtils'
 import { mediaRole } from './fragmentViewUtils'
 import { castStage, figureStyle, type StageExtent } from './stage'
+import { selectedClip } from './stageBindings'
 
 /**
  * A fixed logical canvas of `extent` pixels, scaled as a whole to the column
  * and keeping its aspect ratio. Everything inside is laid out in logical
  * pixels, so a figure drawn at its natural size is that size times the scale.
+ * The viewer's preferences hide bound media and choose each figure's clip;
+ * changing them redraws here and never takes a story step.
  */
 const props = defineProps<{
   images: MediaStoryFragment[]
   extent: StageExtent
+  preferences: PreferenceValues
 }>()
 
 const { remapURL } = useGlobal()
@@ -33,25 +38,22 @@ onMounted(() => {
 })
 onBeforeUnmount(() => observer?.disconnect())
 
-const cast = computed(() => castStage(props.images))
+const cast = computed(() => castStage(props.images, props.preferences))
 // A figure is keyed by its resource, so one restated in a later step stays the
 // same element (and will not replay an entrance). RITs are content-addressed,
 // so repeats of one resource are numbered; media with no RIT keys on its uid.
+// The clip is resolved and recorded on the element; the still is what draws.
 const placed = computed(() => {
-  let dialogIndex = 0
   const repeats = new Map<string, number>()
-  return cast.value.figures.map((figure) => {
+  return cast.value.figures.map(({ figure, index }) => {
     const rit = figure.rit_id
     const repeat = rit ? (repeats.get(rit) ?? 0) : 0
     if (rit) repeats.set(rit, repeat + 1)
     return {
       figure,
       key: rit ? `${rit}#${repeat}` : figure.uid,
-      style: figureStyle(
-        figure,
-        mediaRole(figure) === 'dialog_im' ? dialogIndex++ : 0,
-        props.extent
-      ),
+      style: figureStyle(figure, index, props.extent),
+      clip: selectedClip(figure, props.preferences),
     }
   })
 })
@@ -84,12 +86,13 @@ const source = (fragment: MediaStoryFragment): string => remapURL(mediaContentUr
         data-stage-role="narrative_im"
       >
       <img
-        v-for="{ figure, key, style } in placed"
+        v-for="{ figure, key, style, clip } in placed"
         :key="key"
         :src="source(figure)"
         :alt="figure.text ?? ''"
         :style="style"
         :data-stage-role="mediaRole(figure)"
+        :data-clip="clip"
         class="stage-figure"
       >
     </div>

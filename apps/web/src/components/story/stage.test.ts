@@ -72,12 +72,31 @@ describe('castStage', () => {
     const figures = Array.from({ length: STAGED_LIMIT + 3 }, (_, index) =>
       image(`fig-${index}`, 'staged_im')
     )
-    const cast = castStage([image('old', 'narrative_im'), ...figures, image('new', 'narrative_im')])
+    const cast = castStage(
+      [image('old', 'narrative_im'), ...figures, image('new', 'narrative_im')],
+      {}
+    )
 
     expect(cast.backdrop?.uid).toBe('new')
-    expect(cast.figures.map((figure) => figure.uid)).toEqual(
+    expect(cast.figures.map(({ figure }) => figure.uid)).toEqual(
       figures.slice(0, STAGED_LIMIT).map((figure) => figure.uid)
     )
+  })
+
+  it('hides bound media before the cap, keeping hidden figures in the arrival count', () => {
+    const decor = { media_visibility: { preference_id: 'decor', values: [true] } }
+    const hidden = image('hidden', 'dialog_im', decor)
+    const crowd = Array.from({ length: STAGED_LIMIT }, (_, index) =>
+      image(`fig-${index}`, 'staged_im')
+    )
+    const cast = castStage(
+      [image('bg', 'narrative_im', decor), hidden, image('shown', 'dialog_im'), ...crowd],
+      { decor: false }
+    )
+
+    expect(cast.backdrop).toBeUndefined()
+    expect(cast.figures).toHaveLength(STAGED_LIMIT)
+    expect(cast.figures[0]).toEqual({ figure: expect.objectContaining({ uid: 'shown' }), index: 1 })
   })
 })
 

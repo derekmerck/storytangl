@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -48,3 +51,22 @@ def test_preference_bindings_require_full_distinct_rows_and_real_values() -> Non
         )
     with pytest.raises(ValidationError):
         VisibilityBinding(preference_id="look", values=[1])
+
+
+_BINDINGS = json.loads((Path(__file__).parent / "staging_bindings.json").read_text())
+
+
+@pytest.mark.parametrize("case", _BINDINGS["visibility"], ids=lambda case: case["name"])
+def test_visibility_binding_admits_the_shared_cases(case: dict) -> None:
+    """The web client's tests read the same cases, so both clients hide alike."""
+
+    binding = VisibilityBinding.model_validate(case["binding"])
+    assert binding.admits(case["preferences"]) is case["admits"]
+
+
+@pytest.mark.parametrize("case", _BINDINGS["clip"], ids=lambda case: case["name"])
+def test_clip_binding_selects_the_shared_cases(case: dict) -> None:
+    """The web client's tests read the same cases, so both clients pick alike."""
+
+    binding = ClipBinding.model_validate(case["binding"])
+    assert binding.select(case["preferences"]) == case["clip"]
