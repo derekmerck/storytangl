@@ -161,10 +161,14 @@ and their containing scopes in their own contexts; selection uses the same readi
 path. Beyond that neighbourhood a structurally viable destination requires readiness,
 not a verdict based on template locals. Gating remains read-only. After source and
 payload checks, selection may assemble dormant shape; admission reads the established
-namespace before a bookmark or traversal. A refused destination can remain assembled.
-Readiness runs no arrival phases. Tentative scarce claims require explicit release and
-are outside this path; retained ordinary casting is not a tentative claim. Container
-crossing and completion remain #726 and #560, respectively.
+namespace before a bookmark or traversal. Templates support structural requirement
+matching, but never stand in for a destination namespace or simulate admission. A
+resolver's candidate pools belong to its context: deriving a new context requires a new
+resolver for that node. A refused destination can remain assembled without a bookmark,
+traversal, arrival effects or journal output; there is no general rollback promise.
+Tentative scarce claims require explicit ownership and release and are outside this
+path; retained ordinary casting is not a tentative claim. Container crossing and
+completion remain #726 and #560, respectively.
 
 Frozen shape requires construction closure and refuses newly required expansion.
 Availability stays live. Current setup requires EAGER for freezing; each donation

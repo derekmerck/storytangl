@@ -3,20 +3,51 @@ from __future__ import annotations
 
 import pytest
 
-from tangl.core import Selector
+from tangl.core import Edge, Graph, Selector
 from tangl.mechanics.sandbox import SandboxLocation
 from tangl.persistence.serializers import JsonSerializationHandler as Json
-from tangl.story import Action, Block, InitMode, World
+from tangl.story import Action, Actor, Block, InitMode, World
 from tangl.story.system_handlers import _preview_destination_viability
-from tangl.vm import Ledger
+from tangl.vm import Dependency, Ledger, Requirement, Resolver
+from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.dispatch import do_provision
 
 
-def test_rejected_lazy_call_keeps_graph_and_call_stack_unchanged():
+@pytest.mark.parametrize("through_selection", [False, True])
+def test_readiness_uses_destination_provider_scope(through_selection):
+    graph = Graph()
+    source = Block(label="source", registry=graph)
+    target = Block(label="target", registry=graph)
+    source_actor = Actor(label="source_actor", registry=graph)
+    target_actor = Actor(label="target_actor", registry=graph)
+    Edge(registry=graph, predecessor_id=source.uid, successor_id=source_actor.uid)
+    Edge(registry=graph, predecessor_id=target.uid, successor_id=target_actor.uid)
+    dependency = Dependency(
+        registry=graph, predecessor_id=target.uid, requirement=Requirement(has_kind=Actor),
+    )
+    ctx = PhaseCtx(graph=graph, cursor_id=source.uid)
+    resolver = Resolver.from_ctx(ctx)
+    if through_selection:
+        action = Action(registry=graph, predecessor_id=source.uid, successor_id=target.uid)
+        ledger = Ledger.from_graph(graph, entry_id=source.uid)
+        ledger.resolve_choice(action.uid)
+        assert ledger.cursor is target
+    else:
+        resolver.provision_readiness(target, _ctx=ctx)
+    assert dependency.provider is target_actor
+    before = graph.unstructure()
+    resolver.provision_readiness(target, _ctx=ctx)
+    assert dependency.provider is target_actor
+    assert dependency.provider is not source_actor
+    assert graph.unstructure() == before
+
+
+@pytest.mark.parametrize("field", ["actions", "offered_actions"])
+def test_rejected_lazy_call_keeps_graph_and_call_stack_unchanged(field):
     world = World.from_script_data(script_data={
         "label": "lazy_preflight_guard", "metadata": {"start_at": "intro.start"},
         "scenes": {"intro": {"blocks": {
-            "start": {"locals": {"ready": False}, "actions": [
+            "start": {"locals": {"ready": False}, field: [
                 {"text": "Enter", "successor": "later", "return": True,
                  "conditions": ["ready"]},
             ]},
@@ -27,6 +58,7 @@ def test_rejected_lazy_call_keeps_graph_and_call_stack_unchanged():
     graph = world.create_story("run", init_mode=InitMode.LAZY).graph
     ledger = Ledger.from_graph(graph)
     frame = ledger.get_frame()
+    do_provision(frame.cursor, ctx=frame._make_ctx())
     action = next(frame.cursor.edges_out(Selector(has_kind=Action, text="Enter")))
     before = graph.unstructure()
     random_state = frame._random.getstate()

@@ -1746,7 +1746,7 @@ class Resolver:
         for node in nodes:
             if isinstance(node, TraversableNode):
                 node_ctx = _ctx.derive(cursor_id=node.uid)
-                self.provision_frontier_node(
+                Resolver.from_ctx(node_ctx).provision_frontier_node(
                     node,
                     allow_stubs=self._stubs_allowed(allow_stubs=False, _ctx=_ctx),
                     _ctx=node_ctx,
