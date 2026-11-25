@@ -27,7 +27,7 @@ def test_bound_choice_evaluates_random_source_guard_once():
     assert frame.cursor is target
 
 
-def test_lazy_choice_evaluates_random_source_guard_once():
+def test_lazy_choice_evaluates_random_source_guard_once(monkeypatch):
     world = World.from_script_data(script_data={
         "label": "lazy_random_guard", "metadata": {"start_at": "intro.start"},
         "scenes": {"intro": {"blocks": {
@@ -39,9 +39,18 @@ def test_lazy_choice_evaluates_random_source_guard_once():
     graph = world.create_story("run", init_mode=InitMode.LAZY).graph
     frame = Ledger.from_graph(graph).get_frame()
     action = next(frame.cursor.edges_out(Selector(has_kind=Action, text="Enter")))
+    calls = []
+    original = Action.source_available
+
+    def count_source(self, *, ctx=None, ns=None):
+        calls.append(self.uid)
+        return original(self, ctx=ctx, ns=ns)
+
+    monkeypatch.setattr(Action, "source_available", count_source)
     frame._random.seed(1)
     frame.resolve_choice(action)
     assert frame.cursor.label == "later"
+    assert calls.count(action.uid) == 1
 
 
 @pytest.mark.parametrize("remove_offer", [False, True])
