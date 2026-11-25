@@ -18,8 +18,8 @@ lockfile. On machines with a slow/unwritable matplotlib cache, set
 `MPLCONFIGDIR=/private/tmp/issue571-mpl` and `MPLBACKEND=Agg` for the test command.
 
 Playwright owns readiness and cleanup for one server on port 4173, and refuses
-to reuse an existing server. The server copies only the checked-out `reference`
-bundle into a temporary world root, isolates cache/user/story paths, and serves
+to reuse an existing server. The server copies the checked-out worlds the
+witnesses play (`WITNESSED_WORLDS` in `server.py`) into a temporary world root, isolates cache/user/story paths, and serves
 Vite's built dist through the real top-level `tangl.rest.app`. Persistence is
 native in-memory and lasts for this server process. The browser uses one worker,
 a fresh context, no stored secret, blocked service workers, and no MSW or route
@@ -31,6 +31,11 @@ with the same player/ledger and only the current choice occurrences enabled.
 It checks DOM and network outcomes and fails on browser errors, failed requests,
 or unsuccessful API/media responses. This does not prove Service-restart or
 cross-browser JSON recovery, audio playback, or staging/presentation parity.
+
+Feature witnesses share `witness.ts` and each prove one capability in the world
+that exercises it. `attribution.spec.ts` plays `concept_naming_demo` and checks
+that standalone speech renders through the attribution path, with the speaker
+realized anonymously and then by name, and no fragment-type fallback.
 
 The separate `test:e2e:restart` witness owns two real backend processes on the
 same port and one temporary JSON store. It copies the reference bundle once,

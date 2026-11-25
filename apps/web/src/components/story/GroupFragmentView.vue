@@ -1,16 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import { useGlobal } from '@/composables/globals'
 import type {
   AttributedStoryFragment,
   GroupStoryFragment,
   MediaStoryFragment,
   StoryFragment,
 } from '@/types'
-import { fragmentText, isMediaFragment, mediaContentUrl } from './fragmentUtils'
-import { mediaRole } from './fragmentViewUtils'
-import MediaFragmentView from './MediaFragmentView.vue'
+import AttributedLineView from './AttributedLineView.vue'
+import { isAttributedFragment, isMediaFragment } from './fragmentUtils'
 import PieceMediaGroupView from './PieceMediaGroupView.vue'
 import UnknownFragmentFallback from './UnknownFragmentFallback.vue'
 import ZoneFragmentView from './ZoneFragmentView.vue'
@@ -25,8 +23,6 @@ const props = defineProps<{
   fragments: Record<string, StoryFragment>
 }>()
 
-const { remapURL } = useGlobal()
-
 const groupType = computed(() =>
   props.group.fragment_type === 'dialog' ? 'dialog' : props.group.group_type,
 )
@@ -39,8 +35,8 @@ const dialogLines = computed<DialogLine[]>(() => {
   const lines: DialogLine[] = []
 
   for (const member of groupMembers.value) {
-    if (member.fragment_type === 'attributed') {
-      lines.push({ line: member as AttributedStoryFragment, media: [] })
+    if (isAttributedFragment(member)) {
+      lines.push({ line: member, media: [] })
       continue
     }
     if (isMediaFragment(member) && lines.length > 0) {
@@ -51,46 +47,17 @@ const dialogLines = computed<DialogLine[]>(() => {
   return lines
 })
 
-const mediaUrl = (fragment: MediaStoryFragment): string | undefined => {
-  const url = mediaContentUrl(fragment)
-  return url ? remapURL(url) : undefined
-}
-
-const avatarMedia = (media: MediaStoryFragment[]): MediaStoryFragment | undefined =>
-  media.find((item) => mediaRole(item) === 'avatar_im')
-
 </script>
 
 <template>
   <div class="group-fragment">
     <div v-if="groupType === 'dialog'" class="dialog-group" aria-live="polite">
-      <div
+      <AttributedLineView
         v-for="dialog in dialogLines"
         :key="dialog.line.uid"
-        class="dialog-line"
-      >
-        <v-avatar v-if="avatarMedia(dialog.media)" size="48">
-          <img
-            :src="mediaUrl(avatarMedia(dialog.media)!)"
-            alt=""
-            class="w-100 h-100 object-cover"
-          />
-        </v-avatar>
-        <div class="dialog-body">
-          <div class="dialog-speaker">
-            {{ dialog.line.who }}
-            <span v-if="dialog.line.how">({{ dialog.line.how }})</span>
-          </div>
-          <div>{{ fragmentText(dialog.line.content) }}</div>
-          <div
-            v-for="media in dialog.media.filter((item) => mediaRole(item) !== 'avatar_im')"
-            :key="media.uid"
-            class="dialog-media"
-          >
-            <MediaFragmentView :fragment="media" compact />
-          </div>
-        </div>
-      </div>
+        :line="dialog.line"
+        :media="dialog.media"
+      />
     </div>
 
     <ZoneFragmentView
@@ -127,36 +94,6 @@ const avatarMedia = (media: MediaStoryFragment[]): MediaStoryFragment | undefine
   border-left: 3px solid rgba(var(--v-theme-primary), 0.45);
   margin: 8px 16px;
   padding-left: 12px;
-}
-
-.dialog-line {
-  align-items: flex-start;
-  display: flex;
-  gap: 12px;
-  padding: 8px 0;
-}
-
-.dialog-body {
-  min-width: 0;
-}
-
-.dialog-speaker {
-  color: rgb(var(--v-theme-primary));
-  font-size: 0.86rem;
-  font-weight: 700;
-  margin-bottom: 2px;
-}
-
-.dialog-speaker span {
-  color: rgb(var(--v-theme-on-surface-variant));
-  font-style: italic;
-  font-weight: 400;
-  margin-left: 4px;
-}
-
-.dialog-media {
-  margin-top: 8px;
-  max-width: 280px;
 }
 
 .kv-strip {

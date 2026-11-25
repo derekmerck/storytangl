@@ -1,5 +1,4 @@
 import type { KvRow, MediaStoryFragment, PrimitiveValue, StoryFragment } from '@/types'
-import { mediaContentUrl, mediaData } from './fragmentUtils'
 
 export const contentClass = (fragment: StoryFragment): string[] => {
   const hints = fragment.hints ?? fragment.presentation_hints
@@ -34,15 +33,23 @@ export const mediaRole = (fragment: MediaStoryFragment): string =>
     ? fragment.media_role
     : 'media'
 
+export type MediaElement = 'img' | 'audio' | 'video'
+
+const MEDIA_ELEMENTS: Record<string, MediaElement> = {
+  image: 'img',
+  vector: 'img',
+  audio: 'audio',
+  video: 'video',
+}
+
 /**
- * Pending means the service could not give us a source, not that the fragment
- * started life as a RIT. `content_format` describes what a payload carries, so
- * a resolved generated image arrives as `url` like any other -- sniffing for
- * `'rit'` here placeholdered every generated image the service had already
- * dereferenced.
+ * The element that can play this payload, chosen by what it is (`media_type`),
+ * never by what it is for (`media_role`): a `character_vox` bark is audio
+ * whatever its role is called. `undefined` means no element here can play it,
+ * and the view falls back to an explicit placeholder rather than guessing.
  */
-export const isPendingMedia = (fragment: MediaStoryFragment): boolean =>
-  mediaContentUrl(fragment) === undefined && mediaData(fragment) === undefined
+export const mediaElement = (fragment: MediaStoryFragment): MediaElement | undefined =>
+  MEDIA_ELEMENTS[fragment.media_type ?? '']
 
 const mediaShape = (fragment: MediaStoryFragment): string | undefined => {
   const shape = fragment.staging_hints?.media_shape

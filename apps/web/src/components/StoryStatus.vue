@@ -100,11 +100,11 @@ const normalizeSection = (section: ProjectedSection): StatusSection => {
   if (value.value_type === 'branding') {
     return { ...base, items: normalizeBranding(value) }
   }
-
-  return {
-    ...base,
-    items: [{ key: 'Value', value: formatPrimitive(value.value) }],
+  if (value.value_type === 'scalar') {
+    return { ...base, items: [{ key: 'Value', value: formatPrimitive(value.value) }] }
   }
+  // Viewer preferences are world-static controls, not story state to list.
+  return { ...base, items: [] }
 }
 
 const normalizeStatusPayload = (payload: StoryStatusPayload | null | undefined): StatusSection[] => {

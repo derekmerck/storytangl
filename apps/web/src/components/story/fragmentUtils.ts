@@ -1,4 +1,5 @@
 import type {
+  AttributedStoryFragment,
   BaseStoryFragment,
   ChoiceStoryFragment,
   ControlStoryFragment,
@@ -25,6 +26,10 @@ export const isGroupFragment = (fragment: StoryFragment): fragment is GroupStory
 
 export const isChoiceFragment = (fragment: StoryFragment): fragment is ChoiceStoryFragment =>
   fragment.fragment_type === 'choice'
+
+export const isAttributedFragment = (
+  fragment: StoryFragment,
+): fragment is AttributedStoryFragment => fragment.fragment_type === 'attributed'
 
 export const isMediaFragment = (fragment: StoryFragment): fragment is MediaStoryFragment =>
   fragment.fragment_type === 'media'

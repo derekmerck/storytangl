@@ -5,6 +5,7 @@ import { useDisplay } from 'vuetify'
 import AppNavbar from '@/components/AppNavbar.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import StoryStatus from '@/components/StoryStatus.vue'
+import WorldPreferences from '@/components/WorldPreferences.vue'
 import StoryFlow from '@/components/story/StoryFlow.vue'
 import type { InfoState, RuntimeEnvelope, UserInfo } from '@/types'
 import { useGlobal } from '@/composables/globals'
@@ -44,6 +45,8 @@ const resetSession = () => {
   statusRefreshKey.value = 0
   store.current_world_uid = ''
   store.current_world_info = undefined
+  store.world_preferences = []
+  store.preference_values = {}
 }
 
 const decodeEnvelope = (payload: unknown): RuntimeEnvelope => {
@@ -66,6 +69,9 @@ const activateSession = (envelope: RuntimeEnvelope, current: RuntimeEnvelope) =>
     throw new Error('Story changed while loading; retry the current story')
   }
   store.current_world_uid = envelope.metadata!.world_id as string
+  store.getWorldPresentation(store.current_world_uid).catch((error) => {
+    console.error('Failed to load world presentation:', error)
+  })
   if (store.current_user)
     store.current_user.current_ledger_id = envelope.metadata!.ledger_id as string
   activeSession.value = {
@@ -323,6 +329,9 @@ const handleStoryUpdate = (envelope: RuntimeEnvelope) => {
         </v-list>
         <v-divider class="mb-2" />
         <StoryStatus :refresh-key="statusRefreshKey" :info-state="infoState" />
+        <template #append>
+          <WorldPreferences />
+        </template>
       </v-navigation-drawer>
 
       <v-main>

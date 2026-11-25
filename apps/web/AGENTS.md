@@ -203,10 +203,13 @@ export const useStore = defineStore('main', {
 - **Types**: Generated from OpenAPI spec or manually maintained
 
 ## Media handling
-- **Media arrays** from API: `[{ media_role: 'narrative_im', url: '/media/img.png' }]`
-- **Transform to dict**: `makeMediaDict()` converts to `{ narrative_im: { url, data } }`
+- **Element by type**: `mediaElement()` picks `<img>`, `<audio>` or `<video>` from
+  `media_type`; `media_role` says where media goes, never what element plays it.
+  No source or no element for the type renders an explicit placeholder.
 - **URL remapping**: `remapURL()` converts relative to absolute URLs
-- **Access pattern**: `block.media_dict?.narrative_im?.url`
+- **Legacy blocks**: `makeMediaDict()` keys a `JournalStoryUpdate` media array by role
+- **Preferences**: world `ui-preferences` values live in `localStorage` per world
+  (`worldPreferences.ts`), never in a request or the ledger
 
 ## Environment variables
 Create `.env.local` for development:

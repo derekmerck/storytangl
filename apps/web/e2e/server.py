@@ -12,6 +12,9 @@ import uvicorn
 
 from tangl.config import settings
 
+WITNESSED_WORLDS = ("reference", "concept_naming_demo")
+"""The worlds the browser witnesses play; each is copied from the checkout."""
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -24,7 +27,8 @@ if __name__ == "__main__":
     with owner as temporary:
         root = Path(temporary)
         if args.root is None:
-            copytree(repo / "worlds/reference", root / "worlds/reference")
+            for world in WITNESSED_WORLDS:
+                copytree(repo / "worlds" / world, root / "worlds" / world)
         settings.set("service.paths.worlds", [root / "worlds"])
         settings.set("service.paths.client_dist", repo / "apps/web/dist")
         for key in ("user_data", "story_media", "cache_data"):

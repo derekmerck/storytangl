@@ -9,12 +9,15 @@ Modern Vue 3 + TypeScript web interface for the StoryTangl narrative engine.
 The basic session path uses the real world catalog, player-secret bootstrap,
 explicit story creation, and Continue through the user's current ledger pointer.
 Story/status readers wait for session entry. History is readable, while only
-current choice occurrences can submit. Broader presentation parity remains work
-under #611; staging, attributed dialog and audio are outside this entry slice.
+current choice occurrences can submit. Grouped and standalone attributed lines
+share one renderer, media chooses its element by `media_type`, and a world's
+declared `ui-preferences` get local controls. Staging and audio ownership
+remain work under #611 and #571.
 
 The [Chromium smoke](e2e/README.md) builds the client and serves it through the
-real REST app, proving the reference-world entry, two choices, status, and
-same-server reload. Vitest/MSW remains component evidence, not a substitute.
+real REST app, proving the reference-world entry, two choices, status,
+same-server reload, and `concept_naming_demo` attribution. Vitest/MSW remains
+component evidence, not a substitute.
 
 ---
 
