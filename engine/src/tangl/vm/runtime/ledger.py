@@ -28,7 +28,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Optional, Self
 from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import Field, PrivateAttr, model_validator
 
 from tangl.core import BaseFragment, BehaviorRegistry, Entity, Graph, OrderedRegistry, Selector
 from tangl.type_hints import UnstructuredData
@@ -68,6 +68,8 @@ class Ledger(Entity):
     cursor_history: list[UUID] = Field(default_factory=list)
 
     replay_algorithm_id: str = "diff_v1"
+    committed_state_hash: bytes | None = None
+    _committed_graph: Graph | None = PrivateAttr(default=None)
     checkpoint_cadence: int = 10  # Completed player choices between periodic checkpoints.
     causality_mode: CausalityMode = CausalityMode.CLEAN
     causality_break_reason: str | None = None
@@ -212,7 +214,6 @@ class Ledger(Entity):
         """Finalize entry initialization and persist initial checkpoint."""
         frame = self.get_frame()
         self.call_stack_ids = [e.uid for e in frame.return_stack]
-        self.save_snapshot(force=True)
 
     def initialize_ledger(self, entry_id: UUID | None = None) -> None:
         """Backward-compatible initializer for entry setup."""
@@ -229,6 +230,8 @@ class Ledger(Entity):
 
     def get_frame(self) -> Frame:
         """Create an ephemeral frame for the next pipeline execution."""
+        if self.committed_state_hash is None:
+            self.save_snapshot(force=True)
         return Frame(
             self.graph,
             self.cursor,
@@ -240,6 +243,7 @@ class Ledger(Entity):
             causality_mode=self.causality_mode,
             mark_soft_dirty_callback=self.mark_soft_dirty,
             escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty,
+            seed_state_hash=self.committed_state_hash,
         )
 
     def frame_meta(self) -> dict[str, Any]:
@@ -327,14 +331,6 @@ class Ledger(Entity):
 
     def _record_step(self, trace: StepTrace) -> None:
         """Build and append replay records for one traced frame hop."""
-        engine = get_replay_engine(self.replay_algorithm_id)
-        delta = engine.build_delta(before_graph=trace.before_graph, after_graph=trace.after_graph)
-        delta_id: UUID | None = None
-
-        if delta is not None:
-            self.output_stream.append(delta)
-            delta_id = delta.uid
-
         marker = self._section_marker_for_trace(trace)
         if marker is not None:
             self.output_stream.append(marker)
@@ -346,8 +342,6 @@ class Ledger(Entity):
                 cursor_id=trace.cursor_id,
                 entry_phase=trace.entry_phase.name if trace.entry_phase is not None else None,
                 was_choice=trace.was_choice,
-                delta_id=delta_id,
-                state_hash=trace.state_hash,
                 call_stack_ids=list(trace.call_stack_ids),
                 algorithm_id=self.replay_algorithm_id,
             )
@@ -425,8 +419,31 @@ class Ledger(Entity):
         self.last_redirect = frame.last_redirect
         self.redirect_trace = list(frame.redirect_trace)
 
+    def _commit_frame_graph(self) -> None:
+        engine = get_replay_engine(self.replay_algorithm_id)
+        before = self._get_committed_graph()
+        before_hash = self.committed_state_hash or before.value_hash()
+        after_hash = self.graph.value_hash()
+        delta = None
+        if before_hash != after_hash:
+            delta = engine.build_delta(before_graph=before, after_graph=self.graph,
+                                       before_hash=before_hash, after_hash=after_hash)
+        steps = self._step_records()
+        if steps:
+            last = steps[-1]
+            if delta is not None:
+                self.output_stream.append(delta)
+            self.output_stream.add(last.model_copy(update={
+                "settled": True, "state_hash": after_hash,
+                "delta_id": delta.uid if delta is not None else None,
+            }))
+        self.committed_state_hash = after_hash
+        if delta is not None:
+            self._committed_graph = Graph.structure(self.graph.unstructure())
+
     def _commit_frame_choice(self, *, frame: Frame) -> None:
         self._validate_frame_return_stack(frame)
+        self._commit_frame_graph()
         self._sync_from_frame(frame=frame)
         self.save_snapshot(cadence=self.checkpoint_cadence)
 
@@ -653,7 +670,7 @@ class Ledger(Entity):
                 and self._is_marker(fragment)
                 and getattr(fragment, "marker_type", None) in marker_type_set
             ),
-            len(stream),
+            len(self.output_stream),
         )
         until_step = max(self.cursor_steps + 1, 0)
         fragments: list[BaseFragment] = []
@@ -692,6 +709,7 @@ class Ledger(Entity):
             "user_id": str(self.user_id) if self.user_id is not None else None,
             "replay_algorithm_id": self.replay_algorithm_id,
             "checkpoint_cadence": self.checkpoint_cadence,
+            "committed_state_hash": self.committed_state_hash,
             "graph": self.graph.unstructure(),
             "output_stream": self.output_stream.unstructure(),
         }
@@ -762,6 +780,7 @@ class Ledger(Entity):
             checkpoint_cadence=data.get(
                 "checkpoint_cadence", cls.model_fields["checkpoint_cadence"].default,
             ),
+            committed_state_hash=data.get("committed_state_hash"),
         )
 
     def save_snapshot(self, *, force: bool = False, cadence: int = 0) -> Optional[CheckpointRecord]:
@@ -776,13 +795,18 @@ class Ledger(Entity):
             return None
 
         engine = get_replay_engine(self.replay_algorithm_id)
+        checkpoint_graph = self.graph if self.committed_state_hash is None else self._get_committed_graph()
         checkpoint = engine.make_checkpoint(
-            graph=self.graph,
+            graph=checkpoint_graph,
             step=self.cursor_steps,
             cursor_id=self.cursor_id,
             call_stack_ids=self.call_stack_ids,
+            state_hash=self.committed_state_hash,
         )
         self.output_stream.append(checkpoint)
+        if self.committed_state_hash is None:
+            self.committed_state_hash = checkpoint.state_hash
+            self._committed_graph = Graph.structure(checkpoint_graph.unstructure())
         return checkpoint
 
     def push_snapshot(self) -> Optional[CheckpointRecord]:
@@ -812,6 +836,41 @@ class Ledger(Entity):
         ]
         return sorted(records, key=lambda record: (record.step, record.seq))
 
+    def _get_committed_graph(self) -> Graph:
+        if self._committed_graph is not None:
+            return self._committed_graph
+        engine = get_replay_engine(self.replay_algorithm_id)
+        checkpoints = [
+            record for record in self._checkpoint_records()
+            if record.step <= self.cursor_steps and (
+                record.step < self.cursor_steps or self.committed_state_hash is None
+                or record.state_hash == self.committed_state_hash
+            )
+        ]
+        if not checkpoints:
+            if self.committed_state_hash is None:
+                self._committed_graph = Graph.structure(self.graph.unstructure())
+                self.committed_state_hash = self._committed_graph.value_hash()
+                return self._committed_graph
+            raise RuntimeError("No checkpoint available for committed graph")
+        checkpoint = checkpoints[-1]
+        graph = engine.restore_checkpoint(checkpoint)
+        restored_hash = checkpoint.state_hash
+        for record in self._step_records(upto_step=self.cursor_steps):
+            if record.step <= checkpoint.step:
+                continue
+            if record.delta_id is not None:
+                delta = self.output_stream.get(record.delta_id)
+                if not isinstance(delta, ReplayDelta):
+                    raise RuntimeError(f"Invalid or missing delta for StepRecord {record.uid}")
+                graph = engine.apply_delta(graph=graph, delta=delta)
+            if record.settled:
+                restored_hash = record.state_hash
+        if self.committed_state_hash is not None and restored_hash != self.committed_state_hash:
+            raise ValueError("Committed replay graph hash mismatch")
+        self._committed_graph = graph
+        return graph
+
     def rollback_to_step(self, target_step: int, *, reason: str | None = None) -> None:
         """Restore ledger state to ``target_step`` with destructive truncation."""
         if target_step < 0:
@@ -820,6 +879,9 @@ class Ledger(Entity):
             raise ValueError(
                 f"target_step {target_step} must be <= current step {self.cursor_steps}"
             )
+        if target_step and not any(record.step == target_step and record.settled
+                                   for record in self._step_records(upto_step=target_step)):
+            raise ValueError("Rollback target must be a settled choice")
         if target_step == self.cursor_steps:
             return
 
@@ -875,6 +937,13 @@ class Ledger(Entity):
             record_step = getattr(record, "step", None)
             if isinstance(record_step, int) and record_step <= target_step:
                 cutoff_index = index
+        target_record = next((record for record in reversed(all_active_steps)
+                              if record.step == target_step), None)
+        if target_record is not None and target_record.delta_id is not None:
+            cutoff_index = max(cutoff_index, next(
+                index for index, record in enumerate(ordered_records)
+                if record.uid == target_record.delta_id
+            ))
         kept_records = ordered_records[: cutoff_index + 1] if cutoff_index >= 0 else []
 
         truncated_record_count = len(ordered_records) - len(kept_records)
@@ -894,10 +963,17 @@ class Ledger(Entity):
 
         self.output_stream = new_stream
         self.graph = graph
+        self.committed_state_hash = (
+            target_record.state_hash if target_record is not None else checkpoint.state_hash
+        )
+        self._committed_graph = Graph.structure(graph.unstructure())
         self.cursor_id = final_cursor_id
         self.call_stack_ids = final_call_stack_ids
         self.cursor_steps = target_step
         self.choice_steps = choice_steps
+        self.current_update_start_step = next(
+            (record.step for record in reversed(all_active_steps) if record.was_choice), 0,
+        )
         self.cursor_history = history
         self.reentrant_steps = reentrant_steps
         self.last_redirect = None
