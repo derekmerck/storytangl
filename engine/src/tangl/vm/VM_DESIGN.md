@@ -153,8 +153,11 @@ readiness for the current node's immediate destinations, including their contain
 scopes. Outside that neighborhood, a viable unresolved destination requires readiness;
 preview never creates it or evaluates its template as a namespace. Selection checks
 payload and known source refusals, requests readiness, and validates the actual target
-before pushing a call bookmark or moving. A destination refusal may retain dormant
-constructed shape. Readiness runs provisioning, not arrival phases. This does not
+before pushing a call bookmark or moving. A source guard checked before readiness is
+not evaluated again for that submission; structural attachment is rechecked after
+assembly. An already-ready destination uses ordinary validation. A destination
+refusal may retain dormant constructed shape. Readiness runs provisioning, not arrival
+phases. This does not
 provide rollback or a release policy for tentative scarce claims; crossing and call
 completion remain separate work under #726 and #560.
 

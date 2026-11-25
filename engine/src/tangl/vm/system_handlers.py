@@ -351,7 +351,7 @@ def contribute_visit_stats(*, caller, ctx, **kw):
 # ---------------------------------------------------------------------------
 
 @on_validate
-def validate_successor_exists(*, caller, ctx, **kw):
+def validate_successor_exists(*, caller, ctx, source_checked: bool = False, **kw):
     """Check that successor resolves and traversal is available.
 
     This is the minimum traversal guard: destination exists and edge/node
@@ -375,6 +375,8 @@ def validate_successor_exists(*, caller, ctx, **kw):
                 )
                 if not preview.viable:
                     return False
+        if source_checked and isinstance(caller, TraversableEdge):
+            return bool(caller.available(ctx=ctx, source_checked=True))
         return bool(caller.available(ctx=ctx))
     if hasattr(successor, "available"):
         ns = ctx.get_ns(successor) if ctx is not None and hasattr(ctx, "get_ns") else None

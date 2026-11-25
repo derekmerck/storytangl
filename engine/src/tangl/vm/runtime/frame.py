@@ -720,6 +720,7 @@ class Frame:
         edge: AnyTraversableEdge,
         entry_phase: ResolutionPhase,
         incoming_payload: Any,
+        source_checked: bool = False,
     ) -> None:
         if entry_phase > ResolutionPhase.VALIDATE:
             return
@@ -728,7 +729,7 @@ class Frame:
             incoming_payload=incoming_payload,
         )
         pre_ctx.current_phase = ResolutionPhase.VALIDATE
-        if not do_validate(edge, ctx=pre_ctx):
+        if not do_validate(edge, ctx=pre_ctx, source_checked=source_checked):
             raise ValueError(f"Edge validation failed: {edge!r}")
 
     def _advance_cursor(self, edge: AnyTraversableEdge) -> None:
@@ -751,23 +752,36 @@ class Frame:
         if entry_phase <= ResolutionPhase.VALIDATE:
             if not edge.validate_payload(incoming_payload):
                 raise ValueError(f"Edge payload validation failed: {edge!r}")
+        source_checked = False
         if (was_choice and isinstance(edge, TraversableEdge)
                 and edge.successor_id != edge.predecessor_id):
+            from ..provision import Resolver
+
             provision_ctx = self._make_ctx(
                 incoming_edge=edge, incoming_payload=incoming_payload,
             )
-            factory = self.graph.factory
-            if edge.successor is None and isinstance(factory, TraversableGraphFactory):
-                admitted = factory.is_selectable_edge(edge, ctx=provision_ctx)
-            else:
-                admitted = edge.source_available(ctx=provision_ctx)
-            if not admitted:
-                raise ValueError(f"Edge validation failed: {edge!r}")
-            self._ready_destinations([edge], ctx=provision_ctx)
+            target = edge.successor
+            needs_readiness = target is None or (
+                isinstance(target, TraversableNode)
+                and Resolver.from_ctx(provision_ctx).readiness_needed(target, _ctx=provision_ctx)
+            )
+            if needs_readiness:
+                factory = self.graph.factory
+                if target is None and isinstance(factory, TraversableGraphFactory):
+                    admitted = factory.is_selectable_edge(edge, ctx=provision_ctx)
+                else:
+                    admitted = edge.source_available(ctx=provision_ctx)
+                if not admitted:
+                    raise ValueError(f"Edge validation failed: {edge!r}")
+                source_checked = True
+                self._ready_destinations([edge], ctx=provision_ctx)
+                if self.graph.get(edge.uid) is not edge:
+                    raise ValueError("Edge validation failed: selected edge was detached")
         self._validate_before_move(
             edge=edge,
             entry_phase=entry_phase,
             incoming_payload=incoming_payload,
+            source_checked=source_checked,
         )
         self._push_call_edge_if_needed(edge)
         self._advance_cursor(edge)

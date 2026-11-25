@@ -13,6 +13,63 @@ from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.dispatch import do_provision
 
 
+def test_bound_choice_evaluates_random_source_guard_once():
+    graph = Graph()
+    source = Block(label="source", registry=graph)
+    target = Block(label="target", registry=graph)
+    action = Action(
+        registry=graph, predecessor_id=source.uid, successor_id=target.uid,
+        availability=[{"expr": "rand.random() < 0.5"}],
+    )
+    frame = Ledger.from_graph(graph, entry_id=source.uid).get_frame()
+    frame._random.seed(1)
+    frame.resolve_choice(action)
+    assert frame.cursor is target
+
+
+def test_lazy_choice_evaluates_random_source_guard_once():
+    world = World.from_script_data(script_data={
+        "label": "lazy_random_guard", "metadata": {"start_at": "intro.start"},
+        "scenes": {"intro": {"blocks": {
+            "start": {"actions": [{"text": "Enter", "successor": "later",
+                                   "conditions": ["rand.random() < 0.5"]}]},
+            "later": {"content": "Here."},
+        }}},
+    })
+    graph = world.create_story("run", init_mode=InitMode.LAZY).graph
+    frame = Ledger.from_graph(graph).get_frame()
+    action = next(frame.cursor.edges_out(Selector(has_kind=Action, text="Enter")))
+    frame._random.seed(1)
+    frame.resolve_choice(action)
+    assert frame.cursor.label == "later"
+
+
+@pytest.mark.parametrize("remove_offer", [False, True])
+def test_readiness_rechecks_scoped_attachment(monkeypatch, remove_offer):
+    world = World.from_script_data(script_data={
+        "label": "lazy_stale_offer", "metadata": {"start_at": "intro.start"},
+        "scenes": {"intro": {"blocks": {
+            "start": {"offered_actions": [{"text": "Enter", "successor": "later"}]},
+            "later": {"content": "Here."},
+        }}},
+    })
+    graph = world.create_story("run", init_mode=InitMode.LAZY).graph
+    frame = Ledger.from_graph(graph).get_frame()
+    do_provision(frame.cursor, ctx=frame._make_ctx())
+    action = next(frame.cursor.edges_out(Selector(has_kind=Action, text="Enter")))
+    original = type(frame)._ready_destinations
+
+    def detach_after_readiness(self, edges, *, ctx):
+        original(self, edges, ctx=ctx)
+        graph.remove(action.offer_id if remove_offer else action.uid)
+
+    monkeypatch.setattr(type(frame), "_ready_destinations", detach_after_readiness)
+    with pytest.raises(ValueError, match="Edge validation failed"):
+        frame.resolve_choice(action)
+    assert frame.cursor.label == "start"
+    assert not frame.return_stack
+
+
 @pytest.mark.parametrize("through_selection", [False, True])
 def test_readiness_uses_destination_provider_scope(through_selection):
     graph = Graph()

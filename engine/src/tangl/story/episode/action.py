@@ -47,6 +47,17 @@ class Action(TraversableEdge):
     journal_text: str | None = None
     offer_id: UUID | None = None
 
+    def source_attached(self, *, ctx=None) -> bool:
+        if self.offer_id is None:
+            return True
+        from ..scoped_offers import offer_is_attached
+
+        receiver = self.predecessor
+        return (
+            receiver is not None and ctx is not None
+            and offer_is_attached(self, receiver, ctx=ctx)
+        )
+
     def source_available(self, *, ctx=None, ns=None) -> bool:
         if self.offer_id is None:
             return super().source_available(ctx=ctx, ns=ns)

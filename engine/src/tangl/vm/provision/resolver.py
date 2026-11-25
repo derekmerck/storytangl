@@ -1737,13 +1737,27 @@ class Resolver:
             dependency.requirement.resolution_reason = "resolved"
         return True
 
-    def provision_readiness(self, target: TraversableNode, *, _ctx: VmPhaseCtx) -> None:
-        """Establish a destination's scopes and entry chain without admitting it."""
+    def _readiness_nodes(self, target: TraversableNode, *, _ctx: VmPhaseCtx) -> list[Node]:
         nodes = [*reversed(list(target.ancestors)), target]
         while target.is_container:
             target = target.resolve_entry(ctx=_ctx)
             nodes.append(target)
-        for node in nodes:
+        return nodes
+
+    def readiness_needed(self, target: TraversableNode, *, _ctx: VmPhaseCtx) -> bool:
+        """Whether this destination has pending assembly in its context."""
+        for node in self._readiness_nodes(target, _ctx=_ctx):
+            if isinstance(node, TraversableNode):
+                if next(node.edges_out(Selector(has_kind=Dependency, provider=None)), None):
+                    return True
+                if not getattr(node.graph, "frozen_shape", False):
+                    if next(node.edges_out(Selector(has_kind=Fanout)), None):
+                        return True
+        return False
+
+    def provision_readiness(self, target: TraversableNode, *, _ctx: VmPhaseCtx) -> None:
+        """Establish a destination's scopes and entry chain without admitting it."""
+        for node in self._readiness_nodes(target, _ctx=_ctx):
             if isinstance(node, TraversableNode):
                 node_ctx = _ctx.derive(cursor_id=node.uid)
                 Resolver.from_ctx(node_ctx).provision_frontier_node(
