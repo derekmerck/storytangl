@@ -410,16 +410,20 @@ of bringing a client to the right secret, and neither belongs to Service.
 | Concern | Owner | Portable? |
 | --- | --- | --- |
 | Who is playing: `User`, secret, privileged flag | Service (this note) | yes; the shared contract |
-| How a request becomes a user | the transport, e.g. one dependency in `apps/server` | the swap point |
+| How a request becomes a user | the transport: `resolve_user_auth` in `apps/server` | the swap point |
 | Login screen or profile picker | each client | no, by design |
 
 **Multi-user remote backends.** Authenticate *in front of* the server, not in
 it. A reverse proxy or identity gateway performs the login and forwards the
-authenticated identity; the server's key-resolving dependency is replaced by one
-that maps that identity to a User, either by deriving a secret from it or by a
-stored mapping. Service, Story, VM and Core do not change, and every client keeps
-working because each still ends up holding a key. The replacement is an ordinary
-FastAPI dependency override, not a new plugin registry. Login inside one client
+authenticated identity; the server's key resolution is replaced by code that
+maps that identity to a User, either by deriving a secret from it or by a stored
+mapping. Service, Story, VM and Core do not change, and every client keeps
+working because each still ends up holding a key. Today that resolution is one
+function, `resolve_user_auth` in `apps/server/src/tangl/rest/dependencies_gateway.py`,
+which the routers call directly inside their handlers, so a FastAPI dependency
+override does not reach it. A gateway deployment first injects it with `Depends`
+(a mechanical change to the routers) and then overrides it; no plugin registry
+is needed. Login inside one client
 (browser OAuth, for example) is possible but serves only that client.
 
 **Single-user built-in backends.** A profile is another `User` in local
