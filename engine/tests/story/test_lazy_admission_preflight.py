@@ -11,6 +11,7 @@ from tangl.story.system_handlers import _preview_destination_viability
 from tangl.vm import Dependency, Ledger, Requirement, Resolver
 from tangl.vm.runtime.frame import PhaseCtx
 from tangl.vm.dispatch import do_provision
+from tangl.vm.system_handlers import validate_successor_exists
 
 
 def test_bound_choice_evaluates_random_source_guard_once():
@@ -106,6 +107,37 @@ def test_readiness_uses_destination_provider_scope(through_selection):
     assert dependency.provider is target_actor
     assert dependency.provider is not source_actor
     assert graph.unstructure() == before
+
+
+def test_destination_preview_uses_destination_candidates():
+    graph = Graph()
+    source = Block(label="source", registry=graph)
+    target = Block(label="target", registry=graph)
+    actor = Actor(label="target_actor", registry=graph)
+    Edge(registry=graph, predecessor_id=target.uid, successor_id=actor.uid)
+    Dependency(
+        registry=graph, predecessor_id=target.uid, label="person",
+        requirement=Requirement(has_kind=Actor, uid=actor.uid),
+    )
+    action = Action(registry=graph, predecessor_id=source.uid, successor_id=target.uid)
+    ctx = PhaseCtx(graph=graph, cursor_id=source.uid)
+    assert validate_successor_exists(caller=action, ctx=ctx)
+
+
+def test_nested_destination_assembles_closed_intermediate_scope():
+    world = World.from_script_data(script_data={
+        "label": "closed_intermediate", "metadata": {"start_at": "intro.start"},
+        "scenes": {
+            "intro": {"blocks": {"start": {"actions": [
+                {"text": "Enter", "successor": "other.entry"},
+            ]}}},
+            "other": {"conditions": ["False"], "blocks": {"entry": {"content": "Here."}}},
+        },
+    })
+    ledger = Ledger.from_graph(world.create_story("run", init_mode=InitMode.LAZY).graph)
+    action = next(ledger.cursor.edges_out(Selector(has_kind=Action, text="Enter")))
+    ledger.resolve_choice(action.uid)
+    assert ledger.cursor.label == "entry"
 
 
 @pytest.mark.parametrize("field", ["actions", "offered_actions"])

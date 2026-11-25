@@ -1108,7 +1108,7 @@ class Resolver:
         resolver = Resolver.from_ctx(node_ctx)
         if not admission_required:
             resolver.provision_readiness(entity, _ctx=node_ctx)
-            return True
+            return next(entity.edges_out(Selector(has_kind=Dependency, satisfied=False)), None) is None
         return resolver.resolve_frontier_node(
             entity,
             allow_stubs=self._stubs_allowed(allow_stubs=False, _ctx=_ctx),
@@ -1194,6 +1194,7 @@ class Resolver:
         offer: ProvisionOffer,
         graph: Any,
         _ctx: VmPhaseCtx | None = None,
+        admission_required: bool = True,
     ) -> Any | None:
         plan = self._chain_plan_for_offer(requirement, offer=offer, _ctx=_ctx)
         if not plan.requires_chain:
@@ -1237,6 +1238,7 @@ class Resolver:
                 graph=graph,
                 _ctx=_ctx,
                 request_ctx_path=".".join(segments[: index + 1]),
+                admission_required=admission_required,
             ):
                 raise RuntimeError("Structural chain segment failed runtime validation")
             current = created
@@ -1721,6 +1723,7 @@ class Resolver:
                 offer=selected_offer,
                 graph=dependency.registry,
                 _ctx=_ctx,
+                admission_required=dependency.label != "destination",
             )
             self._bind_dependency_provider(
                 dependency=dependency,
@@ -1737,12 +1740,16 @@ class Resolver:
             dependency.requirement.resolution_reason = "resolved"
         return True
 
-    def _readiness_nodes(self, target: TraversableNode, *, _ctx: VmPhaseCtx) -> list[Node]:
-        nodes = [*reversed(list(target.ancestors)), target]
+    def _readiness_nodes(self, target: TraversableNode, *, _ctx: VmPhaseCtx) -> Iterable[Node]:
+        yield from (node for node in reversed(list(target.ancestors)) if node.uid != target.uid)
+        yield target
         while target.is_container:
-            target = target.resolve_entry(ctx=_ctx)
-            nodes.append(target)
-        return nodes
+            node_ctx = self._make_node_ctx(
+                graph=target.graph, node=target, _ctx=_ctx,
+                request_ctx_path=self._request_ctx_for_node(target),
+            )
+            target = target.resolve_entry(ctx=node_ctx)
+            yield target
 
     def readiness_needed(self, target: TraversableNode, *, _ctx: VmPhaseCtx) -> bool:
         """Whether this destination has pending assembly in its context."""
@@ -1759,7 +1766,10 @@ class Resolver:
         """Establish a destination's scopes and entry chain without admitting it."""
         for node in self._readiness_nodes(target, _ctx=_ctx):
             if isinstance(node, TraversableNode):
-                node_ctx = _ctx.derive(cursor_id=node.uid)
+                node_ctx = self._make_node_ctx(
+                    graph=node.graph, node=node, _ctx=_ctx,
+                    request_ctx_path=self._request_ctx_for_node(node),
+                )
                 Resolver.from_ctx(node_ctx).provision_frontier_node(
                     node,
                     allow_stubs=self._stubs_allowed(allow_stubs=False, _ctx=_ctx),

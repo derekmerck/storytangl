@@ -368,10 +368,14 @@ def validate_successor_exists(*, caller, ctx, source_checked: bool = False, **kw
 
             unresolved = successor.edges_out(Selector(has_kind=Dependency, satisfied=False))
             if successor.is_container or next(unresolved, None) is not None:
-                preview = Resolver.from_ctx(ctx).preview_frontier_node(
+                target_ctx = Resolver.from_ctx(ctx)._make_node_ctx(
+                    graph=successor.graph, node=successor, _ctx=ctx,
+                    request_ctx_path=Resolver._request_ctx_for_node(successor),
+                )
+                preview = Resolver.from_ctx(target_ctx).preview_frontier_node(
                     successor,
-                    allow_stubs=ctx.causality_mode == CausalityMode.HARD_DIRTY,
-                    _ctx=ctx,
+                    allow_stubs=target_ctx.causality_mode == CausalityMode.HARD_DIRTY,
+                    _ctx=target_ctx,
                 )
                 if not preview.viable:
                     return False

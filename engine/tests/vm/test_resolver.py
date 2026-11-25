@@ -19,6 +19,7 @@ from tangl.core import (
     BehaviorRegistry,
     Entity,
     EntityTemplate,
+    Edge,
     Graph,
     Priority,
     Registry,
@@ -55,7 +56,7 @@ from tangl.vm.provision.matching import annotate_offer_specificity
 from tangl.vm.resolution_phase import ResolutionPhase
 from tangl.vm.runtime.causality import CausalityMode
 from tangl.vm.runtime.frame import PhaseCtx
-from tangl.vm.traversable import HasContainerEntryProjection, TraversableNode
+from tangl.vm.traversable import ContainerEntryRule, HasContainerEntryProjection, TraversableNode
 
 
 class FinalizableContainer(TraversableNode):
@@ -73,6 +74,51 @@ class FinalizableContainer(TraversableNode):
 
 class ResumableNode(HasContainerEntryProjection, TraversableNode):
     """Test container that opts into re-entrant entry projection."""
+
+
+def test_readiness_provisions_container_before_selecting_entry() -> None:
+    graph = Graph()
+    source = _node(graph, label="source")
+    container = _resumable_node(graph, label="container")
+    entry = _node(graph, label="entry")
+    alternative = _node(graph, label="alternative")
+    gate = _node(graph, label="gate", locals={"open": True})
+    container.add_child(entry)
+    container.add_child(alternative)
+    container.source_id = entry.uid
+    Edge(registry=graph, predecessor_id=container.uid, successor_id=gate.uid)
+    dependency = Dependency(
+        registry=graph, predecessor_id=container.uid, label="gate",
+        requirement=Requirement(has_kind=TraversableNode, has_identifier="gate"),
+    )
+    container.locals["dep_id"] = dependency.uid
+    container.entry_rules = [ContainerEntryRule(
+        target_id=alternative.uid,
+        availability=[Predicate(expr="self.graph.get(self.locals['dep_id']).provider.locals['open']")],
+    )]
+    ctx = PhaseCtx(graph=graph, cursor_id=source.uid)
+    resolver = Resolver.from_ctx(ctx)
+    assert resolver.readiness_needed(container, _ctx=ctx)
+    assert dependency.provider is None
+    resolver.provision_readiness(container, _ctx=ctx)
+    assert dependency.provider is gate
+    assert container.resolve_entry(ctx=ctx.derive(cursor_id=container.uid)) is alternative
+
+
+def test_readiness_uses_each_scope_request_path(monkeypatch) -> None:
+    graph = Graph()
+    parent = _node(graph, label="inn")
+    target = _node(graph, label="later")
+    parent.add_child(target)
+    ctx = PhaseCtx(graph=graph, cursor_id=target.uid, meta={"request_ctx_path": "inn.later"})
+    paths = []
+
+    def record(_self, node, *, allow_stubs=False, _ctx=None):
+        paths.append((node.uid, _ctx.get_meta()["request_ctx_path"]))
+
+    monkeypatch.setattr(Resolver, "provision_frontier_node", record)
+    Resolver.from_ctx(ctx).provision_readiness(target, _ctx=ctx)
+    assert paths == [(parent.uid, "inn"), (target.uid, "inn.later")]
 
 
 def _node(graph: Graph, **kwargs) -> TraversableNode:
