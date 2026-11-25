@@ -42,7 +42,10 @@ does not fetch a plaintext secret from backend storage.
 
 These codenames are memorable recovery capabilities, not passwords or a claim
 of cryptographic account protection. Authentication/security policy, identity
-providers, expiry, and permissions are explicitly outside this contract.
+providers, expiry, and permissions are explicitly outside this contract. Where a
+deployment needs a real login, it goes in front of the server and maps the
+signed-in identity to a user; this recovery surface is then skipped. See
+"Identity, not authentication" in `engine/src/tangl/service/SERVICE_DESIGN.md`.
 
 Collision rerolling, persisted recovery, and `RemoteServiceManager` parity are
 covered by the service contract. Real-browser E2E remains with
