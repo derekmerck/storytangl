@@ -32,6 +32,7 @@ from pydantic import Field, PrivateAttr, model_validator
 
 from tangl.core import BaseFragment, BehaviorRegistry, Entity, Graph, OrderedRegistry, Selector
 from tangl.type_hints import UnstructuredData
+from tangl.utils.hashing import hashing_func
 from tangl.vm.traversable import TraversableEdge, TraversableNode
 
 from .causality import CausalityMode
@@ -69,6 +70,8 @@ class Ledger(Entity):
 
     replay_algorithm_id: str = "diff_v1"
     committed_state_hash: bytes | None = None
+    allocation_counter: int = 0
+    allocation_step: int = 0
     _committed_graph: Graph | None = PrivateAttr(default=None)
     checkpoint_cadence: int = 10  # Completed player choices between periodic checkpoints.
     causality_mode: CausalityMode = CausalityMode.CLEAN
@@ -202,6 +205,10 @@ class Ledger(Entity):
         self.reentrant_steps = 0
         self.cursor_steps = 0
         self.choice_steps = 0
+        self.allocation_counter = 0
+        self.allocation_step = 0
+        self.committed_state_hash = None
+        self._committed_graph = None
         self.call_stack_ids = []
         self.last_redirect = None
         self.redirect_trace = []
@@ -244,7 +251,19 @@ class Ledger(Entity):
             mark_soft_dirty_callback=self.mark_soft_dirty,
             escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty,
             seed_state_hash=self.committed_state_hash,
+            allocate_uid=self._next_allocation_uid,
         )
+
+    def _next_allocation_uid(self) -> UUID:
+        """Allocate deterministically within the last settled boundary."""
+        if self.committed_state_hash is None:
+            self.save_snapshot(force=True)
+        value = hashing_func(
+            self.committed_state_hash, self.allocation_step, self.allocation_counter,
+            digest_size=16,
+        )
+        self.allocation_counter += 1
+        return UUID(bytes=value, version=4)
 
     def frame_meta(self) -> dict[str, Any]:
         """What every phase context built from this ledger carries on ``meta``.
@@ -377,6 +396,7 @@ class Ledger(Entity):
             mark_soft_dirty_callback=self.mark_soft_dirty,
             escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty,
             local_authorities=self._local_authorities(),
+            allocate_uid=self._next_allocation_uid,
         )
 
     def _require_choice_edge(self, edge_id: UUID) -> TraversableEdge:
@@ -412,6 +432,7 @@ class Ledger(Entity):
     def _sync_from_frame(self, *, frame: Frame) -> None:
         self.choice_steps += 1
         self.cursor_steps += frame.cursor_steps
+        self.allocation_step = self.cursor_steps
         self._sync_reentrant_steps(frame=frame)
         self.cursor_id = frame.cursor.uid
         self.cursor_history.extend(frame.cursor_trace)
@@ -438,6 +459,7 @@ class Ledger(Entity):
                 "delta_id": delta.uid if delta is not None else None,
             }))
         self.committed_state_hash = after_hash
+        self.allocation_counter = 0
         if delta is not None:
             self._committed_graph = Graph.structure(self.graph.unstructure())
 
@@ -710,6 +732,8 @@ class Ledger(Entity):
             "replay_algorithm_id": self.replay_algorithm_id,
             "checkpoint_cadence": self.checkpoint_cadence,
             "committed_state_hash": self.committed_state_hash,
+            "allocation_counter": self.allocation_counter,
+            "allocation_step": self.allocation_step,
             "graph": self.graph.unstructure(),
             "output_stream": self.output_stream.unstructure(),
         }
@@ -781,6 +805,8 @@ class Ledger(Entity):
                 "checkpoint_cadence", cls.model_fields["checkpoint_cadence"].default,
             ),
             committed_state_hash=data.get("committed_state_hash"),
+            allocation_counter=data.get("allocation_counter", 0),
+            allocation_step=data.get("allocation_step", data.get("cursor_steps", 0)),
         )
 
     def save_snapshot(self, *, force: bool = False, cadence: int = 0) -> Optional[CheckpointRecord]:
@@ -970,6 +996,8 @@ class Ledger(Entity):
         self.cursor_id = final_cursor_id
         self.call_stack_ids = final_call_stack_ids
         self.cursor_steps = target_step
+        self.allocation_step = target_step
+        self.allocation_counter = 0
         self.choice_steps = choice_steps
         self.current_update_start_step = next(
             (record.step for record in reversed(all_active_steps) if record.was_choice), 0,

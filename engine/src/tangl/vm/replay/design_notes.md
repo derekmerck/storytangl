@@ -98,6 +98,11 @@ class StepRecord:
   journal steps but are not rollback targets. The Ledger carries this hash for
   the next frame's random seed. After restore it reconstructs a missing committed
   base from checkpoints and deltas, rather than adopting uncommitted live shape.
+- The Ledger owns a separate deterministic provisioning allocation sequence. Its
+  persisted counter is combined with the committed hash and settled step, shared
+  by frames and derived contexts, and does not consume gameplay randomness. A
+  settled choice or rollback resets the counter at the new boundary, even when
+  the graph hash is unchanged. Standalone setup without a Ledger uses fresh IDs.
 
 ### Narrative Trace (Ledger.output_stream)
 

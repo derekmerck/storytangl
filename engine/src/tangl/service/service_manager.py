@@ -431,6 +431,7 @@ class ServiceManager:
             prev_id = node_id
 
         ledger.cursor_steps += frame.cursor_steps
+        ledger.allocation_step = ledger.cursor_steps
         ledger.cursor_id = frame.cursor.uid
         ledger.cursor_history.extend(frame.cursor_trace)
         ledger.call_stack_ids = [edge.uid for edge in frame.return_stack]

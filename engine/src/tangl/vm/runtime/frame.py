@@ -174,6 +174,7 @@ class PhaseCtx:
     escalate_to_hard_dirty_callback: Callable[[str, str | None], bool] | None = None
 
     random: Random = field(default_factory=Random)
+    allocate_uid: Callable[[], UUID] | None = None
     inline_behaviors: list[Callable | Behavior] = field(default_factory=list)
     local_authorities: list[BehaviorRegistry] = field(default_factory=list)
     incoming_edge: Any | None = None
@@ -236,6 +237,7 @@ class PhaseCtx:
             "mark_soft_dirty_callback": self.mark_soft_dirty_callback,
             "escalate_to_hard_dirty_callback": self.escalate_to_hard_dirty_callback,
             "random": self.random,
+            "allocate_uid": self.allocate_uid,
             "inline_behaviors": list(self.inline_behaviors),
             "local_authorities": list(self.local_authorities),
             "incoming_edge": self.incoming_edge,
@@ -564,6 +566,7 @@ class Frame:
 
     _random: Random = field(default_factory=Random)
     seed_state_hash: bytes | None = None
+    allocate_uid: Callable[[], UUID] | None = None
     selected_edge: AnyTraversableEdge | None = None
     selected_payload: Any = None
 
@@ -622,6 +625,7 @@ class Frame:
             mark_soft_dirty_callback=self.mark_soft_dirty_callback,
             escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty_callback,
             random=self._random,
+            allocate_uid=self.allocate_uid,
             local_authorities=self._local_authorities(),
             incoming_edge=incoming_edge,
             incoming_payload=incoming_payload,
