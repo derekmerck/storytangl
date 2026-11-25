@@ -62,6 +62,17 @@ def test_staging_hints_travel_with_the_media_they_stage(world, profile) -> None:
                                         "media_timing": "loop", "media_clip": "idle"}
 
 
+@pytest.mark.parametrize("profile", PROFILES, ids=lambda p: p.value)
+def test_stepped_media_carries_its_journal_step(world, profile) -> None:
+    # A client folds the stage over journal steps; media that lost its step joined
+    # whichever step its neighbours were in, and restored play kept retired figures.
+    root, manager = world
+    fragment = _fragment(manager.get_rit("hero.png"))
+
+    assert _payload(fragment.evolve(step=3), root, profile)["step"] == 3
+    assert "step" not in _payload(fragment, root, profile)
+
+
 def test_media_without_hints_carries_no_empty_hint_object(world) -> None:
     root, manager = world
 

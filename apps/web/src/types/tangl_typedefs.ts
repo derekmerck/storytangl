@@ -259,6 +259,13 @@ export interface UiPreferencesValue {
   preferences: PreferenceDeclaration[]
 }
 
+/** The world's declared logical stage (`ui-stage`), in pixels. */
+export interface StageExtentValue {
+  value_type: 'stage_extent'
+  width: number
+  height: number
+}
+
 export type SectionValue =
   | ScalarValue
   | KvListValue
@@ -266,6 +273,7 @@ export type SectionValue =
   | TableValue
   | BadgeListValue
   | BrandingValue
+  | StageExtentValue
   | UiPreferencesValue
 
 export interface ProjectedSection {
@@ -337,6 +345,21 @@ export interface AttributedStoryFragment extends BaseStoryFragment {
   hints?: PresentationHints | null
 }
 
+/**
+ * Per-use staging advice, mirroring `tangl.presentation.hints.StagingHints`.
+ * A numeric `media_x` is the image's horizontal centre and a numeric `media_y`
+ * its bottom edge, each as a fraction of the stage; a name is a station.
+ */
+export interface StagingHints {
+  media_shape?: string | number | null
+  media_x?: 'left' | 'mid' | 'right' | number | null
+  media_y?: 'top' | 'mid' | 'bottom' | number | null
+  media_flip_h?: boolean | null
+  media_timing?: string | null
+  media_clip?: string | null
+  [key: string]: unknown
+}
+
 export interface MediaStoryFragment extends BaseStoryFragment {
   fragment_type: 'media'
   content?: unknown
@@ -353,17 +376,17 @@ export interface MediaStoryFragment extends BaseStoryFragment {
   media_role?: MediaRole | string | null
   presentation_handle?: string | null
   scope?: string | null
-  staging_hints?: Record<string, unknown> | null
+  staging_hints?: StagingHints | null
   /**
-   * Present when the payload came from a resource in the inventory. A client
-   * that learns to ask the service for another representation would key on
-   * this; nothing needs it yet.
+   * Present when the payload came from a resource in the inventory. The stage
+   * keys figures on it, so a resource restated in a later step stays one
+   * element; a client asking for another representation would key on it too.
    */
   rit_id?: string | null
   url?: string
   src?: string
   data?: unknown
-  text?: string
+  text?: string | null
 }
 
 export interface GroupStoryFragment extends BaseStoryFragment {

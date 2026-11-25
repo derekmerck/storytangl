@@ -103,7 +103,7 @@ describe('StoryBlock', () => {
         content: 'https://example.com/portrait.svg',
         content_format: 'url',
         media_type: 'vector',
-        media_role: 'narrative_im',
+        media_role: 'portrait_im',
         staging_hints: { media_shape: 'portrait' },
       },
     }
@@ -120,9 +120,8 @@ describe('StoryBlock', () => {
   it.each([
     ['character_vox', 'audio', 'bark.wav', 'audio'],
     ['music', 'audio', 'theme.mp3', 'audio'],
-    ['narrative_im', 'image', 'quai_bg.png', 'img'],
-    ['staged_im', 'image', 'clerk_sprite.png', 'img'],
-    ['dialog_im', 'vector', 'clerk.svg', 'img'],
+    ['info_im', 'image', 'ledger.png', 'img'],
+    ['portrait_im', 'vector', 'clerk.svg', 'img'],
     ['cutscene', 'video', 'intro.mp4', 'video'],
     ['narrative_im', 'other', 'scene.xyz', 'placeholder'],
   ])('renders %s %s media from %s as %s', (role, mediaType, file, element) => {
@@ -141,6 +140,32 @@ describe('StoryBlock', () => {
     expect(wrapper.find('audio').exists()).toBe(element === 'audio')
     expect(wrapper.find('video').exists()).toBe(element === 'video')
     expect(wrapper.find('[data-testid="pending-media"]').exists()).toBe(element === 'placeholder')
+  })
+
+  it('leaves drawable backdrops and figures to the stage, and keeps the rest in the flow', () => {
+    const image = (uid: string, role: string, url: string) => ({
+      uid,
+      fragment_type: 'media' as const,
+      content_format: 'url',
+      media_type: 'image',
+      media_role: role,
+      url,
+    })
+    const fragments: Record<string, StoryFragment> = {
+      backdrop: image('backdrop', 'narrative_im', '/media/bg.png'),
+      figure: image('figure', 'staged_im', '/media/fig.png'),
+      portrait: image('portrait', 'dialog_im', '/media/face.png'),
+      unresolved: image('unresolved', 'dialog_im', ''),
+      plate: image('plate', 'map_im', '/media/map.png'),
+    }
+
+    const wrapper = mountBlock(fragments, Object.keys(fragments))
+    const sources = wrapper
+      .findAllComponents({ name: 'VImg' })
+      .map((item) => String(item.props('src')))
+
+    expect(sources).toEqual([expect.stringContaining('/media/map.png')])
+    expect(wrapper.findAll('[data-testid="pending-media"]')).toHaveLength(1)
   })
 
   it('renders a standalone attributed line through the attribution path', () => {
@@ -254,7 +279,7 @@ describe('StoryBlock', () => {
         media_type: 'image',
         url: '/media/story/abc/hero_portrait-1.png',
         rit_id: '2f1e5a90-0000-4000-8000-000000000000',
-        media_role: 'dialog_im',
+        media_role: 'portrait_im',
       },
     }
 

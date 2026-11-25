@@ -21,6 +21,7 @@ import {
   isRollFragment,
 } from './fragmentUtils'
 import { choiceKeysForList } from './choicePresentation'
+import { isStagedMedia } from './stage'
 
 const props = defineProps<{
   scene: StorySceneModel
@@ -49,10 +50,12 @@ const currentChoices = computed(() =>
   )
 )
 const choiceHotkeys = computed(() => choiceKeysForList(currentChoices.value))
+// Backdrops and figures belong to the stage, not the text flow.
 const flowMembers = computed(() =>
   sceneMembers.value.filter(
     (fragment) =>
       !isChoiceFragment(fragment) &&
+      !(isMediaFragment(fragment) && isStagedMedia(fragment)) &&
       fragment.fragment_type !== 'update' &&
       fragment.fragment_type !== 'delete'
   )

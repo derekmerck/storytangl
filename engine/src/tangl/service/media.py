@@ -266,6 +266,11 @@ def _base_payload(
     }
     if rit_id is not None:
         payload["rit_id"] = str(rit_id)
+    # The journal step is the boundary clients fold presentation over, so it
+    # travels with media exactly as fragment_to_dto delivers it for the rest.
+    step = getattr(fragment, "step", None)
+    if step is not None:
+        payload["step"] = step
     if fragment.presentation_handle is not None:
         payload["presentation_handle"] = fragment.presentation_handle
     if fragment.speaker_id is not None:

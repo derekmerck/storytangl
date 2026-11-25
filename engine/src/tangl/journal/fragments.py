@@ -449,6 +449,10 @@ def fragment_to_dto(
     DTO projection is distinct from :meth:`unstructure`: it is JSON-safe,
     keyed by ``fragment_type``, and selected through ``dto_exclude`` field
     metadata rather than persistence's constructor-form ``kind`` path.
+
+    A stepped fragment keeps its journal ``step``: it is the boundary clients
+    fold presentation state over, so a flat restored history reads as the
+    steps it was played in.
     """
 
     exclude_fields = set(fragment._match_fields(dto_exclude=True))
@@ -460,7 +464,6 @@ def fragment_to_dto(
         exclude_none=True,
         exclude=exclude_fields,
     )
-    payload.pop("step", None)
     if payload.get("type") == payload.get("fragment_type"):
         payload.pop("type")
     if payload.get("tags") == []:

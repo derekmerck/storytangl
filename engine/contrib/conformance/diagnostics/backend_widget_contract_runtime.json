@@ -1,5 +1,4 @@
 {
-  "presentation": {"music": null},
   "cursor_id": "04b7d8af-0d53-56df-bdfe-7d5e8bb521b5",
   "step": 1,
   "fragments": [
@@ -7,7 +6,8 @@
       "uid": "93d7085a-d4e5-5d1a-92f2-27f107a2b0aa",
       "fragment_type": "content",
       "content": "The road forks under cold rain.",
-      "source_id": "04b7d8af-0d53-56df-bdfe-7d5e8bb521b5"
+      "source_id": "04b7d8af-0d53-56df-bdfe-7d5e8bb521b5",
+      "step": 1
     },
     {
       "uid": "a6f1367a-2dcf-549f-badd-4c609b7e284c",
@@ -41,7 +41,8 @@
             "unit": "silver"
           }
         ]
-      }
+      },
+      "step": 1
     },
     {
       "uid": "4a8267ad-2196-5311-8e39-825941b0ce4c",
@@ -60,7 +61,8 @@
         "source_kind": "stable",
         "contribution": "rename",
         "cost_previews": []
-      }
+      },
+      "step": 1
     }
   ],
   "ux_events": [],
@@ -102,5 +104,8 @@
     },
     "world_id": "widget_contract_demo",
     "ledger_id": "c59747d5-53a8-5617-9a4f-4aaeda16adc8"
+  },
+  "presentation": {
+    "music": null
   }
 }

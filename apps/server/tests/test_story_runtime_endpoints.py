@@ -523,7 +523,7 @@ def test_story_update_preserves_choice_fragment_uid_and_edge_id(
     assert choice["uid"] != choice["edge_id"]
     assert choice["label"] == "Continue"
     assert "seq" not in choice
-    assert "step" not in choice
+    assert choice["step"] == update.json()["step"]
 
     resolved = client.post(
         "story/do",

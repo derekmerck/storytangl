@@ -163,7 +163,7 @@ def test_cli_applies_runtime_envelope_dto_projection(
 
     assert story_controller._current_story_update[0]["content"] == "start"
     assert "seq" not in story_controller._current_story_update[0]
-    assert "step" not in story_controller._current_story_update[0]
+    assert story_controller._current_story_update[0]["step"] == 3
     assert story_controller._current_story_update[1]["uid"] == str(fragment_uid)
     assert story_controller._current_choices[0].edge_id == edge_id
     assert story_controller._current_choices[0].label == "Go north"

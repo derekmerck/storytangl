@@ -36,6 +36,15 @@ Feature witnesses share `witness.ts` and each prove one capability in the world
 that exercises it. `attribution.spec.ts` plays `concept_naming_demo` and checks
 that standalone speech renders through the attribution path, with the speaker
 realized anonymously and then by name, and no fragment-type fallback.
+`stage.spec.ts` plays `repartee_loop`. It checks that the backdrop is drawn once
+on a 320x200 stage scaled as a whole. It checks that the 102x112 clerk stands at
+its natural size times the scale, a gutter in from the left, on the floor and
+mirrored. It checks that a map plate keeps the room staged, and that the next
+room replaces the room and stations its figure on the right. A reload then
+restores the whole journal as one envelope, and the stage, folded at journal
+steps, shows that room without the earlier clerk. Witnesses tolerate only
+`net::ERR_ABORTED` on media, which is what a reload does to an `<audio>`
+element's in-flight load.
 
 The separate `test:e2e:restart` witness owns two real backend processes on the
 same port and one temporary JSON store. It copies the reference bundle once,
@@ -43,7 +52,7 @@ creates a player/story through the UI, takes two choices, gracefully stops the
 first backend, and starts the second over the existing files. Readiness checks
 use only system info: no world compilation, world-info warm-up, or replacement
 story. Reload must restore the same player, ledger, cursor, step and current
-choice occurrence/edge IDs, with history once and decoded SVG media.
+choice occurrence/edge IDs, with history once and the staged SVG backdrop decoded.
 
 A completely fresh browser context first creates an unrelated player with no
 story. It then uses Switch or Recover Player and the original recovery secret
