@@ -90,8 +90,8 @@ Current first-pass surface:
   unchanged declarations retain their receiver-local Actions. Their sandbox
   timing request uses the scope's interaction duration when the action arrives
   at a sandbox location; it is separate from explicit call-completion costs.
-- `project_sandbox_wait`: planning handler that projects wait as a normal
-  self-loop choice.
+- `declare_sandbox_wait`: reconciles the local Wait declaration; the shared
+  scoped-offer path retains or replaces its ordinary self-loop choice.
 - `project_sandbox_scheduled_events`: planning handler that projects known
   scope, location, mob, asset, and fixture scheduled-event
   candidates through the normal sponsored interaction path; their gates remain
