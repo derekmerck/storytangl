@@ -28,6 +28,7 @@ import yaml
 import tangl.utils.setup_yaml
 
 from tangl.type_hints import FlatData, UnstructuredData, HasUid
+from tangl.utils.json_encoding import BYTES_TYPE, HEX_KEY, TYPE_KEY, encode_json_value
 
 
 class SerializationHandlerProtocol(Protocol):
@@ -71,49 +72,19 @@ class PickleSerializationHandler:
 class JsonSerializationHandler:
     # Requires a flat text storage backend
 
-    type_key = "__tangl_type__"
-    bytes_type = "bytes"
-    hex_key = "hex"
-
-    @classmethod
-    def encode_bytes(cls, value: bytes | bytearray | memoryview) -> dict[str, str]:
-        return {
-            cls.type_key: cls.bytes_type,
-            cls.hex_key: bytes(value).hex(),
-        }
-
-    class MyJsonEncoder(json.JSONEncoder):
-        def default(self, o):
-            if isinstance(o, set):
-                return list(o)
-            elif isinstance(o, type):
-                return f"{o.__module__}.{o.__name__}"
-            elif isinstance(o, datetime):
-                return o.isoformat()
-            elif isinstance(o, Enum):
-                return o.value
-            elif isinstance(o, UUID):
-                return o.hex
-            elif isinstance(o, (bytes, bytearray, memoryview)):
-                return JsonSerializationHandler.encode_bytes(o)
-            try:
-                return super().default(o)  # Attempt to serialize using super class
-            except TypeError:
-                return str(o)  # Fallback to converting to string if not serializable
-
     @classmethod
     def serialize(cls, unstructured: UnstructuredData) -> str:
-        flat = json.dumps(unstructured, cls=JsonSerializationHandler.MyJsonEncoder)
+        flat = json.dumps(unstructured, default=encode_json_value)
         return flat
 
     @staticmethod
     def decode_object_hook(obj):
         if (
-            obj.get(JsonSerializationHandler.type_key) == JsonSerializationHandler.bytes_type
-            and set(obj.keys()) == {JsonSerializationHandler.type_key, JsonSerializationHandler.hex_key}
-            and isinstance(obj.get(JsonSerializationHandler.hex_key), str)
+            obj.get(TYPE_KEY) == BYTES_TYPE
+            and set(obj.keys()) == {TYPE_KEY, HEX_KEY}
+            and isinstance(obj.get(HEX_KEY), str)
         ):
-            return bytes.fromhex(obj[JsonSerializationHandler.hex_key])
+            return bytes.fromhex(obj[HEX_KEY])
 
         for key, value in obj.items():
             if not isinstance(value, str):

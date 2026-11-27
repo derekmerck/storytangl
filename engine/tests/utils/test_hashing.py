@@ -6,11 +6,15 @@ import json
 import subprocess
 import sys
 from pytest_helpers.subprocess_env import REPO_ROOT, checkout_env
+from datetime import datetime
+from enum import Enum
 from hashlib import sha224
 from typing import Any
+from uuid import UUID
 
 import pytest
 
+from tangl.persistence.serializers import JsonSerializationHandler
 from tangl.utils.hashing import hashing_func
 
 
@@ -65,3 +69,29 @@ def test_nested_unordered_collections_hash_identically_across_processes() -> Non
         for seed in (0, 11, 37)
     }
     assert len(digests) == 1
+
+
+class Move(Enum):
+    ROCK = "rock"
+    PAPER = "paper"
+
+
+def test_constructor_form_hash_matches_persistence_value_encoding() -> None:
+    payload = {
+        "kind": Move,
+        "uid": UUID("696bbb9a-15f5-45da-942c-356fc4b884aa"),
+        "data": {
+            "move": Move.ROCK,
+            "options": {Move.PAPER, Move.ROCK},
+            "at": datetime(2026, 1, 1, 12),
+            "hash": b"\x00\x01",
+        },
+    }
+    wire = JsonSerializationHandler.serialize(payload)
+    restored = JsonSerializationHandler.deserialize(wire)
+
+    assert restored["data"]["move"] == "rock"
+    assert hashing_func(payload) == hashing_func(json.loads(wire))
+    assert hashing_func(payload) == hashing_func(restored)
+    restored["data"]["move"] = "paper"
+    assert hashing_func(payload) != hashing_func(restored)
