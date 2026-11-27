@@ -68,7 +68,8 @@ def test_tiny_worker_traverses_and_restores_json_store(tmp_path: Path) -> None:
     assert Path(sample["source_file"]).is_relative_to(ROOT / "engine/src")
     assert sample["counts"] == {
         "blocks": 4, "nodes": 5, "edges": 4, "actions": 4, "members": 9,
-        "step_records": 10, "checkpoints": 3, "checkpoint_steps": [0, 1, 11],
+        # One initial entry record and ten player choices.
+        "step_records": 11, "checkpoints": 3, "checkpoint_steps": [0, 1, 11],
         "choice_steps": 10, "cursor_steps": 11, "cursor_label": "block_0002",
     }
     assert sample["checkpoint_cadence_choices"] == 10
