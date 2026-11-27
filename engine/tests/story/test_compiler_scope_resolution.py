@@ -368,8 +368,8 @@ class TestCompilerCanonicalSuccessorPolicy:
         assert block_templ is not None
         payload = block_templ.payload
         assert isinstance(payload, Block)
-        assert payload.actions
-        return payload.actions[0]
+        assert block_templ.action_specs["actions"]
+        return block_templ.action_specs["actions"][0]
 
     def test_bare_root_scene_successor_remains_bare_and_marks_absolute(self) -> None:
         script = {

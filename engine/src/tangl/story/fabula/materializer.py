@@ -34,6 +34,7 @@ from ..concepts import Actor, Location, Role, Setting
 from ..dispatch import do_story_materialized
 from ..episode import Action, Block, MenuBlock, Scene
 from ..story_graph import StoryGraph
+from .block_template import BlockTemplate
 from .types import (
     GraphInitializationError,
     InitMode,
@@ -198,7 +199,7 @@ class StoryMaterializer:
 
         state = self._runtime_state(graph=graph)
         state.ctx = _ctx
-        self._run_runtime_topology_passes(nodes=[entity], state=state)
+        self._run_runtime_topology_passes(nodes=[entity], state=state, template=template)
         ctx = (
             _ctx.derive(cursor_id=entity.uid)
             if _ctx is not None
@@ -421,6 +422,7 @@ class StoryMaterializer:
         *,
         nodes: list[TraversableNode],
         state: _MaterializationState,
+        template: EntityTemplate | None = None,
     ) -> None:
         unwired: list[TraversableNode] = []
         for node in nodes:
@@ -433,7 +435,7 @@ class StoryMaterializer:
 
         self._wire_role_and_setting_dependencies(nodes=unwired, state=state)
         self._wire_menu_fanouts(nodes=unwired, state=state)
-        self._wire_block_actions(nodes=unwired, state=state)
+        self._wire_block_actions(nodes=unwired, state=state, template=template)
         self._wire_media_dependencies(nodes=unwired, state=state)
         self._mark_nodes_wired(nodes=unwired, state=state)
 
@@ -840,21 +842,28 @@ class StoryMaterializer:
         *,
         nodes: list[TraversableNode],
         state: _MaterializationState,
+        template: EntityTemplate | None = None,
     ) -> None:
         for node in nodes:
             if isinstance(node, Block):
                 from ..scoped_offers import add_local_action_offer
 
-                for template in node.action_templates.get("offered_actions", []):
-                    add_local_action_offer(node, template, ctx=state.ctx)
+                source = template
+                if source is None:
+                    template_id = state.graph.template_by_entity_id.get(node.uid)
+                    source = state.template_registry.get(template_id) if template_id else None
+                if not isinstance(source, BlockTemplate):
+                    continue
+                for declaration_template in source.action_templates.get("offered_actions", []):
+                    add_local_action_offer(node, declaration_template, ctx=state.ctx)
                 self._wire_actions_for_block(
-                    node=node, specs=node.redirects, state=state, field="redirects"
+                    node=node, source=source, state=state, field="redirects"
                 )
                 self._wire_actions_for_block(
-                    node=node, specs=node.continues, state=state, field="continues"
+                    node=node, source=source, state=state, field="continues"
                 )
                 self._wire_actions_for_block(
-                    node=node, specs=node.actions, state=state, field="actions"
+                    node=node, source=source, state=state, field="actions"
                 )
 
     def _wire_media_dependencies(
@@ -964,11 +973,11 @@ class StoryMaterializer:
         self,
         *,
         node: Block,
-        specs: list[dict[str, Any]],
+        source: BlockTemplate,
         state: _MaterializationState,
         field: str = "actions",
     ) -> None:
-        for index, spec in enumerate(specs):
+        for index, spec in enumerate(source.action_specs.get(field, [])):
             authored_successor_ref = self._coerce_str(spec.get("authored_successor_ref"))
             successor_ref = self._coerce_str(spec.get("successor_ref"))
             if successor_ref is None:
@@ -984,11 +993,7 @@ class StoryMaterializer:
                     "(expected one of: successor, next, successor_ref, target_ref, target_node)"
                 )
                 raise ValueError(msg)
-            templates = node.action_templates.get(field, [])
-            template = templates[index] if index < len(templates) else action_template_from_spec(
-                {**spec, "successor_ref": successor_ref},
-                label=f"{_EDGE_LABEL_STEM[field]}_{node.label}_{index}",
-            )
+            template = source.action_templates[field][index]
             action = template.materialize(
                 uid=_next_provision_uid(_ctx=state.ctx), predecessor_id=node.uid,
             )
