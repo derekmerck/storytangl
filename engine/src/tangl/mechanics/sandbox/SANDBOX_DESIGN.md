@@ -761,7 +761,9 @@ it when they change. Its plain constructor-form time-cost mapping survives JSON
 restoration, and selected-action UPDATE advances the sandbox clock normally.
 Existing auto-provision and frozen-shape restrictions continue to apply. Generated
 local declarations can use the labeled local-offer entry point without introducing
-a separate Action projector.
+a separate Action projector. Journal composition keeps Wait after movement
+choices even while other sandbox families rebuild their Actions; it does not
+change graph membership or the relative order of the other choices.
 
 Selectable and triggered scheduled events are temporal gates over the same
 sponsored interaction surface used by locations, mobs, assets, and fixtures.

@@ -14,7 +14,7 @@ from tangl.core import DispatchLayer, EntityTemplate, Graph, Selector, Token
 from tangl.core.behavior import Priority
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.journal.compose import replace_first
-from tangl.journal.fragments import ContentFragment
+from tangl.journal.fragments import ChoiceFragment, ContentFragment
 from tangl.presentation.intent import UIHints
 from tangl.story import Action, Block, Scene, StoryGraph
 from tangl.story.dispatch import on_story_materialized, on_story_ready
@@ -2786,6 +2786,32 @@ def reconcile_charged_sandbox_assets(
                     )
                 )
     return events or None
+
+
+@on_compose_journal(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+    priority=Priority.NORMAL,
+)
+def compose_sandbox_wait_order(*, caller: SandboxLocation, ctx: VmPhaseCtx, fragments, **_kw):
+    """Place retained Wait after rebuilt movement choices without changing graph order."""
+    slots = [index for index, fragment in enumerate(fragments)
+             if isinstance(fragment, ChoiceFragment)]
+    choices = [fragments[index] for index in slots]
+    waits = [index for index, choice in enumerate(choices)
+             if (action := caller.graph.get(choice.edge_id)) is not None
+             and isinstance(action, Action) and _has_tags(action, "sandbox", "wait")]
+    moves = [index for index, choice in enumerate(choices)
+             if (action := caller.graph.get(choice.edge_id)) is not None
+             and isinstance(action, Action) and _has_tags(action, "sandbox", "movement")]
+    if not waits or not moves or waits[0] > moves[-1]:
+        return None
+    wait = choices.pop(waits[0])
+    choices.insert(moves[-1], wait)
+    result = list(fragments)
+    for index, choice in zip(slots, choices):
+        result[index] = choice
+    return result
 
 
 @on_compose_journal(

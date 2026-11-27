@@ -5,7 +5,10 @@ import pytest
 
 from tangl.core import EntityTemplate, Graph, Selector
 from tangl.mechanics.sandbox import SandboxLocation, SandboxScope, current_world_time
+from tangl.journal.fragments import ChoiceFragment, ContentFragment
+from tangl.mechanics.sandbox.handlers import compose_sandbox_wait_order
 from tangl.persistence.serializers import JsonSerializationHandler as Json
+from tangl.service import ServiceManager
 from tangl.story import Action, World
 from tangl.vm import Ledger
 from tangl.vm.dispatch import do_provision
@@ -13,6 +16,51 @@ from tangl.vm.dispatch import do_provision
 
 def _wait(location: SandboxLocation) -> Action:
     return next(location.edges_out(Selector(has_kind=Action, has_tags={"wait"})))
+
+
+def test_wait_keeps_its_menu_position_after_selection():
+    world = World.from_script_data(script_data={
+        "label": "wait_menu_order", "metadata": {"start_at": "hub.road"},
+        "scenes": {"hub": {"kind": SandboxScope, "blocks": {
+            "road": {"kind": SandboxLocation, "links": {"east": "east", "west": "west"}},
+            "east": {"kind": SandboxLocation}, "west": {"kind": SandboxLocation},
+        }}},
+    })
+    graph = world.create_story("run").graph
+    road = graph.find_one(Selector(has_kind=SandboxLocation, label="road"))
+    ledger = Ledger.from_graph(graph, entry_id=road.uid)
+    ServiceManager._prime_initial_update(ledger)
+    before = [f for f in ledger.get_current_update() if isinstance(f, ChoiceFragment)]
+    assert [f.text for f in before] == ["Go east to east", "Go west to west", "Wait"]
+    wait_uid = before[-1].edge_id
+    ledger.resolve_choice(wait_uid)
+    after = [f for f in ledger.get_current_update() if isinstance(f, ChoiceFragment)]
+    assert [f.text for f in after] == ["Go east to east", "Go west to west", "Wait"]
+    assert after[-1].edge_id == wait_uid
+
+
+def test_wait_order_preserves_other_choices_and_fragment_slots():
+    graph = Graph()
+    road = SandboxLocation(label="road", registry=graph)
+    actions = [
+        Action(registry=graph, predecessor_id=road.uid, successor_id=road.uid,
+               text=text, tags=tags)
+        for text, tags in [
+            ("Wait", {"sandbox", "wait"}), ("Inspect", set()),
+            ("East", {"sandbox", "movement"}), ("Listen", set()),
+            ("West", {"sandbox", "movement"}),
+        ]
+    ]
+    content = ContentFragment(content="Scene text")
+    choices = [ChoiceFragment(edge_id=action.uid, text=action.text) for action in actions]
+    fragments = [choices[0], content, *choices[1:]]
+    before_ids = list(graph.members)
+    result = compose_sandbox_wait_order(caller=road, ctx=None, fragments=fragments)
+    assert [f.text for f in result if isinstance(f, ChoiceFragment)] == [
+        "Inspect", "East", "Listen", "West", "Wait",
+    ]
+    assert result[1] is content
+    assert list(graph.members) == before_ids
 
 
 def test_wait_retains_replaces_and_retires_via_shared_offers(monkeypatch):
