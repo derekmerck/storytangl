@@ -1186,8 +1186,7 @@ def test_sandbox_location_projects_wait_choice() -> None:
     assert waits[0].successor is road
     assert waits[0].payload["sandbox_action"] == "wait"
     assert waits[0].payload["turn_delta"] == 1
-    assert waits[0].payload["sandbox_time_cost"].duration == 1
-    assert waits[0].payload["sandbox_time_cost"].kind == "wait"
+    assert waits[0].payload["sandbox_time_cost"] == {"kind": "wait", "duration": 1}
 
 
 def test_wait_choice_advances_world_turn_through_ledger() -> None:
@@ -3300,8 +3299,7 @@ def test_scope_donates_wait_to_child_locations() -> None:
     assert wait.text == "Pass time"
     assert wait.payload["sandbox_action"] == "wait"
     assert wait.payload["turn_delta"] == 2
-    assert wait.payload["sandbox_time_cost"].duration == 2
-    assert wait.payload["sandbox_time_cost"].kind == "wait"
+    assert wait.payload["sandbox_time_cost"] == {"kind": "wait", "duration": 2}
 
     do_provision(peer, ctx=PhaseCtx(graph=graph, cursor_id=peer.uid))
     assert _dynamic_sandbox_actions_with_tag(peer, "wait") == []

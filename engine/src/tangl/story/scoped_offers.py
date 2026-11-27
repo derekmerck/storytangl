@@ -29,10 +29,16 @@ class ScopedActionOffer(Affordance):
 
 def add_local_action_offer(
     owner: Block, template: EntityTemplate[Action], *, ctx: VmPhaseCtx | None = None,
+    label: str | None = None,
 ) -> ScopedActionOffer:
-    """Attach a declaration whose structural scope is this receiving block."""
+    """Attach a receiver-local declaration; a label identifies generated occurrences.
+
+    Callers retain the offer and its template while construction inputs match, and
+    replace the template or remove the offer when those inputs change. Ordinary
+    scoped reconciliation owns the executable Action lifecycle.
+    """
     return ScopedActionOffer(
-        uid=_next_provision_uid(_ctx=ctx),
+        uid=_next_provision_uid(_ctx=ctx), label=label,
         registry=owner.graph, predecessor_id=owner.uid, requirement=Requirement(),
         source_requirement=Requirement(uid=owner.uid), action_template=template,
     )

@@ -754,11 +754,16 @@ turn-on/turn-off self-loop choices while darkness is active, so "lamp restores
 room detail" is modeled as asset state changing the projection state on the
 next render.
 
-The generated wait action intentionally mirrors the `tangl.mechanics.games`
-self-loop move pattern. Both use an ordinary dynamic `Action`, a self-loop
-successor, selected payload during UPDATE, and the normal ledger/journal
-pipeline. The syntax can vary by mechanic family, but the re-entrant provider
-pattern is shared.
+Wait uses a receiver-local scoped Action declaration. Sandbox resolves location
+over nearest-scope enablement, wording and duration; Story retains the ordinary
+self-loop Action while those construction inputs match and replaces or retires
+it when they change. Its plain constructor-form time-cost mapping survives JSON
+restoration, and selected-action UPDATE advances the sandbox clock normally.
+Existing auto-provision and frozen-shape restrictions continue to apply. Generated
+local declarations can use the labeled local-offer entry point without introducing
+a separate Action projector. Journal composition keeps Wait after movement
+choices even while other sandbox families rebuild their Actions; it does not
+change graph membership or the relative order of the other choices.
 
 Selectable and triggered scheduled events are temporal gates over the same
 sponsored interaction surface used by locations, mobs, assets, and fixtures.

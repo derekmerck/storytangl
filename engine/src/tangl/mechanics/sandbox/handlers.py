@@ -10,14 +10,17 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, cast, runtime_checkable
 from uuid import UUID
 
-from tangl.core import DispatchLayer, Graph, Selector, Token
+from tangl.core import DispatchLayer, EntityTemplate, Graph, Selector, Token
 from tangl.core.behavior import Priority
 from tangl.core.runtime_op import Effect, Predicate
 from tangl.journal.compose import replace_first
-from tangl.journal.fragments import ContentFragment
+from tangl.journal.fragments import ChoiceFragment, ContentFragment
+from tangl.presentation.intent import UIHints
 from tangl.story import Action, Block, Scene, StoryGraph
 from tangl.story.dispatch import on_story_materialized, on_story_ready
 from tangl.story.concepts.asset import AssetTransactionManager, HasAssets
+from tangl.story.scoped_offers import ScopedActionOffer, add_local_action_offer
+from tangl.vm.provision.provisioner import _next_provision_uid
 from tangl.vm import (
     Dependency,
     ProvisionPolicy,
@@ -1389,6 +1392,12 @@ def contribute_sandbox_inventory_helpers(*, caller, ctx, **_kw):
     inventory = frozenset(_sandbox_inventory(caller))
     return {
         "world_time": current_world_time(caller),
+        "sandbox_wait_matches": lambda text, duration, scope: (
+            caller.auto_provision and _nearest_wait_enabled(caller)
+            and _nearest_wait_text(caller) == text
+            and _nearest_wait_turn_delta(caller) == duration
+            and _sandbox_scope_label(caller) == scope
+        ),
         "sandbox_inventory": inventory,
         "sandbox_has_key": lambda key: str(key) in inventory,
         "sandbox_fixture_locked": lambda label: _fixture_locked(caller, str(label)),
@@ -2454,40 +2463,63 @@ def project_sandbox_mob_actions(*, caller, ctx, **_kw):
     wants_caller_kind=SandboxLocation,
     wants_exact_kind=False,
 )
-def project_sandbox_wait(*, caller, ctx, **_kw):
-    """Project a normal self-loop wait action for sandbox locations."""
+def declare_sandbox_wait(*, caller, ctx, **_kw):
+    """Reconcile the receiver-local Wait declaration before Story projects it."""
     if not isinstance(caller, SandboxLocation):
         return None
-    if not caller.auto_provision or not _nearest_wait_enabled(caller):
+    if not caller.auto_provision:
         return None
     graph = caller.graph
     if graph is None or _graph_frozen_shape(graph):
         return None
 
-    _clear_dynamic_sandbox_actions(caller, action_kind="wait", ctx=ctx)
+    offer = next(caller.edges_out(Selector(
+        has_kind=ScopedActionOffer, label="sandbox_wait_offer",
+    )), None)
+    if not _nearest_wait_enabled(caller):
+        if offer is not None:
+            graph.remove(offer.uid, _ctx=ctx)
+        return None
 
     wait_text = _nearest_wait_text(caller)
     turn_delta = _nearest_wait_turn_delta(caller)
-    Action(
-        registry=graph,
-        label=f"sandbox_wait_{caller.get_label()}",
-        predecessor_id=caller.uid,
-        successor_id=caller.uid,
-        text=wait_text,
-        payload=_sandbox_action_payload(
-            "wait",
-            duration=turn_delta,
-            extra={"sandbox_action": "wait", "turn_delta": turn_delta},
-        ),
-        tags={"dynamic", "sandbox", "wait"},
-        ui_hints=_sandbox_contribution_hints(
-            caller,
-            source="sandbox_wait",
-            contribution="wait",
-            source_label=_sandbox_scope_label(caller),
-            source_kind="scope",
-        ),
+    payload = {
+        "sandbox_time_cost": {"kind": "wait", "duration": turn_delta},
+        "sandbox_action": "wait",
+        "turn_delta": turn_delta,
+    }
+    hints = UIHints.model_validate(
+        _sandbox_contribution_hints(
+            caller, source="sandbox_wait", contribution="wait",
+            source_label=_sandbox_scope_label(caller), source_kind="scope",
+        )
     )
+    availability = [Predicate(expr=(
+        f"sandbox_wait_matches({wait_text!r}, {turn_delta!r}, {_sandbox_scope_label(caller)!r})"
+    ))]
+    if offer is None:
+        declaration = Action(
+            uid=_next_provision_uid(_ctx=ctx), label=f"sandbox_wait_{caller.get_label()}",
+            successor_ref="current", text=wait_text, payload=payload,
+            tags={"dynamic", "sandbox", "wait"}, ui_hints=hints, availability=availability,
+        )
+        add_local_action_offer(
+            caller, EntityTemplate[Action](uid=_next_provision_uid(_ctx=ctx), payload=declaration),
+            ctx=ctx, label="sandbox_wait_offer",
+        )
+    else:
+        declaration = offer.action_template.payload
+        if (
+            declaration.text != wait_text
+            or declaration.payload != payload
+            or declaration.ui_hints != hints
+        ):
+            offer.action_template = EntityTemplate[Action](
+                uid=offer.action_template.uid,
+                payload=declaration.evolve(
+                    text=wait_text, payload=payload, ui_hints=hints, availability=availability,
+                ),
+            )
     return None
 
 
@@ -2754,6 +2786,32 @@ def reconcile_charged_sandbox_assets(
                     )
                 )
     return events or None
+
+
+@on_compose_journal(
+    wants_caller_kind=SandboxLocation,
+    wants_exact_kind=False,
+    priority=Priority.NORMAL,
+)
+def compose_sandbox_wait_order(*, caller: SandboxLocation, ctx: VmPhaseCtx, fragments, **_kw):
+    """Place retained Wait after rebuilt movement choices without changing graph order."""
+    slots = [index for index, fragment in enumerate(fragments)
+             if isinstance(fragment, ChoiceFragment)]
+    choices = [fragments[index] for index in slots]
+    waits = [index for index, choice in enumerate(choices)
+             if (action := caller.graph.get(choice.edge_id)) is not None
+             and isinstance(action, Action) and _has_tags(action, "sandbox", "wait")]
+    moves = [index for index, choice in enumerate(choices)
+             if (action := caller.graph.get(choice.edge_id)) is not None
+             and isinstance(action, Action) and _has_tags(action, "sandbox", "movement")]
+    if not waits or not moves or waits[0] > moves[-1]:
+        return None
+    wait = choices.pop(waits[0])
+    choices.insert(moves[-1], wait)
+    result = list(fragments)
+    for index, choice in zip(slots, choices):
+        result[index] = choice
+    return result
 
 
 @on_compose_journal(
