@@ -351,7 +351,7 @@ def contribute_visit_stats(*, caller, ctx, **kw):
 # ---------------------------------------------------------------------------
 
 @on_validate
-def validate_successor_exists(*, caller, ctx, **kw):
+def validate_successor_exists(*, caller, ctx, source_checked: bool = False, **kw):
     """Check that successor resolves and traversal is available.
 
     This is the minimum traversal guard: destination exists and edge/node
@@ -363,18 +363,25 @@ def validate_successor_exists(*, caller, ctx, **kw):
     if successor is None:
         return False
     if hasattr(caller, "available"):
-        if not bool(caller.available(ctx=ctx)):
-            return False
-        if isinstance(successor, TraversableNode) and successor.is_container:
-            from .provision import Resolver
+        if isinstance(successor, TraversableNode):
+            from .provision import Dependency, Resolver
 
-            preview = Resolver.from_ctx(ctx).preview_frontier_node(
-                successor,
-                allow_stubs=ctx.causality_mode == CausalityMode.HARD_DIRTY,
-                _ctx=ctx,
-            )
-            return preview.viable
-        return True
+            unresolved = successor.edges_out(Selector(has_kind=Dependency, satisfied=False))
+            if successor.is_container or next(unresolved, None) is not None:
+                target_ctx = Resolver.from_ctx(ctx)._make_node_ctx(
+                    graph=successor.graph, node=successor, _ctx=ctx,
+                    request_ctx_path=Resolver._request_ctx_for_node(successor),
+                )
+                preview = Resolver.from_ctx(target_ctx).preview_frontier_node(
+                    successor,
+                    allow_stubs=target_ctx.causality_mode == CausalityMode.HARD_DIRTY,
+                    _ctx=target_ctx,
+                )
+                if not preview.viable:
+                    return False
+        if source_checked and isinstance(caller, TraversableEdge):
+            return bool(caller.available(ctx=ctx, source_checked=True))
+        return bool(caller.available(ctx=ctx))
     if hasattr(successor, "available"):
         ns = ctx.get_ns(successor) if ctx is not None and hasattr(ctx, "get_ns") else None
         return bool(successor.available(ns=ns))

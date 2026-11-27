@@ -876,7 +876,9 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
     def successor(self, value: TraversableNode) -> None:
         self.set_successor(value)
 
-    def available(self, *, ctx=None, ns: Mapping[str, Any] | None = None) -> bool:
+    def available(
+        self, *, ctx=None, ns: Mapping[str, Any] | None = None, source_checked: bool = False,
+    ) -> bool:
         """Return ``True`` when edge and successor availability both pass.
 
         Judgment call
@@ -893,7 +895,10 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
             return False
         if self.once and has_visited(successor, ctx=ctx):
             return False
-        if not self.source_available(ctx=ctx, ns=ns):
+        if source_checked:
+            if not self.source_attached(ctx=ctx):
+                return False
+        elif not self.source_available(ctx=ctx, ns=ns):
             return False
 
         rand = _resolve_rand(rand=None, ctx=ctx)
@@ -907,6 +912,10 @@ class TraversableEdge(HasAvailability, HasEffects, Edge):
         if not hasattr(successor, "available"):
             return True
         return successor.available(ns=successor_ns, ctx=ctx, rand=rand)
+
+    def source_attached(self, *, ctx=None) -> bool:
+        """Recheck structural attachment after readiness without rerunning live guards."""
+        return True
 
     def source_available(self, *, ctx=None, ns: Mapping[str, Any] | None = None) -> bool:
         """Return whether this edge's predecessor-side guards permit selection."""

@@ -148,13 +148,18 @@ selected next. Those successors must exist before they are presented: a disclose
 “note on the door” is either a fact on an already-provisioned provider or a durable
 constraint that any remaining lazy realization must satisfy.
 
-A lazily materialized edge carries its destination as a dependency of its own. A choice
-stays that way until it is selected: it is previewed when offered and provisioned when
-chosen. A triggered edge (a continuation or redirect) is followed without being chosen,
-so the current node's triggered destinations are provisioned as the node is entered, and
-a triggered edge is followed only into a target that can be entered. One whose
-destination cannot be provisioned, or whose target's hard dependencies cannot be, is not
-followed.
+A lazily materialized edge carries its destination as a dependency. Planning requests
+readiness for the current node's immediate destinations, including their containing
+scopes. Outside that neighborhood, a viable unresolved destination requires readiness;
+preview never creates it or evaluates its template as a namespace. Selection checks
+payload and known source refusals, requests readiness, and validates the actual target
+before pushing a call bookmark or moving. A source guard checked before readiness is
+not evaluated again for that submission; structural attachment is rechecked after
+assembly. An already-ready destination uses ordinary validation. A destination
+refusal may retain dormant constructed shape. Readiness runs provisioning, not arrival
+phases. This does not
+provide rollback or a release policy for tentative scarce claims; crossing and call
+completion remain separate work under #726 and #560.
 
 UPDATE changes committed state after the frontier's shape is mostly settled. It may
 lock or unlock already-provisioned doors, transfer custody, apply injury, change

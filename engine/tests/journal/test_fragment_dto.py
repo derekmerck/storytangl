@@ -78,6 +78,22 @@ def test_fragment_to_dto_omits_stream_bookkeeping_but_delivers_step() -> None:
     assert "tags" not in payload
 
 
+def test_attributed_tags_are_canonical_after_constructor_json_restore() -> None:
+    fragment = AttributedFragment(
+        content="Keep moving.", who="host", how="speaks", media="",
+        tags={"speaker_key:host", "zebra", "alpha"},
+        style_tags=["loud", "soft"],
+    )
+    restored = StructuringHandler.structure(
+        Json.deserialize(Json.serialize(fragment.unstructure())),
+        kind_map={AttributedFragment.__fqn__(): AttributedFragment},
+    )
+    assert fragment_to_dto(fragment)["tags"] == ["alpha", "speaker_key:host", "zebra"]
+    assert fragment_to_dto(restored) == fragment_to_dto(fragment)
+    assert fragment_to_dto(restored)["style_tags"] == ["loud", "soft"]
+    assert "tags" not in fragment_to_dto(restored, exclude={"tags"})
+
+
 def test_choice_blocker_dto_round_trip_preserves_typed_contract() -> None:
     fragment = ChoiceFragment(
         edge_id=uuid4(),

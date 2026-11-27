@@ -206,6 +206,12 @@ ordinary entity relationships store UUIDs or symbolic references and let the
 registry serialize each entity once. Raw `model_dump()` snapshots do not prove
 this ownership contract.
 
+Hashing, transport DTOs, and other side-channel encoders may use different output
+shapes, but must agree with persistence on shared value semantics. Reuse canonical
+value conversion where applicable, order unordered collections deterministically,
+and preserve actual sequence order. Saving and reopening must preserve the hash and
+an equivalent client projection.
+
 Embedded values preserve value, not shared Python object identity. Reusing one
 mutable mu-block instance on two owners does not promise that aliasing survives
 restore; each owned occurrence may become an independent value. If shared

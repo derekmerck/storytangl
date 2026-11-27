@@ -278,7 +278,9 @@ def _preview_destination_viability(*, edge: Action, ctx) -> ViabilityResult | No
     except (TypeError, ValueError, LookupError) as exc:
         logger.debug("Resolver preview unavailable for edge=%s", edge, exc_info=exc)
         return None
-    return resolver.preview_requirement(dep.requirement, _ctx=ctx)
+    preview = resolver.preview_requirement(dep.requirement, _ctx=ctx)
+    preview.requires_readiness = preview.viable
+    return preview
 
 
 def _blocker_message(code: str) -> str:

@@ -12,6 +12,8 @@ from tangl.service import ServiceManager
 from tangl.service.response import DirectEdgeRequest
 from tangl.story import Action, Block, InitMode, World
 from tangl.story.concepts import Role
+from tangl.story.fabula.materializer import action_template_from_spec
+from tangl.story.scoped_offers import add_local_action_offer
 from tangl.vm import Ledger
 from tangl.vm.dispatch import do_provision
 
@@ -121,6 +123,23 @@ def test_frozen_reconciliation_rejects_newly_matching_scope_without_mutation():
     far = _node(graph, "far")
     assert {edge.text for edge in _offered(far)} == {"Light"}
     far.tags = far.tags | {"chosen"}
+    before = graph.unstructure()
+    ledger = Ledger.from_graph(graph, entry_id=far.uid)
+    with pytest.raises(ValueError, match="Frozen story cannot bind scoped Action offer"):
+        do_provision(far, ctx=ledger.get_frame()._make_ctx())
+    assert graph.unstructure() == before
+
+
+def test_frozen_reconciliation_rejects_new_latent_destination():
+    graph = World.from_script_data(script_data=_script("frozen_latent")).create_story(
+        "run", freeze_shape=True,
+    ).graph
+    far = _node(graph, "far")
+    graph.remove(_node(graph, "middle").uid)
+    template = action_template_from_spec(
+        {"text": "Hidden", "successor_ref": "inn.middle"}, label="hidden",
+    )
+    add_local_action_offer(far, template)
     before = graph.unstructure()
     ledger = Ledger.from_graph(graph, entry_id=far.uid)
     with pytest.raises(ValueError, match="Frozen story cannot bind scoped Action offer"):

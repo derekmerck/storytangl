@@ -468,6 +468,8 @@ def fragment_to_dto(
         payload.pop("type")
     if payload.get("tags") == []:
         payload.pop("tags")
+    elif "tags" in payload:
+        payload["tags"] = sorted(payload["tags"])
     for field_name in fragment._match_fields(dto=True):
         dto_alias = type(fragment).model_fields[field_name].json_schema_extra["dto_alias"]
         if field_name in payload:

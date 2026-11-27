@@ -126,11 +126,12 @@ Actions can traverse it using existing EAGER traversal and JSON restoration.
 Frozen EAGER setup reconciles scoped Actions for all realized Blocks after entry
 selection and story-ready hooks. Unchanged bindings retain their IDs and live
 gates remain live; a newly required or changed binding is refused at runtime.
-Targets not already realized remain outside this readiness slice. LAZY remains
-unsupported for this shape: in the tested
-actor-qualified destination, initial setup left the episode unmaterialized and
-selecting its unresolved Action failed validation. It is not eagerly expanded to
-hide that gap.
+Already-discoverable declarations may retain a receiver-local Action with an ordinary
+unresolved destination dependency. Immediate planning or accepted selection assembles
+the destination before admission reads its real namespace. Unchanged reconciliation
+keeps the Action and dependency identity as the destination binds. Discovery of donors
+that are themselves latent remains outside this slice; tentative scarce provider claims
+also require a separate explicit release policy.
 
 Candidate lowering chokepoints are the existing compiler/template grouping and
 `EntityTemplate.materialize`/factory attachment, graph-owned reference restoration,

@@ -75,6 +75,8 @@ def action_template_from_spec(spec: Mapping[str, Any], *, label: str) -> EntityT
         label=spec.get("label") or label,
         text=spec.get("text") or spec.get("content") or spec.get("label") or "",
         successor_ref=spec.get("successor_ref") or spec.get("successor") or spec.get("target_ref"),
+        authored_successor_ref=spec.get("authored_successor_ref"),
+        successor_is_absolute=bool(spec.get("successor_is_absolute", False)),
         activation=activation,
         predicate=spec.get("predicate"),
         availability=[*expressions(spec.get("availability")), *expressions(spec.get("conditions"))],
@@ -91,6 +93,18 @@ def action_template_from_spec(spec: Mapping[str, Any], *, label: str) -> EntityT
         return_phase=ResolutionPhase.PLANNING if _authored_flag(spec, "return") else None,
     )
     return EntityTemplate[Action](payload=action)
+
+
+def action_destination_requirement(action: Action) -> Requirement:
+    """Build the ordinary destination requirement from authored Action metadata."""
+    reference = action.successor_ref
+    authored = action.authored_successor_ref or reference
+    return Requirement(
+        has_kind=TraversableNode, has_identifier=reference, authored_path=authored,
+        is_qualified=isinstance(authored, str) and "." in authored,
+        is_absolute=action.successor_is_absolute, provision_policy=ProvisionPolicy.ANY,
+        hard_requirement=True,
+    )
 
 
 @dataclass(slots=True)
@@ -957,7 +971,6 @@ class StoryMaterializer:
         for index, spec in enumerate(specs):
             authored_successor_ref = self._coerce_str(spec.get("authored_successor_ref"))
             successor_ref = self._coerce_str(spec.get("successor_ref"))
-            successor_is_absolute = bool(spec.get("successor_is_absolute", False))
             if successor_ref is None:
                 successor_ref = self._coerce_str(
                     spec.get("successor")
@@ -990,15 +1003,7 @@ class StoryMaterializer:
                 action.set_successor(target)
                 continue
 
-            requirement = Requirement(
-                has_kind=TraversableNode,
-                has_identifier=successor_ref,
-                authored_path=authored_successor_ref or successor_ref,
-                is_qualified=self._is_qualified_path(authored_successor_ref or successor_ref),
-                is_absolute=successor_is_absolute,
-                provision_policy=ProvisionPolicy.ANY,
-                hard_requirement=True,
-            )
+            requirement = action_destination_requirement(action)
             if state.report.mode is InitMode.LAZY:
                 self._validate_lazy_destination(
                     state=state,

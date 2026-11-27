@@ -720,6 +720,7 @@ class Frame:
         edge: AnyTraversableEdge,
         entry_phase: ResolutionPhase,
         incoming_payload: Any,
+        source_checked: bool = False,
     ) -> None:
         if entry_phase > ResolutionPhase.VALIDATE:
             return
@@ -728,7 +729,7 @@ class Frame:
             incoming_payload=incoming_payload,
         )
         pre_ctx.current_phase = ResolutionPhase.VALIDATE
-        if not do_validate(edge, ctx=pre_ctx):
+        if not do_validate(edge, ctx=pre_ctx, source_checked=source_checked):
             raise ValueError(f"Edge validation failed: {edge!r}")
 
     def _advance_cursor(self, edge: AnyTraversableEdge) -> None:
@@ -751,23 +752,38 @@ class Frame:
         if entry_phase <= ResolutionPhase.VALIDATE:
             if not edge.validate_payload(incoming_payload):
                 raise ValueError(f"Edge payload validation failed: {edge!r}")
-        self._push_call_edge_if_needed(edge)
-        if was_choice and isinstance(edge, TraversableEdge) and edge.successor is None:
-            from ..provision import Resolver  # provisioning imports the runtime
+        source_checked = False
+        if (was_choice and isinstance(edge, TraversableEdge)
+                and edge.successor_id != edge.predecessor_id):
+            from ..provision import Resolver
 
             provision_ctx = self._make_ctx(
                 incoming_edge=edge, incoming_payload=incoming_payload,
             )
-            Resolver.from_ctx(provision_ctx).provision_destination(
-                edge,
-                allow_stubs=self.causality_mode is CausalityMode.HARD_DIRTY,
-                _ctx=provision_ctx,
+            target = edge.successor
+            needs_readiness = target is None or (
+                isinstance(target, TraversableNode)
+                and Resolver.from_ctx(provision_ctx).readiness_needed(target, _ctx=provision_ctx)
             )
+            if needs_readiness:
+                factory = self.graph.factory
+                if target is None and isinstance(factory, TraversableGraphFactory):
+                    admitted = factory.is_selectable_edge(edge, ctx=provision_ctx)
+                else:
+                    admitted = edge.source_available(ctx=provision_ctx)
+                if not admitted:
+                    raise ValueError(f"Edge validation failed: {edge!r}")
+                source_checked = True
+                self._ready_destinations([edge], ctx=provision_ctx)
+                if self.graph.get(edge.uid) is not edge:
+                    raise ValueError("Edge validation failed: selected edge was detached")
         self._validate_before_move(
             edge=edge,
             entry_phase=entry_phase,
             incoming_payload=incoming_payload,
+            source_checked=source_checked,
         )
+        self._push_call_edge_if_needed(edge)
         self._advance_cursor(edge)
         ctx = self._make_ctx(
             incoming_edge=edge,
@@ -790,23 +806,20 @@ class Frame:
                 do_provision(successor, ctx=successor_ctx)
 
     def _provision_destinations(self, *, ctx: VmPhaseCtx) -> None:
-        """Provision the destinations the cursor's triggered edges do not have yet.
-
-        A lazily materialized edge carries its destination as a dependency of
-        its own. A choice is previewed and provisioned when it is selected; a
-        triggered edge is followed without being selected, so its destination
-        is provisioned as the cursor is entered. One whose destination cannot
-        be provisioned keeps no successor, and nothing follows it.
-        """
-        from ..provision import Resolver  # provisioning imports the runtime
-
+        """Establish unresolved destinations in the current planning neighborhood."""
         edges = [
             edge
             for edge in self.cursor.edges_out(Selector(has_kind=TraversableEdge))
-            if edge.trigger_phase is not None and edge.successor is None
+            if edge.successor is None
         ]
         if not edges:
             return
+        self._ready_destinations(edges, ctx=ctx)
+
+    def _ready_destinations(self, edges: list[TraversableEdge], *, ctx: VmPhaseCtx) -> None:
+        """Establish the requested destinations through ordinary provisioning."""
+        from ..provision import Resolver  # provisioning imports the runtime
+
         resolver = Resolver.from_ctx(ctx)
         for edge in edges:
             resolver.provision_destination(
@@ -814,6 +827,8 @@ class Frame:
                 allow_stubs=ctx.causality_mode is CausalityMode.HARD_DIRTY,
                 _ctx=ctx,
             )
+            if isinstance(edge.successor, TraversableNode):
+                resolver.provision_readiness(edge.successor, _ctx=ctx)
 
     def _handle_redirect(
         self,

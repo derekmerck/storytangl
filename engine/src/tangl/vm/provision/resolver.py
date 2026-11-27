@@ -1094,6 +1094,7 @@ class Resolver:
         graph: Any,
         _ctx: VmPhaseCtx | None = None,
         request_ctx_path: str | None = None,
+        admission_required: bool = True,
     ) -> bool:
         if not isinstance(entity, TraversableNode):
             return True
@@ -1104,7 +1105,11 @@ class Resolver:
             _ctx=_ctx,
             request_ctx_path=self._request_ctx_for_node(entity, fallback=request_ctx_path),
         )
-        return Resolver.from_ctx(node_ctx).resolve_frontier_node(
+        resolver = Resolver.from_ctx(node_ctx)
+        if not admission_required:
+            resolver.provision_readiness(entity, _ctx=node_ctx)
+            return next(entity.edges_out(Selector(has_kind=Dependency, satisfied=False)), None) is None
+        return resolver.resolve_frontier_node(
             entity,
             allow_stubs=self._stubs_allowed(allow_stubs=False, _ctx=_ctx),
             _ctx=node_ctx,
@@ -1145,6 +1150,7 @@ class Resolver:
         graph: Any,
         parent: Any | None,
         _ctx: VmPhaseCtx | None = None,
+        admission_required: bool = True,
     ) -> PT:
         reused = self._existing_target_provider(
             requirement=requirement,
@@ -1175,6 +1181,7 @@ class Resolver:
                 graph=graph,
                 _ctx=_ctx,
                 request_ctx_path=offer.target_ctx,
+                admission_required=admission_required,
             ):
                 raise RuntimeError("Provisioned provider failed runtime validation")
 
@@ -1187,6 +1194,7 @@ class Resolver:
         offer: ProvisionOffer,
         graph: Any,
         _ctx: VmPhaseCtx | None = None,
+        admission_required: bool = True,
     ) -> Any | None:
         plan = self._chain_plan_for_offer(requirement, offer=offer, _ctx=_ctx)
         if not plan.requires_chain:
@@ -1230,6 +1238,7 @@ class Resolver:
                 graph=graph,
                 _ctx=_ctx,
                 request_ctx_path=".".join(segments[: index + 1]),
+                admission_required=admission_required,
             ):
                 raise RuntimeError("Structural chain segment failed runtime validation")
             current = created
@@ -1252,6 +1261,7 @@ class Resolver:
             graph=dependency.registry,
             parent=parent,
             _ctx=_ctx,
+            admission_required=dependency.label != "destination",
         )
         dependency.set_provider(provider, _ctx=_ctx)
         return True
@@ -1336,6 +1346,16 @@ class Resolver:
                 )
 
         if isinstance(node, TraversableNode) and node.is_container:
+            target = node.resolve_entry(ctx=_ctx)
+            target_ctx = _ctx.derive(cursor_id=target.uid) if _ctx is not None else None
+            target_resolver = Resolver.from_ctx(target_ctx) if target_ctx is not None else self
+            target_preview = target_resolver.preview_frontier_node(
+                target,
+                allow_stubs=allow_stubs,
+                _ctx=target_ctx,
+            )
+            if not target_preview.viable:
+                return target_preview
             if not node.enterable(ctx=_ctx):
                 return ViabilityResult(
                     viable=False,
@@ -1346,14 +1366,7 @@ class Resolver:
                         )
                     ],
                 )
-            target = node.resolve_entry(ctx=_ctx)
-            target_ctx = _ctx.derive(cursor_id=target.uid) if _ctx is not None else None
-            target_resolver = Resolver.from_ctx(target_ctx) if target_ctx is not None else self
-            return target_resolver.preview_frontier_node(
-                target,
-                allow_stubs=allow_stubs,
-                _ctx=target_ctx,
-            )
+            return target_preview
 
         return ViabilityResult(viable=True)
 
@@ -1710,6 +1723,7 @@ class Resolver:
                 offer=selected_offer,
                 graph=dependency.registry,
                 _ctx=_ctx,
+                admission_required=dependency.label != "destination",
             )
             self._bind_dependency_provider(
                 dependency=dependency,
@@ -1726,6 +1740,59 @@ class Resolver:
             dependency.requirement.resolution_reason = "resolved"
         return True
 
+    def _readiness_nodes(self, target: TraversableNode, *, _ctx: VmPhaseCtx) -> Iterable[Node]:
+        yield from (node for node in reversed(list(target.ancestors)) if node.uid != target.uid)
+        yield target
+        while target.is_container:
+            node_ctx = self._make_node_ctx(
+                graph=target.graph, node=target, _ctx=_ctx,
+                request_ctx_path=self._request_ctx_for_node(target),
+            )
+            target = target.resolve_entry(ctx=node_ctx)
+            yield target
+
+    def readiness_needed(self, target: TraversableNode, *, _ctx: VmPhaseCtx) -> bool:
+        """Whether this destination has pending assembly in its context."""
+        for node in self._readiness_nodes(target, _ctx=_ctx):
+            if isinstance(node, TraversableNode):
+                if next(node.edges_out(Selector(has_kind=Dependency, provider=None)), None):
+                    return True
+                if not getattr(node.graph, "frozen_shape", False):
+                    if next(node.edges_out(Selector(has_kind=Fanout)), None):
+                        return True
+        return False
+
+    def provision_readiness(self, target: TraversableNode, *, _ctx: VmPhaseCtx) -> None:
+        """Establish a destination's scopes and entry chain without admitting it."""
+        for node in self._readiness_nodes(target, _ctx=_ctx):
+            if isinstance(node, TraversableNode):
+                node_ctx = self._make_node_ctx(
+                    graph=node.graph, node=node, _ctx=_ctx,
+                    request_ctx_path=self._request_ctx_for_node(node),
+                )
+                Resolver.from_ctx(node_ctx).provision_frontier_node(
+                    node,
+                    allow_stubs=self._stubs_allowed(allow_stubs=False, _ctx=_ctx),
+                    _ctx=node_ctx,
+                )
+
+    def provision_frontier_node(
+        self,
+        node: Node,
+        *,
+        allow_stubs: bool = False,
+        _ctx: VmPhaseCtx | None = None,
+    ) -> None:
+        """Establish the node's declared dependencies without judging entry."""
+        open_deps = list(node.edges_out(Selector(has_kind=Dependency, provider=None)))
+        for dep in open_deps:
+            self.resolve_dependency(dep, allow_stubs=allow_stubs, _ctx=_ctx)
+
+        graph = node.graph
+        if not bool(getattr(graph, "frozen_shape", False)):
+            for fanout in list(node.edges_out(Selector(has_kind=Fanout))):
+                self.resolve_fanout(fanout, _ctx=_ctx)
+
     def resolve_frontier_node(
         self,
         node: Node,
@@ -1734,16 +1801,7 @@ class Resolver:
         _ctx: VmPhaseCtx | None = None,
     ) -> bool:
         """Resolve all open dependencies on ``node`` and verify traversal viability."""
-        # Note this is not unsatisfied deps, it's anyone without a provider
-        # satisfied could mean not a hard req
-        open_deps = list(node.edges_out(Selector(has_kind=Dependency, provider=None)))
-        for dep in open_deps:
-            self.resolve_dependency(dep, allow_stubs=allow_stubs, _ctx=_ctx)
-
-        graph = getattr(node, "graph", None)
-        if not bool(getattr(graph, "frozen_shape", False)):
-            for fanout in list(node.edges_out(Selector(has_kind=Fanout))):
-                self.resolve_fanout(fanout, _ctx=_ctx)
+        self.provision_frontier_node(node, allow_stubs=allow_stubs, _ctx=_ctx)
 
         # Find unsat blockers with no provider and a hard-requirement
         unsatisfied_deps = node.edges_out(Selector(has_kind=Dependency, satisfied=False))
