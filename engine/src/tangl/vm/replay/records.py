@@ -18,8 +18,9 @@ class StepRecord(Record):
     cursor_id: UUID
     entry_phase: str | None = None
     was_choice: bool = False
-    delta_id: UUID | None = None
-    state_hash: bytes = b""
+    delta_id: UUID | None = Field(default=None, json_schema_extra={"include": True})
+    state_hash: bytes = Field(default=b"", json_schema_extra={"include": True})
+    settled: bool = Field(default=False, json_schema_extra={"include": True})
     call_stack_ids: list[UUID] = Field(default_factory=list)
     algorithm_id: str = ""
 

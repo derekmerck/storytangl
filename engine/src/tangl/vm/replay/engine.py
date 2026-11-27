@@ -25,7 +25,8 @@ class DiffReplayEngine:
     def algorithm_id(self) -> str:
         return DEFAULT_ALGORITHM_ID
 
-    def build_delta(self, *, before_graph: Graph, after_graph: Graph) -> Patch | None:
+    def build_delta(self, *, before_graph: Graph, after_graph: Graph,
+                    before_hash: bytes | None = None, after_hash: bytes | None = None) -> Patch | None:
         if type(before_graph) is not type(after_graph) or before_graph.uid != after_graph.uid:
             raise ValueError("Cannot diff registries with different identities or kinds")
         before_state = before_graph.unstructure(include_members=False)
@@ -74,8 +75,8 @@ class DiffReplayEngine:
 
         return Patch(
             registry_id=after_graph.uid,
-            initial_registry_value_hash=before_graph.value_hash(),
-            final_registry_value_hash=after_graph.value_hash(),
+            initial_registry_value_hash=before_hash if before_hash is not None else before_graph.value_hash(),
+            final_registry_value_hash=after_hash if after_hash is not None else after_graph.value_hash(),
             events=events,
             registry_state=after_state if before_state != after_state else None,
         )
@@ -90,12 +91,13 @@ class DiffReplayEngine:
         step: int,
         cursor_id: UUID,
         call_stack_ids: Iterable[UUID],
+        state_hash: bytes | None = None,
     ) -> CheckpointRecord:
         return CheckpointRecord(
             step=step,
             algorithm_id=self.algorithm_id(),
             graph_payload=graph.unstructure(),
-            state_hash=graph.value_hash(),
+            state_hash=state_hash if state_hash is not None else graph.value_hash(),
             cursor_id=cursor_id,
             call_stack_ids=list(call_stack_ids),
         )

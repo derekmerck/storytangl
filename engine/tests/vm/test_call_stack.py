@@ -630,16 +630,17 @@ class TestFrameCallReturn:
             ledger.save_snapshot(force=True)
             ledger.resolve_choice(call_edge.uid)
             terminal_step = next(
-                record
-                for record in Selector(has_kind=StepRecord).filter(ledger.output_stream)
-                if record.cursor_id == callee.uid
+                record for record in Selector(has_kind=StepRecord).filter(ledger.output_stream)
+                if record.settled
             )
 
             assert caller.locals["completion_count"] == 1
             assert terminal_step.delta_id is not None
             assert terminal_step.state_hash == ledger.graph.value_hash()
 
-            ledger.rollback_to_step(1, reason="verify completion replay")
+            settled_step = ledger.cursor_steps
+            ledger.resolve_choice(call_edge.uid)
+            ledger.rollback_to_step(settled_step, reason="verify completion replay")
             replayed_caller = ledger.graph.get(caller.uid)
 
             assert isinstance(replayed_caller, TraversableNode)

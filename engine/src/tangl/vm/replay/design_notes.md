@@ -1,7 +1,7 @@
 # Replay Architecture — Patches, Step Records, and Reconstruction
 
-Status: current MVP replay contract, including registry-owned constructor state
-and insertion-order preservation for new graph members.
+Status: replay commits graph deltas at settled choice boundaries, including
+registry-owned constructor state and insertion-order preservation for new members.
 
 ## Context
 
@@ -36,13 +36,11 @@ excluded runtime state and member bindings remain owned by the live registry. Th
 provides built-in determinism verification:
 if the hash doesn't match, something went wrong.
 
-``hashing_func`` sorts mapping keys and encodes sets/frozensets as ordered
-JSON arrays, recursively, so equivalent unordered values retain their hash
-through constructor-form restoration. Nested lists and tuples preserve their
-order. Arbitrary Python-object string fallbacks are not a portable hash contract.
-This corrects the former order-dependent set string encoding: stored checkpoints
-and patches containing those old hashes must be regenerated, not accepted by
-disabling integrity checks or by a legacy hash fallback.
+Constructor-form hashes use the same JSON value encoding as persistence,
+including enum values and deterministic ordering for sets and frozensets.
+The hash also sorts mapping keys. Lists and tuples retain their order.
+Type recovery still follows the constructor schema. Any checkpoints or
+patches with earlier digests must be regenerated.
 
 `DiffReplayEngine` emits CREATE events in `after_graph.members` insertion order,
 not UUID order. Registry membership is an ordered list in constructor form, and
@@ -84,17 +82,25 @@ class StepRecord:
     entry_phase: ResolutionPhase     # where the pipeline started
     was_choice: bool                 # True = player chose, False = redirect
 
-    patch: Optional[Patch]           # combined mutations (UPDATE + FINALIZE)
-    state_hash: bytes                # graph value_hash after step completes
+    delta_id: Optional[UUID]         # only on the settled final hop
+    state_hash: bytes                # only on the settled final hop
+    settled: bool                    # valid rollback boundary
 ```
 
 - `edge_id` identifies the specific edge followed, not just the destination.
   Two edges can lead to the same node; the edge may carry metadata
   (return_phase, trigger_phase) that affects pipeline behavior.
 - `was_choice` distinguishes player-initiated moves from automatic redirects.
-- `state_hash` is the graph's `value_hash()` after the full pipeline
-  completes (both mutation windows applied).  This is the same hash
-  stored as `final_registry_value_hash` on the patch.
+- The final hop records the hash after the choice settles and at most one delta
+  from the previous committed graph. Intermediate hops retain their history and
+  journal steps but are not rollback targets. The Ledger carries this hash for
+  the next frame's random seed. After restore it reconstructs a missing committed
+  base from checkpoints and deltas, rather than adopting uncommitted live shape.
+- The Ledger owns a separate deterministic provisioning allocation sequence. Its
+  persisted counter is combined with the committed hash and settled step, shared
+  by frames and derived contexts, and does not consume gameplay randomness. A
+  settled choice or rollback resets the counter at the new boundary, even when
+  the graph hash is unchanged. Standalone setup without a Ledger uses fresh IDs.
 
 ### Narrative Trace (Ledger.output_stream)
 
@@ -106,9 +112,10 @@ Records *what the player saw*:
 
 ## Reconstruction Modes
 
-### 1. Rollback to Step N
+### 1. Rollback to a settled step
 
-**Goal**: restore graph state to step N, discard everything after.
+**Goal**: restore graph state to settled step N, discard everything after. An
+intermediate hop is not a valid rollback target.
 
 **Method**: load the most recent snapshot at or before step N, apply patches
 forward from there.
@@ -117,8 +124,8 @@ forward from there.
 snapshot = find_snapshot_before(step_n)
 graph = Graph.structure(snapshot.payload)
 for step in step_history[snapshot.step : step_n]:
-    if step.patch:
-        step.patch.apply(graph)
+    if step.delta_id:
+        output_stream.get(step.delta_id).apply(graph)
 ```
 
 The output stream is trimmed by tombstoning fragments after step N.
@@ -172,7 +179,7 @@ separately.
 
 ## Patch Canonicalization
 
-With a single combined patch per step, canonicalization is straightforward:
+With a single combined patch per settled choice, canonicalization is straightforward:
 
 - Collapse redundant mutations: `set(x, 1); set(x, 2)` → `set(x, 2)`
 - Cancel inverses: `create(node); delete(node)` → no-op

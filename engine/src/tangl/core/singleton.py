@@ -159,13 +159,12 @@ class Singleton(Entity):
         return {"kind": self.__class__, "label": self.label}
 
     @classmethod
-    def structure(cls, data) -> Self:
-        """Resolve serialized singleton reference back to an existing live instance."""
-        cls_ = data.pop("kind", cls)
+    def structure(cls, data: UnstructuredData) -> Self:
+        """Resolve a constructor-form reference without modifying it."""
+        cls_ = data.get("kind", cls)
         if not isclass(cls_):
             raise TypeError(f"Expected {cls_} to be a class")
-        label = data.pop("label")
-        return cls_.get_instance(label)
+        return cls_.get_instance(data["label"])
 
 
 class InstanceInheritance(Singleton):

@@ -174,6 +174,7 @@ class PhaseCtx:
     escalate_to_hard_dirty_callback: Callable[[str, str | None], bool] | None = None
 
     random: Random = field(default_factory=Random)
+    allocate_uid: Callable[[], UUID] | None = None
     inline_behaviors: list[Callable | Behavior] = field(default_factory=list)
     local_authorities: list[BehaviorRegistry] = field(default_factory=list)
     incoming_edge: Any | None = None
@@ -236,6 +237,7 @@ class PhaseCtx:
             "mark_soft_dirty_callback": self.mark_soft_dirty_callback,
             "escalate_to_hard_dirty_callback": self.escalate_to_hard_dirty_callback,
             "random": self.random,
+            "allocate_uid": self.allocate_uid,
             "inline_behaviors": list(self.inline_behaviors),
             "local_authorities": list(self.local_authorities),
             "incoming_edge": self.incoming_edge,
@@ -453,9 +455,6 @@ class StepTrace:
     cursor_id: UUID
     entry_phase: ResolutionPhase
     was_choice: bool
-    state_hash: bytes
-    before_graph: Graph
-    after_graph: Graph
     call_stack_ids: list[UUID] = field(default_factory=list)
 
 
@@ -566,13 +565,15 @@ class Frame:
     escalate_to_hard_dirty_callback: Callable[[str, str | None], bool] | None = None
 
     _random: Random = field(default_factory=Random)
+    seed_state_hash: bytes | None = None
+    allocate_uid: Callable[[], UUID] | None = None
     selected_edge: AnyTraversableEdge | None = None
     selected_payload: Any = None
 
     def __post_init__(self) -> None:
         """Seed RNG deterministically from graph state + cursor + starting step."""
         seed_hash = hashing_func(
-            self.graph.value_hash(),
+            self.seed_state_hash if self.seed_state_hash is not None else self.graph.value_hash(),
             self.cursor.uid,
             self.step_base,
             digest_size=8,
@@ -624,6 +625,7 @@ class Frame:
             mark_soft_dirty_callback=self.mark_soft_dirty_callback,
             escalate_to_hard_dirty_callback=self.escalate_to_hard_dirty_callback,
             random=self._random,
+            allocate_uid=self.allocate_uid,
             local_authorities=self._local_authorities(),
             incoming_edge=incoming_edge,
             incoming_payload=incoming_payload,
@@ -681,19 +683,14 @@ class Frame:
         self.last_redirect = record
         self.redirect_trace.append(record)
 
-    def _snapshot_graph(self) -> Graph:
-        """Create a detached snapshot graph for replay tracing."""
-        return Graph.structure(self.graph.unstructure())
-
     def _capture_step_trace(
         self,
         *,
         edge: AnyTraversableEdge,
         entry_phase: ResolutionPhase,
         was_choice: bool,
-        before_graph: Graph | None,
     ) -> None:
-        if self.step_observer is None or before_graph is None:
+        if self.step_observer is None:
             self._last_step_trace = None
             return
         edge_id = getattr(edge, "uid", None)
@@ -703,9 +700,6 @@ class Frame:
             cursor_id=self.cursor.uid,
             entry_phase=entry_phase,
             was_choice=was_choice,
-            state_hash=self.graph.value_hash(),
-            before_graph=before_graph,
-            after_graph=self._snapshot_graph(),
         )
 
     def _emit_step_trace(self) -> None:
@@ -719,11 +713,6 @@ class Frame:
     @staticmethod
     def _entry_phase(edge: AnyTraversableEdge) -> ResolutionPhase:
         return getattr(edge, "entry_phase", None) or ResolutionPhase.VALIDATE
-
-    def _snapshot_before_hop(self) -> Graph | None:
-        if self.step_observer is None:
-            return None
-        return self._snapshot_graph()
 
     def _validate_before_move(
         self,
@@ -753,13 +742,12 @@ class Frame:
         edge: AnyTraversableEdge,
         was_choice: bool,
         selected_payload_override: Any = None,
-    ) -> tuple[ResolutionPhase, Graph | None, VmPhaseCtx]:
+    ) -> tuple[ResolutionPhase, VmPhaseCtx]:
         entry_phase = self._entry_phase(edge)
         incoming_payload = self._resolve_incoming_payload(edge, selected_payload_override)
         self.selected_edge = edge
         self.selected_payload = incoming_payload
 
-        before_graph = self._snapshot_before_hop()
         if entry_phase <= ResolutionPhase.VALIDATE:
             if not edge.validate_payload(incoming_payload):
                 raise ValueError(f"Edge payload validation failed: {edge!r}")
@@ -785,7 +773,7 @@ class Frame:
             incoming_edge=edge,
             incoming_payload=incoming_payload,
         )
-        return entry_phase, before_graph, ctx
+        return entry_phase, ctx
 
     def _run_planning_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
         if entry_phase > ResolutionPhase.PLANNING:
@@ -836,7 +824,6 @@ class Frame:
         edge: AnyTraversableEdge,
         entry_phase: ResolutionPhase,
         was_choice: bool,
-        before_graph: Graph | None,
     ) -> AnyTraversableEdge | None:
         if redirect is None:
             return None
@@ -846,7 +833,6 @@ class Frame:
             edge=edge,
             entry_phase=entry_phase,
             was_choice=was_choice,
-            before_graph=before_graph,
         )
         return redirect
 
@@ -859,7 +845,6 @@ class Frame:
         phase: ResolutionPhase,
         dispatch_func: Callable[..., AnyTraversableEdge | None],
         was_choice: bool,
-        before_graph: Graph | None,
     ) -> AnyTraversableEdge | None:
         if entry_phase > phase:
             return None
@@ -872,7 +857,6 @@ class Frame:
             edge=edge,
             entry_phase=entry_phase,
             was_choice=was_choice,
-            before_graph=before_graph,
         )
 
     def _run_update_phase(self, *, ctx: VmPhaseCtx, entry_phase: ResolutionPhase) -> None:
@@ -963,14 +947,12 @@ class Frame:
         edge: AnyTraversableEdge,
         entry_phase: ResolutionPhase,
         was_choice: bool,
-        before_graph: Graph | None,
     ) -> None:
         self.causality_mode = ctx.causality_mode
         self._capture_step_trace(
             edge=edge,
             entry_phase=entry_phase,
             was_choice=was_choice,
-            before_graph=before_graph,
         )
 
     @staticmethod
@@ -1065,7 +1047,7 @@ class Frame:
         ValueError
             If VALIDATE fails (the edge is not traversable).
         """
-        entry_phase, before_graph, ctx = self._prepare_follow_edge(
+        entry_phase, ctx = self._prepare_follow_edge(
             edge=edge,
             was_choice=was_choice,
             selected_payload_override=selected_payload_override,
@@ -1079,7 +1061,6 @@ class Frame:
             phase=ResolutionPhase.PREREQS,
             dispatch_func=do_prereqs,
             was_choice=was_choice,
-            before_graph=before_graph,
         )
         if redirect is not None:
             return redirect
@@ -1096,7 +1077,6 @@ class Frame:
             phase=ResolutionPhase.POSTREQS,
             dispatch_func=do_postreqs,
             was_choice=was_choice,
-            before_graph=before_graph,
         )
         completion_return = None
         completion_records: list[Any] = []
@@ -1115,7 +1095,6 @@ class Frame:
             edge=edge,
             entry_phase=entry_phase,
             was_choice=was_choice,
-            before_graph=before_graph,
         )
         return completion_return
 

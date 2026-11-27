@@ -178,7 +178,10 @@ class _ResolverCtx:
 
 
 def _ctx_with_seed(seed: int) -> _ResolverCtx:
-    return _ResolverCtx(rng=Random(seed))
+    ctx = _ResolverCtx(rng=Random(seed))
+    allocation_rng = Random(seed)
+    ctx.allocate_uid = lambda: UUID(int=allocation_rng.getrandbits(128), version=4)
+    return ctx
 
 
 def _ctx_with_token_catalogs(*catalogs: TokenCatalog) -> _ResolverCtx:
@@ -318,7 +321,7 @@ class TestResolverOfferGathering:
         )
         assert isinstance(provider.uid, UUID)
 
-    def test_template_create_offer_uses_ctx_rng_for_uid(self) -> None:
+    def test_template_create_offer_uses_ctx_allocator_for_uid(self) -> None:
         template = EntityTemplate(payload={"kind": Entity, "label": "crafted"})
         resolver = Resolver(location_entity_groups=[], template_scope_groups=[_template_registry(template)])
         req = Requirement(has_identifier="crafted", provision_policy=ProvisionPolicy.CREATE)
@@ -330,7 +333,7 @@ class TestResolverOfferGathering:
         assert provider.uid == UUID(int=Random(seed).getrandbits(128), version=4)
         assert req.selected_offer_policy == ProvisionPolicy.CREATE
 
-    def test_inline_template_offer_uses_ctx_rng_for_uid(self) -> None:
+    def test_inline_template_offer_uses_ctx_allocator_for_uid(self) -> None:
         template = EntityTemplate(payload={"kind": Entity, "label": "inline"})
         req = Requirement(
             has_identifier="inline",

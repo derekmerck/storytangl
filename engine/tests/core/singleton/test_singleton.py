@@ -99,8 +99,8 @@ class TestSingletonIdentityAndSerialization:
     def test_unstructure_roundtrip_reference(self) -> None:
         instance = ValueSingleton(label="x", value=3)
         data = instance.unstructure()
-        restored = ValueSingleton.structure(dict(data))
-        assert restored is instance
+        assert Singleton.structure(data) is instance
+        assert Singleton.structure(data) is instance
         assert data == {"kind": ValueSingleton, "label": "x"}
 
     def test_pickle_returns_same_instance(self) -> None:

@@ -96,13 +96,11 @@ class Provisioner(Protocol):
 
 
 def _next_provision_uid(*, _ctx: Any = None) -> UUID:
-    """Return a deterministic uid when vm context RNG is available."""
+    """Allocate from the ledger sequence when present, otherwise use a fresh uid."""
     if _ctx is not None:
-        get_random = getattr(_ctx, "get_random", None)
-        if callable(get_random):
-            rng = get_random()
-            if hasattr(rng, "getrandbits"):
-                return UUID(int=rng.getrandbits(128), version=4)
+        allocate_uid = getattr(_ctx, "allocate_uid", None)
+        if allocate_uid is not None:
+            return allocate_uid()
     return uuid4()
 
 

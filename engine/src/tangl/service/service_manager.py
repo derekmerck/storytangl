@@ -78,7 +78,7 @@ from .world_registry import (
 if TYPE_CHECKING:  # pragma: no cover
     from tangl.media import MediaDataType
     from tangl.media.media_resource import MediaResourceInventoryTag as MediaRIT
-    from tangl.vm.runtime.frame import PhaseCtx
+    from tangl.vm.runtime.frame import PhaseCtx, StepTrace
 
     from .auth import UserAuthInfo
 
@@ -416,7 +416,13 @@ class ServiceManager:
             return
 
         frame = ledger.get_frame()
+        def record_initial_step(trace: StepTrace) -> None:
+            trace.was_choice = False
+            ledger._record_step(trace)
+
+        frame.step_observer = record_initial_step
         frame.goto_node(ledger.cursor)
+        ledger._commit_frame_graph()
 
         prev_id = ledger.cursor_history[-1] if ledger.cursor_history else None
         for node_id in frame.cursor_trace:
@@ -425,6 +431,7 @@ class ServiceManager:
             prev_id = node_id
 
         ledger.cursor_steps += frame.cursor_steps
+        ledger.allocation_step = ledger.cursor_steps
         ledger.cursor_id = frame.cursor.uid
         ledger.cursor_history.extend(frame.cursor_trace)
         ledger.call_stack_ids = [edge.uid for edge in frame.return_stack]

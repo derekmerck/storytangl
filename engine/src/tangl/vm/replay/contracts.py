@@ -29,7 +29,8 @@ class ReplayEngine(Protocol):
     def algorithm_id(self) -> str:
         """Stable algorithm identifier used on replay records."""
 
-    def build_delta(self, *, before_graph: Graph, after_graph: Graph) -> ReplayDelta | None:
+    def build_delta(self, *, before_graph: Graph, after_graph: Graph,
+                    before_hash: bytes | None = None, after_hash: bytes | None = None) -> ReplayDelta | None:
         """Build a delta between two graph states, or ``None`` when unchanged."""
 
     def apply_delta(self, *, graph: Graph, delta: ReplayDelta) -> Graph:
@@ -42,6 +43,7 @@ class ReplayEngine(Protocol):
         step: int,
         cursor_id,
         call_stack_ids,
+        state_hash: bytes | None = None,
     ) -> CheckpointRecord:
         """Create a checkpoint record for the current graph state."""
 

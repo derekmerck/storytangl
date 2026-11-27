@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from tangl.type_hints import Hash   # bytes
+from tangl.utils.json_encoding import encode_json_value
 
 try:
     from tangl.config import settings
@@ -20,20 +21,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
 logger.debug( "Hashing with salt: %s", HASHING_SALT )
-
-# Sets and JSON mapping keys are ordered for hashing. Arbitrary fallback Python
-# objects still use str(); durable callers must explicitly encode those values.
-
-
-def _hash_json_default(value: Any) -> str | list[Any]:
-    """Order unordered collections, including mixed and nested member types."""
-    if isinstance(value, (set, frozenset)):
-        return sorted(
-            value,
-            key=lambda member: json.dumps(member, default=_hash_json_default, sort_keys=True),
-        )
-    return str(value)
-
 
 def hashing_func(
     *data: Any, salt: bytes = HASHING_SALT, digest_size: int | None = None,
@@ -63,7 +50,7 @@ def hashing_func(
             item_bytes = item.encode('utf-8')
         elif isinstance(item, (dict, set, frozenset)):
             item_bytes = json.dumps(
-                item, default=_hash_json_default, sort_keys=True,
+                item, default=encode_json_value, sort_keys=True,
             ).encode("utf-8")
         else:
             item_bytes = hash(item).to_bytes(8, byteorder="big", signed=True)
