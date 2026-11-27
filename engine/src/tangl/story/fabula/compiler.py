@@ -23,6 +23,7 @@ from tangl.vm.traversable import TraversableEffect
 
 from ..concepts import Actor, Location
 from ..episode import Action, Block, MenuBlock, Scene
+from .block_template import BlockTemplate
 from .types import AuthoredRef, CompileIssue, CompileSeverity, JsonValue
 
 
@@ -993,19 +994,21 @@ class StoryCompiler:
                     block_data.get("kind") or block_data.get("block_cls"),
                     fallback=Block, collector=collector, authored_path=block_authored_path,
                 )
+                block_input = {
+                    **block_data,
+                    "label": block_data.get("label") or block_label,
+                    "actions": actions, "continues": continues, "redirects": redirects,
+                    "offered_actions": offered_actions,
+                    "roles": block_roles, "settings": block_settings,
+                    "media": self._normalize_list(block_data.get("media")),
+                }
+                declarations = (
+                    self._block_declarations(block_input, block_label)
+                    if issubclass(block_kind, Block) else {}
+                )
                 block_payload = self._build_payload(
                     kind=block_kind,
-                    payload={
-                        **block_data,
-                        "label": block_data.get("label") or block_label,
-                        "actions": actions,
-                        "continues": continues,
-                        "redirects": redirects,
-                        "offered_actions": offered_actions,
-                        "roles": block_roles,
-                        "settings": block_settings,
-                        "media": self._normalize_list(block_data.get("media")),
-                    },
+                    payload=block_input,
                     default_label=block_label,
                     collector=collector,
                     authored_path=block_authored_path,
@@ -1015,10 +1018,14 @@ class StoryCompiler:
                     payload=block_payload,
                     authored_path=block_authored_path,
                 )
-                block_templ = TemplateGroup(
+                template_kind = BlockTemplate if isinstance(block_payload, Block) else TemplateGroup
+                if template_kind is TemplateGroup:
+                    declarations = {}
+                block_templ = template_kind(
                     label=qualified_label,
                     payload=block_payload,
                     registry=registry,
+                    **declarations,
                 )
                 scene_templ.add_child(block_templ)
                 self._collect_provider_ref_issues(
@@ -1205,7 +1212,9 @@ class StoryCompiler:
     def _decompile_template(self, template: EntityTemplate) -> dict[str, Any]:
         data = _decompile_source_value(EntityTemplate.decompile(template))
         if isinstance(template.payload, Block):
-            data.pop("action_templates", None)
+            if isinstance(template, BlockTemplate):
+                data.update({key: _decompile_source_value(value)
+                             for key, value in template.action_specs.items() if value})
             self._decompile_block_effects(data)
         if isinstance(template, TemplateGroup):
             children = list(template.members())
@@ -1241,14 +1250,19 @@ class StoryCompiler:
                 item_index,
                 label,
             )
+            kind = self._resolve_kind(
+                item_data.get("kind"),
+                fallback=fallback_kind,
+                collector=collector,
+                authored_path=item_authored_path,
+            )
+            item_input = {**item_data, "label": item_data.get("label") or label}
+            declarations = (
+                self._block_declarations(item_input, label) if issubclass(kind, Block) else {}
+            )
             payload = self._build_payload(
-                kind=self._resolve_kind(
-                    item_data.get("kind"),
-                    fallback=fallback_kind,
-                    collector=collector,
-                    authored_path=item_authored_path,
-                ),
-                payload={**item_data, "label": item_data.get("label") or label},
+                kind=kind,
+                payload=item_input,
                 default_label=label,
                 collector=collector,
                 authored_path=item_authored_path,
@@ -1258,10 +1272,14 @@ class StoryCompiler:
                 payload=payload,
                 authored_path=item_authored_path,
             )
-            templ = TemplateGroup(
+            template_kind = BlockTemplate if isinstance(payload, Block) else TemplateGroup
+            if template_kind is TemplateGroup:
+                declarations = {}
+            templ = template_kind(
                 label=scoped_label,
                 payload=payload,
                 registry=parent.registry,
+                **declarations,
             )
             parent.add_child(templ)
             self._compile_section(
@@ -1639,6 +1657,28 @@ class StoryCompiler:
         return _CARDINAL_KINDS.get(kind_name)
 
     @staticmethod
+    def _block_declarations(payload: dict[str, Any], label: str) -> dict[str, Any]:
+        from .materializer import _EDGE_LABEL_STEM, action_template_from_spec
+
+        specs_by_field = {}
+        templates_by_field = {}
+        existing = payload.pop("action_templates", {}) or {}
+        for field in ("actions", "continues", "redirects", "offered_actions"):
+            specs = StoryCompiler._normalize_list(payload.pop(field, None))
+            specs = [with_default_activation(spec, DEFAULT_ACTIVATION_BY_FIELD.get(field))
+                     for spec in specs]
+            specs_by_field[field] = specs
+            templates_by_field[field] = existing[field] if field in existing else [
+                action_template_from_spec(
+                    {**spec, "successor_ref": _coerce_text(
+                        spec.get("successor_ref") or spec.get("successor")
+                        or spec.get("next") or spec.get("target_ref") or spec.get("target_node")
+                    )}, label=f"{_EDGE_LABEL_STEM.get(field, field)}_{label}_{index}",
+                ) for index, spec in enumerate(specs)
+            ]
+        return {"action_specs": specs_by_field, "action_templates": templates_by_field}
+
+    @staticmethod
     def _build_payload(
         kind: type[Entity],
         payload: dict[str, Any],
@@ -1651,26 +1691,6 @@ class StoryCompiler:
 
         if issubclass(kind, Block):
             StoryCompiler._lower_node_effects(payload)
-            from .materializer import _EDGE_LABEL_STEM, action_template_from_spec
-
-            templates = dict(payload.get("action_templates") or {})
-            for field in ("actions", "continues", "redirects", "offered_actions"):
-                specs = StoryCompiler._normalize_list(payload.get(field))
-                specs = [with_default_activation(spec, DEFAULT_ACTIVATION_BY_FIELD.get(field))
-                         for spec in specs]
-                payload[field] = specs
-                if field not in templates:
-                    templates[field] = [
-                        action_template_from_spec(
-                            {**spec, "successor_ref": _coerce_text(
-                                spec.get("successor_ref") or spec.get("successor")
-                                or spec.get("next") or spec.get("target_ref") or spec.get("target_node")
-                            )},
-                            label=f"{_EDGE_LABEL_STEM.get(field, field)}_{default_label}_{index}",
-                        )
-                        for index, spec in enumerate(specs)
-                    ]
-            payload["action_templates"] = templates
 
         if issubclass(kind, Block) and isinstance(payload.get("content"), str):
             _report_invalid_dialog_callout(

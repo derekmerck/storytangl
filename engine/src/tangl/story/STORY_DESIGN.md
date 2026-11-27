@@ -221,6 +221,15 @@ binding fail explicitly while live availability remains read-only.
 
 ### Runtime materialization domain work
 
+Compiled Block templates own their authored Action occurrences, including local
+scoped offers. Runtime Blocks retain template provenance rather than copies of
+those declarations. Story wiring resolves the owning template and materializes
+the corresponding edges once; later visits use those edges. The template's
+content identity includes its declarations, so equal Block payloads with
+different authored Actions remain distinguishable after a cold restore.
+Runtime scoped offers continue to embed their Action templates; changing that
+ownership is a separate slice.
+
 ``StoryMaterializer.story_post_materialize`` invokes
 ``story.dispatch.on_story_materialized`` after a newly attached traversable
 node has provenance and story topology. The caller is that node; its derived

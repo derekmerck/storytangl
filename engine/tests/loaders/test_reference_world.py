@@ -213,8 +213,8 @@ class TestCompilerIRDecoupling:
 
             block_a = bundle.template_registry.find_one(Selector(has_identifier="main.a"))
             assert block_a is not None
-            assert len(block_a.payload.actions) == 1
-            assert block_a.payload.actions[0].get("successor_ref") == "main.b"
+            assert len(block_a.action_specs["actions"]) == 1
+            assert block_a.action_specs["actions"][0].get("successor_ref") == "main.b"
 
 
 # ============================================================================

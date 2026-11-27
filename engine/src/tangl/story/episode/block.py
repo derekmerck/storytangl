@@ -4,11 +4,8 @@ from typing import Any
 
 from pydantic import Field
 
-from tangl.core import EntityTemplate
 from tangl.presentation.hints import PresentationHints
 from tangl.vm import TraversableNode
-
-from .action import Action
 
 
 class Block(TraversableNode):
@@ -19,14 +16,13 @@ class Block(TraversableNode):
     Why
     ----
     Blocks are the units a player or consumer actually visits. They hold the
-    authored narrative content together with local action, role, setting, and
-    media declarations that journaling and provisioning consume.
+    authored narrative content together with local role, setting, and media
+    declarations that journaling and provisioning consume.
 
     Key Features
     ------------
     * Carries authored prose in ``content``.
-    * Stores local action, continue, and redirect declarations that later
-      materialize into traversable edges.
+    * Connects to Actions wired from the owning world template.
     * Declares local roles, settings, and media used by namespace and render
       handlers.
 
@@ -34,22 +30,12 @@ class Block(TraversableNode):
     ---
     - :attr:`content` stores authored narrative text, and :attr:`content_hints`
       how a client is meant to read it, carried on its content fragment.
-    - :attr:`actions`, :attr:`continues`, and :attr:`redirects` hold authored
-      navigation declarations.
     - :attr:`roles`, :attr:`settings`, and :attr:`media` hold local provider and
       presentation declarations.
     """
 
     content: str = ""
     content_hints: PresentationHints | None = None
-    actions: list[dict[str, Any]] = Field(default_factory=list)
-    continues: list[dict[str, Any]] = Field(default_factory=list)
-    redirects: list[dict[str, Any]] = Field(default_factory=list)
-    offered_actions: list[dict[str, Any]] = Field(default_factory=list)
-    action_templates: dict[str, list[EntityTemplate[Action]]] = Field(
-        default_factory=dict,
-        json_schema_extra={"include": True, "unstructurable": True},
-    )
     roles: list[dict[str, Any]] = Field(default_factory=list)
     settings: list[dict[str, Any]] = Field(default_factory=list)
     media: list[dict[str, Any]] = Field(default_factory=list)
