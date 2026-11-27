@@ -307,6 +307,37 @@ def test_container_entry_role_is_established_before_admission():
     assert frame.cursor.label == "entry"
 
 
+def test_refused_lazy_entry_roundtrips_before_replay():
+    world = World.from_script_data(script_data={
+        "label": "refused_entry_replay", "metadata": {"start_at": "intro.start"},
+        "scenes": {"intro": {"blocks": {
+            "start": {"actions": [
+                {"text": "Enter", "successor": "later", "return": True},
+                {"text": "Stay", "successor": "current"},
+            ]},
+            "later": {"conditions": ["False"]},
+        }}},
+    })
+    ledger = Ledger.from_graph(world.create_story("run", init_mode=InitMode.LAZY).graph)
+    actions = {edge.text: edge.uid for edge in ledger.cursor.edges_out(Selector(has_kind=Action))}
+    with pytest.raises(ValueError):
+        ledger.resolve_choice(actions["Enter"])
+    assert ledger.graph.find_one(Selector(has_kind=Block, label="later")) is not None
+    restored = Ledger.structure(Json.deserialize(Json.serialize(ledger.unstructure())))
+    restored.resolve_choice(actions["Stay"])
+    settled_step = restored.cursor_steps
+    expected_hash = restored.graph.value_hash()
+    expected_history = list(restored.cursor_history)
+    expected_stack = list(restored.call_stack_ids)
+    expected_journal = [fragment.unstructure() for fragment in restored.get_journal()]
+    restored.resolve_choice(actions["Stay"])
+    restored.rollback_to_step(settled_step)
+    assert restored.graph.value_hash() == expected_hash
+    assert restored.cursor_history == expected_history
+    assert restored.call_stack_ids == expected_stack
+    assert [fragment.unstructure() for fragment in restored.get_journal()] == expected_journal
+
+
 def test_closed_container_remains_bound_without_pushing_return():
     world = World.from_script_data(script_data={
         "label": "lazy_closed_entry", "metadata": {"start_at": "intro.start"},
