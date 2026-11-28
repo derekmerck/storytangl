@@ -8,6 +8,7 @@ from pydantic import Field, PrivateAttr, model_validator
 
 from tangl.core import EntityTemplate, Selector, TemplateRegistry
 from tangl.core.bases import HasState
+from tangl.core.template import TemplateGroup
 from tangl.presentation.dispatch import presentation_dispatch
 from tangl.vm import TraversableGraph
 
@@ -61,6 +62,9 @@ class StoryGraph(TraversableGraph, HasState):
     world_ref: Any | None = Field(default=None, exclude=True, validation_alias="world")
     story_id: UUID | None = Field(default=None, exclude=True)
     story_resources: Any | None = Field(default=None, exclude=True)
+    template_refs: list[tuple[UUID, str, tuple[tuple[str, int], ...]]] = Field(
+        default_factory=list, json_schema_extra={"include": True},
+    )
     template_by_entity_id: dict[UUID, UUID] = Field(default_factory=dict, exclude=True)
     template_lineage_by_entity_id: dict[UUID, list[UUID]] = Field(default_factory=dict, exclude=True)
     wired_node_ids: set[UUID] = Field(default_factory=set, exclude=True)
@@ -69,6 +73,9 @@ class StoryGraph(TraversableGraph, HasState):
     _story_materialize_override: Any = PrivateAttr(default=None)
     _story_post_materialize_override: Any = PrivateAttr(default=None)
     _story_preview_requirement_override: Any = PrivateAttr(default=None)
+    _template_ref_by_entity: dict[UUID, tuple[str, tuple[tuple[str, int], ...]]] = PrivateAttr(
+        default_factory=dict,
+    )
 
     @property
     def world(self) -> Any | None:
@@ -136,7 +143,11 @@ class StoryGraph(TraversableGraph, HasState):
             self._world_override = self.world_ref
         if self.story_id is None:
             self.story_id = self.uid
-        if not self.template_by_entity_id and not self.template_lineage_by_entity_id:
+        self._template_ref_by_entity = {
+            entity_uid: (root_label, path)
+            for entity_uid, root_label, path in self.template_refs
+        }
+        if not self.template_refs and not self.template_by_entity_id:
             self.rebuild_template_lineage()
         return self
 
@@ -178,6 +189,8 @@ class StoryGraph(TraversableGraph, HasState):
     def get_template_scope_groups(self, caller) -> list[list[object]]:
         """Return template groups ordered from closest template scope outward."""
         caller_uid = getattr(caller, "uid", None)
+        if caller_uid not in self.template_lineage_by_entity_id:
+            self._restore_template_reference(caller_uid)
         lineage = self.template_lineage_by_entity_id.get(caller_uid, [])
 
         registry = self._template_registry()
@@ -241,11 +254,59 @@ class StoryGraph(TraversableGraph, HasState):
         self.template_lineage_by_entity_id[entity_uid] = self.template_lineage_ids_for_template(
             template
         )
+        if entity_uid not in self._template_ref_by_entity:
+            path = []
+            current = template
+            while isinstance(current, TemplateGroup) and current.parent is not None:
+                parent = current.parent
+                occurrence = 0
+                for sibling in parent.members():
+                    if sibling.uid == current.uid:
+                        break
+                    if sibling.label == current.label:
+                        occurrence += 1
+                path.append((current.label, occurrence))
+                current = parent
+            if current.label is not None:
+                reference = (current.label, tuple(reversed(path)))
+                self.template_refs.append((entity_uid, *reference))
+                self._template_ref_by_entity[entity_uid] = reference
+
+    def _restore_template_reference(
+        self, entity_uid: UUID, registry: TemplateRegistry | None = None,
+    ) -> None:
+        """Resolve one authored occurrence against the bound world catalog."""
+        reference = self._template_ref_by_entity.get(entity_uid)
+        registry = registry or self._template_registry()
+        if reference is None or registry is None:
+            return
+        entity = self.get(entity_uid)
+        if entity is None:
+            return
+        root_label, path = reference
+        template = registry.find_one(Selector(label=root_label))
+        for label, occurrence in path:
+            if not isinstance(template, TemplateGroup):
+                raise LookupError(f"Cannot resolve authored template reference {reference!r}")
+            siblings = template.members(selector=Selector(label=label))
+            template = next(
+                (item for index, item in enumerate(siblings) if index == occurrence), None,
+            )
+        if template is None:
+            raise LookupError(f"Cannot resolve authored template reference {reference!r}")
+        self.record_runtime_template(entity, template)
 
     def rebuild_template_lineage(self, registry: TemplateRegistry | None = None) -> None:
-        """Rebuild runtime template lineage from templ_hash provenance."""
+        """Rebuild runtime lineage from occurrence references or template hashes."""
         registry = registry or self._template_registry()
         if registry is None:
+            return
+
+        if self.template_refs:
+            self.template_by_entity_id.clear()
+            self.template_lineage_by_entity_id.clear()
+            for entity_uid, _, _ in self.template_refs:
+                self._restore_template_reference(entity_uid, registry)
             return
 
         template_by_hash: dict[bytes, EntityTemplate] = {}
