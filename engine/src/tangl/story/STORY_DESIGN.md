@@ -263,9 +263,15 @@ not implement their own target materialization path.
 - `initial_cursor_ids` carries one or more story entry points.
 - `wired_node_ids` records which runtime-created traversable nodes have already
   had story topology passes applied.
-- `template_by_entity_id` and `template_lineage_by_entity_id` are rebuildable
-  runtime provenance maps derived from `templ_hash` plus the authoritative
-  template registry.
+- `template_refs` persists authored template occurrence paths. The runtime
+  `template_by_entity_id` and `template_lineage_by_entity_id` maps are resolved
+  from root labels and sibling-label occurrences against the world authority as
+  each scope is needed; ordinary restore of compiled stories does not rehash the
+  catalog. Authored Action edges also carry their
+  field and occurrence within the owning Block template. These addresses are an
+  interim lookup for the current materialization path, not a general policy for
+  structural changes or retirement. Reordering same-labelled siblings changes
+  their occurrence addresses. `templ_hash` remains revision provenance.
 
 `StoryGraph.world` is a convenience property over the bound factory when the
 factory is a `World`. The factory is the authority; the graph is the per-story

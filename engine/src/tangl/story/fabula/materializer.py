@@ -996,6 +996,7 @@ class StoryMaterializer:
             template = source.action_templates[field][index]
             action = template.materialize(
                 uid=_next_provision_uid(_ctx=state.ctx), predecessor_id=node.uid,
+                declaration_ref=(field, index),
             )
             state.graph.add(action)
 

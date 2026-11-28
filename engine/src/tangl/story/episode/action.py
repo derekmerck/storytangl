@@ -46,6 +46,8 @@ class Action(TraversableEdge):
     ui_hints: UIHints | None = None
     journal_text: str | None = None
     offer_id: UUID | None = None
+    # Field and occurrence on the predecessor's authored Block template.
+    declaration_ref: tuple[str, int] | None = None
 
     def source_attached(self, *, ctx=None) -> bool:
         if self.offer_id is None:
